@@ -25,6 +25,15 @@ uv run adk web                                # ADK dev UI
 | Venv | `.venv/` — self-contained, links to no system interpreter |
 | ADK | `google-adk` 2.5.0 |
 | Reference dev host | NVIDIA DGX Spark — Ubuntu 24.04, **aarch64** |
+| Domain | **keplaria.com** — registered via Cloudflare Registrar (2026-08-11) |
+| Cloudflare CLI | `wrangler` (nvm-managed Node), OAuth-authenticated |
+
+The keplaria.com zone is live on Cloudflare nameservers; no DNS records point
+anywhere yet. `wrangler` is logged in as the personal account (the same
+identity as gcloud and git in this repo), with
+write scopes for Workers, Pages, DNS routes, D1, KV, queues, email routing, and
+SSL certs, so it can deploy and wire up DNS without re-authenticating. Brand
+assets for the site live in the sibling repo `~/dev/git/keplaria-assets`.
 
 ## Dependency management: use `uv`, never `pip`
 
