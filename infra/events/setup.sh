@@ -2,6 +2,12 @@
 # Provisions the event spine: topic, identities, and IAM.
 # Idempotent — every step tolerates the resource/binding already existing, so
 # re-running after a partial failure (or just to confirm state) is harmless.
+# "Already exists" is the ONLY tolerated failure: each create is preceded by
+# a describe check, so creation is attempted only when the resource is
+# actually missing. A genuine failure (bad permissions, wrong project, quota,
+# a transient API error) is never mistaken for "already exists" — the create
+# call runs with its stderr intact, and `set -e` stops the script on that
+# real error instead of sailing into later steps with a misleading "ok".
 #
 # What this script does NOT do:
 #   - Grant keplaria-pubsub-push@ roles/run.invoker on keplaria-ingress. That
@@ -14,22 +20,30 @@
 set -euo pipefail
 
 PROJECT="${PROJECT:-keplaria}"
-REGION="${REGION:-us-central1}"
 TOPIC="keplaria-events"
 INGRESS_SA="keplaria-ingress@${PROJECT}.iam.gserviceaccount.com"
 PUSH_SA="keplaria-pubsub-push@${PROJECT}.iam.gserviceaccount.com"
 
 echo "== topic =="
-gcloud pubsub topics create "$TOPIC" --project="$PROJECT" 2>/dev/null \
-  || echo "topic $TOPIC already exists"
+if gcloud pubsub topics describe "$TOPIC" --project="$PROJECT" >/dev/null 2>&1; then
+  echo "topic $TOPIC already exists"
+else
+  gcloud pubsub topics create "$TOPIC" --project="$PROJECT"
+fi
 
 echo "== service accounts =="
-gcloud iam service-accounts create keplaria-ingress \
-  --display-name="Keplaria event ingress" --project="$PROJECT" 2>/dev/null \
-  || echo "ingress SA already exists"
-gcloud iam service-accounts create keplaria-pubsub-push \
-  --display-name="Keplaria Pub/Sub push identity" --project="$PROJECT" 2>/dev/null \
-  || echo "push SA already exists"
+if gcloud iam service-accounts describe "$INGRESS_SA" --project="$PROJECT" >/dev/null 2>&1; then
+  echo "ingress SA already exists"
+else
+  gcloud iam service-accounts create keplaria-ingress \
+    --display-name="Keplaria event ingress" --project="$PROJECT"
+fi
+if gcloud iam service-accounts describe "$PUSH_SA" --project="$PROJECT" >/dev/null 2>&1; then
+  echo "push SA already exists"
+else
+  gcloud iam service-accounts create keplaria-pubsub-push \
+    --display-name="Keplaria Pub/Sub push identity" --project="$PROJECT"
+fi
 
 echo "== ingress SA roles =="
 for ROLE in roles/datastore.user roles/aiplatform.user roles/cloudtrace.agent; do
