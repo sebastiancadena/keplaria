@@ -119,6 +119,30 @@
     "flagged": [],
     "reachable": true
   },
+  "trace_id": "e6b8f83136661272408ce96b86d7189e",
+  "traces": {
+    "ingress_anonymous_refused": {
+      "http_status": 403,
+      "span": "/pubsub/push",
+      "start": "2026-08-13T23:24:21.464936Z",
+      "trace_id": "e447b820bcf7989863ae7d46f3d235b9"
+    },
+    "ingress_push_accepted": {
+      "http_status": 200,
+      "span": "/pubsub/push",
+      "start": "2026-08-13T23:24:54.877827Z",
+      "trace_id": "1594ca61c05983f994171d6d8953f179"
+    },
+    "source": "Cloud Trace, project keplaria; queried after the run and merged in (verify.py does not capture these)",
+    "workflow_invocation": {
+      "end": "2026-08-13T23:24:49.478660179Z",
+      "engine": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
+      "engine_service_version": "6",
+      "span": "invoke_workflow keplaria_workflow",
+      "start": "2026-08-13T23:24:45.918607028Z",
+      "trace_id": "e6b8f83136661272408ce96b86d7189e"
+    }
+  },
   "unauthenticated_status": {
     "get_root": "403",
     "post_pubsub_push": "403"
