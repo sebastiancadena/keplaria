@@ -12,130 +12,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Keplaria workflow — durable-HITL spine.
+"""Keplaria workflow — the thin vertical.
 
-Minimal deterministic graph: case intake → sanctions screening → RequestInput
-pause → decision processing, on a resumable App whose events persist in Agent
-Platform Sessions. A paused approval must survive the death of the serving
-process and resume in a fresh one. The full multi-agent graph grows from this
-spine; no LLM node is involved yet, so runs are deterministic and token-free.
+event → canonical parse → structured routing decision → validated branch →
+idempotent ERP supplier creation. The coordinator proposes a route; deterministic
+policy code decides whether it is allowed, so no model output reaches a side
+effect unvalidated.
 
 The screening node reaches the self-hosted yente service on the private VM. It
-has no public address, so this call only succeeds when the serving workload has
+has no public address, so that call only succeeds when the serving workload has
 private VPC connectivity — on Agent Runtime, a PSC-I network attachment.
 """
 
-import json
-import os
-
-import httpx
-from google.adk import Context, Event, Workflow
+from google.adk.agents import LlmAgent
 from google.adk.apps import App, ResumabilityConfig
-from google.adk.events import RequestInput
+from google.adk.workflow import Workflow
+from google.genai import types
 
-YENTE_BASE_URL = os.environ.get("YENTE_BASE_URL", "http://10.10.0.2:8000")
-YENTE_DATASET = os.environ.get("YENTE_DATASET", "keplaria_synthetic")
-# yente drops results below `cutoff` entirely; the default 0.5 would hide the
-# sub-threshold candidates a reviewer needs to judge a false positive.
-YENTE_CUTOFF = 0.0
+from app.nodes import apply_route, execute_supplier, parse_case, screen_supplier
+from app.schemas import RoutingDecision
 
-
-def parse_case(node_input: str, ctx: Context) -> Event:
-    """Parse the inbound case payload and stash it for the approval node."""
-    try:
-        case = json.loads(node_input)
-    except json.JSONDecodeError:
-        case = {"raw": str(node_input)[:200]}
-    ctx.state["case_data"] = case
-    return Event(output=case)
-
-
-def screen_supplier(node_input, ctx: Context) -> Event:  # type: ignore[no-untyped-def]
-    """Screen the supplier against self-hosted yente over private VPC.
-
-    Records the outcome in state either way: an unreachable service is a
-    result the trace must show, not an exception that hides the network.
-    """
-    case = ctx.state.get("case_data", {})
-    name = case.get("supplier", "")
-    query = {
-        "queries": {
-            "q": {
-                "schema": "Company",
-                "properties": {"name": [name]},
-            }
-        }
-    }
-    screening: dict = {"endpoint": YENTE_BASE_URL, "supplier": name}
-    try:
-        response = httpx.post(
-            f"{YENTE_BASE_URL}/match/{YENTE_DATASET}",
-            params={"cutoff": YENTE_CUTOFF},
-            json=query,
-            timeout=30,
-        )
-        response.raise_for_status()
-        results = response.json()["responses"]["q"]["results"]
-        screening["reachable"] = True
-        screening["candidates"] = [
-            {
-                "id": r["id"],
-                "caption": r["caption"],
-                "score": r["score"],
-                "match": r["match"],
-                "topics": r.get("properties", {}).get("topics", []),
-            }
-            for r in results
-        ]
-        screening["flagged"] = [c["id"] for c in screening["candidates"] if c["match"]]
-    except (httpx.HTTPError, KeyError, ValueError) as exc:
-        screening["reachable"] = False
-        screening["error"] = f"{type(exc).__name__}: {exc}"
-
-    ctx.state["screening"] = screening
-    return Event(output=screening)
-
-
-def request_approval(node_input, ctx: Context):  # type: ignore[no-untyped-def]
-    """Pause the workflow until a human approves or rejects the case."""
-    yield RequestInput(
-        message="Case requires human approval. Approve or reject.",
-        payload={
-            "case": ctx.state.get("case_data", {}),
-            "screening": ctx.state.get("screening", {}),
-        },
-    )
-
-
-def process_decision(node_input, ctx: Context) -> Event:  # type: ignore[no-untyped-def]
-    """Turn the human's RequestInput reply into a terminal case status."""
-    decision = "unknown"
-    raw = node_input
-    if isinstance(raw, dict):
-        # either {"decision": ...} directly or {"result": "<json string>"}
-        if "decision" in raw:
-            decision = raw["decision"]
-        elif "result" in raw:
-            raw = raw["result"]
-    if isinstance(raw, str) and decision == "unknown":
-        try:
-            decision = json.loads(raw).get("decision", "unknown")
-        except (json.JSONDecodeError, AttributeError):
-            decision = "approve" if "approve" in raw.lower() else "reject"
-
-    status = "approved" if decision == "approve" else "rejected"
-    return Event(
-        output={
-            "status": status,
-            "case": ctx.state.get("case_data", {}),
-            "screening": ctx.state.get("screening", {}),
-        }
-    )
-
+coordinator = LlmAgent(
+    name="mission_coordinator",
+    model="gemini-3.6-flash",
+    instruction=(
+        "You are the Mission Coordinator for a supplier onboarding workflow.\n"
+        "You receive a canonical event describing a supplier case. Decide which "
+        "specialist agents must be engaged.\n\n"
+        "Available agents:\n"
+        "  - evidence: extracts grounded corporate fields from submitted documents.\n"
+        "  - compliance: screens the legal entity against a sanctions service.\n\n"
+        "Rules:\n"
+        "  - new_supplier_packet: a brand new supplier. Both evidence and "
+        "compliance are required, because nothing about the entity is verified yet.\n"
+        "  - certificate_received: a document arrived for a known supplier. "
+        "Engage evidence only; do not re-screen unless entity fields changed.\n\n"
+        "Return the agents in the route field and one sentence of justification "
+        "in the reason field. Never invent agent names."
+    ),
+    output_schema=RoutingDecision,
+    output_key="routing_decision",
+    # Routing must be reproducible run to run; this is a control-flow decision,
+    # not a creative one.
+    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True,
+)
 
 root_agent = Workflow(
     name="keplaria_workflow",
-    edges=[("START", parse_case, screen_supplier, request_approval, process_decision)],
+    edges=[
+        ("START", parse_case),
+        (parse_case, coordinator),
+        (coordinator, apply_route),
+        # A routing-map chain element is this ADK version's syntax for a
+        # conditional edge; it expands to the same (from, to, route) pairs
+        # the design calls for: "screen" -> screen_supplier, "skip" ->
+        # execute_supplier.
+        (apply_route, {"screen": screen_supplier, "skip": execute_supplier}),
+        (screen_supplier, execute_supplier),
+    ],
 )
 
 app = App(

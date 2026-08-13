@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
+import uuid
+
+import pytest
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -19,11 +24,24 @@ from google.genai import types
 
 from app.agent import root_agent
 
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("FRAPPE_API_KEY"),
+    reason="FRAPPE_* credentials not in the environment",
+)
+
 
 def test_agent_stream() -> None:
     """
     Integration test for the agent stream functionality.
-    Tests that the agent returns valid streaming responses.
+
+    The scaffold version of this test sent free text ("Why is the sky blue?")
+    and asserted a text reply came back. That described a generic chat agent;
+    this workflow now validates every input against CanonicalEvent and fails
+    closed on anything else (see app.nodes.parse_case), so free text is no
+    longer a meaningful input here. Adapted to drive the real graph with a
+    valid event and assert the terminal structured output streams back over
+    the raw ADK Runner, exercising RunConfig(streaming_mode=SSE) directly
+    (test_server_e2e.py covers the same graph through the HTTP layer instead).
     """
 
     session_service = InMemorySessionService()
@@ -31,8 +49,18 @@ def test_agent_stream() -> None:
     session = session_service.create_session_sync(user_id="test_user", app_name="test")
     runner = Runner(agent=root_agent, session_service=session_service, app_name="test")
 
+    case_id = f"TEST-{uuid.uuid4().hex[:12]}"
+    event = {
+        "event_id": f"evt-{uuid.uuid4().hex[:8]}",
+        "case_id": case_id,
+        # certificate_received skips compliance screening, so this test does
+        # not depend on reaching the private-VPC yente service.
+        "event_type": "certificate_received",
+        "supplier": "Comercializadora Andes Verde SAS",
+        "schema_version": 1,
+    }
     message = types.Content(
-        role="user", parts=[types.Part.from_text(text="Why is the sky blue?")]
+        role="user", parts=[types.Part.from_text(text=json.dumps(event))]
     )
 
     events = list(
@@ -45,13 +73,7 @@ def test_agent_stream() -> None:
     )
     assert len(events) > 0, "Expected at least one message"
 
-    has_text_content = False
-    for event in events:
-        if (
-            event.content
-            and event.content.parts
-            and any(part.text for part in event.content.parts)
-        ):
-            has_text_content = True
-            break
-    assert has_text_content, "Expected at least one message with text content"
+    outputs = [ev.output for ev in events if ev.output is not None]
+    assert outputs, "Expected the graph to produce at least one structured output"
+    assert outputs[-1]["status"] == "executed"
+    assert outputs[-1]["case_id"] == case_id

@@ -130,8 +130,34 @@ def server_fixture(request: Any) -> Iterator[subprocess.Popen[str]]:
     yield server_process
 
 
+def _canonical_event() -> dict:
+    """A valid event, so parse_case's fail-closed validation lets it through.
+
+    certificate_received skips compliance screening, keeping this test
+    independent of the private-VPC yente service the deployed graph reaches.
+    """
+    return {
+        "event_id": f"evt-{uuid.uuid4().hex[:8]}",
+        "case_id": f"TEST-{uuid.uuid4().hex[:12]}",
+        "event_type": "certificate_received",
+        "supplier": "Comercializadora Andes Verde SAS",
+        "schema_version": 1,
+    }
+
+
+@pytest.mark.skipif(
+    not os.environ.get("FRAPPE_API_KEY"),
+    reason="FRAPPE_* credentials not in the environment",
+)
 def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
-    """Test the native ADK route (/run_sse) end to end."""
+    """Test the native ADK route (/run_sse) end to end, driving the real graph.
+
+    The scaffold version sent free text ("Hi!") and asserted a text reply.
+    parse_case now validates every input against CanonicalEvent and fails
+    closed on anything else, so this drives the graph with a valid event and
+    asserts the terminal structured output (the executor's result) streams
+    back, instead of asserting generic chat text content.
+    """
     logger.info("Starting ADK /run_sse test")
     user_id = f"user_{uuid.uuid4()}"
     session_data = {"state": {"preferred_language": "English", "visit_count": 1}}
@@ -145,11 +171,12 @@ def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
     assert session_response.status_code == 200
     session_id = session_response.json()["id"]
 
+    event = _canonical_event()
     data = {
         "app_name": "app",
         "user_id": user_id,
         "session_id": session_id,
-        "new_message": {"role": "user", "parts": [{"text": "Hi!"}]},
+        "new_message": {"role": "user", "parts": [{"text": json.dumps(event)}]},
         "streaming": True,
     }
     response = requests.post(
@@ -165,17 +192,21 @@ def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
                 events.append(json.loads(line_str[6:]))
 
     assert events, "No events received from stream"
-    has_text_content = any(
-        (content := event.get("content"))
-        and content.get("parts")
-        and any(part.get("text") for part in content["parts"])
-        for event in events
-    )
-    assert has_text_content, "Expected at least one event with text content"
+    outputs = [ev["output"] for ev in events if ev.get("output") is not None]
+    assert outputs, "Expected the graph to produce at least one structured output"
+    assert outputs[-1]["status"] == "executed"
+    assert outputs[-1]["case_id"] == event["case_id"]
 
 
+@pytest.mark.skipif(
+    not os.environ.get("FRAPPE_API_KEY"),
+    reason="FRAPPE_* credentials not in the environment",
+)
 def test_a2a_chat_stream(server_fixture: subprocess.Popen[str]) -> None:
-    """Test the A2A route using the JSON-RPC streaming protocol."""
+    """Test the A2A route using the JSON-RPC streaming protocol, driving the
+    real graph with a valid event instead of the scaffold's free text "Hi!"
+    (see test_adk_run_sse for why that no longer applies to this workflow).
+    """
     logger.info("Starting A2A chat stream test")
 
     async def _stream() -> list[StreamResponse]:
@@ -187,7 +218,7 @@ def test_a2a_chat_stream(server_fixture: subprocess.Popen[str]) -> None:
         message = Message(
             message_id=f"msg-user-{uuid.uuid4()}",
             role=Role.ROLE_USER,
-            parts=[Part(text="Hi!")],
+            parts=[Part(text=json.dumps(_canonical_event()))],
         )
         return [
             chunk
