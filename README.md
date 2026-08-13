@@ -399,9 +399,9 @@ frozen.
 Agent Registry snapshots `displayName` at registration and does not follow a
 later engine rename — it will show the stale name indefinitely, and `PATCH` on
 the registry entry returns 404 (the entries are system-managed). **A redeploy is
-what refreshes it.** This matters because Agent Registry is the cataloging
-surface the Fleet track claim points at, so a stale or debugging-flavoured name
-is judge-visible.
+what refreshes it.** This matters because Agent Registry is the catalog surface
+other services and operators discover this agent through, so a stale or
+debugging-flavoured display name is externally visible and misleading.
 
 Prefer deploying with the final name via `--service-name` from the start.
 

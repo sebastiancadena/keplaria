@@ -1,4 +1,4 @@
-"""Day-3 thin vertical: end-to-end proof against deployed infrastructure.
+"""Thin vertical: end-to-end proof against deployed infrastructure.
 
 Publishes one canonical event to the topic, waits for the case to reach a
 terminal command, then republishes the SAME event and asserts the ERP was
