@@ -43,7 +43,13 @@ separate component from the agent graph, by design, not a workaround.
 **Fail-closed routing.** The LLM coordinator only proposes a route; a
 deterministic policy layer (`app/policy.py`) decides whether it is
 permitted. A refused proposal routes to a `quarantine_case` terminal node
-that performs no Firestore command claim and no ERP write.
+that performs no Firestore command claim and no ERP write. This gate is
+about *routing* — which nodes run — not about sanctions screening: a
+supplier that yente flags as a match still reaches `queue_supplier` and its
+create_supplier command still gets queued and executed. The screening
+result is recorded (`cases/{case_id}.screening`) but not currently
+evaluated by anything; a deterministic policy/risk node that blocks or
+holds a flagged case is scoped, later work, not yet built.
 
 **Idempotency.** Every side effect is a Firestore command with a
 deterministic ID (`{case_id}:{action}`). A command already `DONE` is never

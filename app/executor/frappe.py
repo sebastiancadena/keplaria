@@ -41,10 +41,15 @@ def leaf_supplier_group(client: httpx.Client) -> str:
     return rows[0]["name"] if rows else "All Supplier Groups"
 
 
-def create_or_update_supplier(
+def create_supplier_if_absent(
     client: httpx.Client, supplier_name: str, country: str = "Colombia"
 ) -> dict:
     """Create the Supplier, treating a native duplicate as success.
+
+    This does not update an existing record — a duplicate is reported as
+    `created: False` with no reconciliation of any field against `payload`.
+    The name reflects that: it is a create-once-if-absent operation, not an
+    upsert.
 
     Returns the deterministic external ID and whether this call created it.
     """

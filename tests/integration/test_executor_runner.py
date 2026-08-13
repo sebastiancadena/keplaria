@@ -75,7 +75,7 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     made the failure invisible in the case document and the evidence until
     something happened to raise a caught type. This proves any exception
     type ends up recorded as `failed`, not silently PENDING. No real Frappe
-    call is made — create_or_update_supplier is monkeypatched to raise
+    call is made — create_supplier_if_absent is monkeypatched to raise
     before any network I/O happens."""
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
     claim_command(db, case_id, "create_supplier", _payload(supplier))
@@ -83,7 +83,7 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     def _boom(client, name):
         raise KeyError("data")
 
-    monkeypatch.setattr(runner_module, "create_or_update_supplier", _boom)
+    monkeypatch.setattr(runner_module, "create_supplier_if_absent", _boom)
 
     results = execute_pending_commands(db, case_id)
 

@@ -9,7 +9,7 @@ atomically or not at all.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from google.cloud import firestore
 
@@ -22,19 +22,21 @@ def get_client(database: str | None = None) -> firestore.Client:
     """Firestore client for the configured project and database.
 
     FIRESTORE_PROJECT_ID, not GOOGLE_CLOUD_PROJECT: on Agent Runtime,
-    GOOGLE_CLOUD_PROJECT is a reserved env var the platform injects itself
-    (agents-cli deploy silently drops whatever value ships in .env, warning
-    "Ignoring reserved Agent Runtime env var"), and what it injects is the
-    numeric project number, not the project ID string. Firestore's resource
-    path requires the string ID — a client built with the numeric project
-    number 404s with "The database (default) does not exist for project
-    <number>" even though the database is real, because queue_supplier's
-    claim_command call is the only Firestore write made from inside the
-    engine. The ingress adapter (Cloud Run) never hits this: it has no
-    GOOGLE_CLOUD_PROJECT override at all, so it falls through to this
-    function's own "keplaria" default and works by accident. Same pattern as
-    AGENT_ENGINE_LOCATION vs GOOGLE_CLOUD_LOCATION in ingress/engine_client.py
-    — two consumers needing different values for what looks like one setting.
+    GOOGLE_CLOUD_PROJECT is a reserved env var the platform overwrites with
+    the numeric project number, not the project ID string (agents-cli deploy
+    silently drops whatever value ships in .env, warning "Ignoring reserved
+    Agent Runtime env var"). Firestore's resource path requires the string
+    ID — a client built with the numeric project number 404s with "The
+    database (default) does not exist for project <number>" even though the
+    database is real, because queue_supplier's claim_command call is the
+    only Firestore write made from inside the engine, and it is the call
+    that would hit this. FIRESTORE_PROJECT_ID exists specifically to give
+    that call the string ID back. Both FIRESTORE_PROJECT_ID and
+    GOOGLE_CLOUD_PROJECT are set explicitly (both to "keplaria") on the
+    deployed ingress too — nothing here works "by accident" on either
+    runtime. Same pattern as AGENT_ENGINE_LOCATION vs GOOGLE_CLOUD_LOCATION
+    in ingress/engine_client.py — two consumers needing different values for
+    what looks like one setting.
     """
     project = os.environ.get("FIRESTORE_PROJECT_ID") or os.environ.get(
         "GOOGLE_CLOUD_PROJECT", "keplaria"
@@ -90,6 +92,22 @@ def claim_event(
             inbox_data = inbox_snap.to_dict() or {}
             if inbox_data.get("dispatched"):
                 return ClaimResult(False, current_version, "duplicate_event")
+            # A real write, not just a read-only return: a transaction with no
+            # write has nothing for Firestore's optimistic concurrency to
+            # conflict on, so two concurrent redeliveries of the same
+            # undispatched event could otherwise both be admitted as a
+            # redispatch. Bumping redispatch_count and refreshing claimed_at
+            # makes this transaction a genuine writer, so only one of two
+            # concurrent attempts commits. case_version is deliberately NOT
+            # touched here — a redispatch replays at the version already
+            # recorded on the original claim, it does not advance it.
+            txn.update(
+                inbox_ref,
+                {
+                    "redispatch_count": firestore.Increment(1),
+                    "claimed_at": firestore.SERVER_TIMESTAMP,
+                },
+            )
             return ClaimResult(
                 True, int(inbox_data.get("case_version", current_version)), "redispatch"
             )

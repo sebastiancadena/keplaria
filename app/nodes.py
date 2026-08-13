@@ -34,6 +34,10 @@ def _record_outcome(db, case_id: str, phase: str, routing: dict | None, screenin
     Session state is invisible outside the engine; this is what lets
     verify.py (and anyone else reading Firestore) substantiate the routing
     and screening decisions without reaching into the graph.
+
+    The persisted `screening` block is a record of what yente returned, not a
+    gate: nothing downstream reads `flagged` as a condition. See
+    `queue_supplier` for why, and for what is still missing.
     """
     summary = None
     if screening:
@@ -200,6 +204,16 @@ def screen_supplier(node_input, ctx: Context) -> Event:
 
 def queue_supplier(node_input, ctx: Context) -> Event:
     """Claim the create_supplier command and stop. Never calls the ERP.
+
+    IMPORTANT — screening does not gate this write. `ctx.state["screening"]`
+    (including `flagged`, the yente match outcome) is recorded and advisory
+    only in this slice: it is attached to the output and persisted onto the
+    case doc via `_record_outcome`, but nothing here reads it as a condition.
+    A screening hit does NOT prevent the create_supplier command from being
+    claimed and, downstream, executed against the ERP. Gating on screening
+    results is deterministic policy/risk work that has not been built yet —
+    this node unconditionally queues the command regardless of what
+    screen_supplier found.
 
     The Agent Runtime engine's PSC-I network attachment routes egress through
     keplaria-vpc, whose Cloud NAT is ENDPOINT_TYPE_VM only — it does not cover

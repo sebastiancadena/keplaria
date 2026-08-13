@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import httpx
 
-from app.executor.frappe import FrappeError, create_or_update_supplier, frappe_client
+from app.executor.frappe import FrappeError, create_supplier_if_absent, frappe_client
 from app.state.commands import DONE, record_failure, record_success
 from app.state.firestore import CASES, OUTBOX
 
@@ -38,9 +38,22 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     never re-driven — the same guarantee claim_command gives the graph side.
     Safe to call unconditionally on every ingress invocation, including a
     duplicate-event redelivery: a case whose commands are all DONE drains to
-    a no-op. Every failure — expected (FrappeError/httpx) or not — is
-    recorded via record_failure before this returns, so a command is never
-    left PENDING with no trace of what went wrong.
+    a no-op. Every failure of the ERP call itself — expected
+    (FrappeError/httpx) or not — is recorded via record_failure before this
+    returns, so a command is never left PENDING with no trace of what went
+    wrong on that side.
+
+    This does NOT cover a failure in record_success: that call sits outside
+    the try block, on purpose, because it only runs after the ERP write
+    already succeeded and there is nothing left to roll back. If Firestore
+    itself is unreachable at that exact moment, the command stays PENDING
+    despite the ERP record existing — a narrow, self-healing window: the
+    next drain (any later event for the same case, or a duplicate-event
+    redelivery) calls create_supplier_if_absent again, the ERP responds 409
+    for the record that already exists, and that 409 path returns
+    `created: False` without raising, so record_success runs and the command
+    reaches DONE. It is not left permanently PENDING, just delayed to the
+    next drain.
     """
     outbox_ref = db.collection(CASES).document(case_id).collection(OUTBOX)
     results: list[dict] = []
@@ -59,7 +72,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
 
         try:
             with frappe_client() as client:
-                result = create_or_update_supplier(client, supplier)
+                result = create_supplier_if_absent(client, supplier)
         except (FrappeError, httpx.HTTPError) as exc:
             error = f"{type(exc).__name__}: {exc}"
             record_failure(db, case_id, action, error)
@@ -68,7 +81,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
         except Exception as exc:
             # Not FrappeError/httpx.HTTPError — e.g. a malformed Frappe
             # response raising KeyError/TypeError out of
-            # create_or_update_supplier. Still a failed command, not a crash
+            # create_supplier_if_absent. Still a failed command, not a crash
             # this module should let propagate silently: leaving it PENDING
             # with no record_failure would make the failure invisible in the
             # case document and the evidence until some later drain happens

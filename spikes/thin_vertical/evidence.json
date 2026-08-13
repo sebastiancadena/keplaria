@@ -1,8 +1,8 @@
 {
   "case": {
-    "case_id": "TV-27BAAF948F",
+    "case_id": "TV-AC18109EA3",
     "case_version": 1,
-    "created_at": "2026-08-13 22:18:09.433000+00:00",
+    "created_at": "2026-08-13 23:24:44.619000+00:00",
     "phase": "queued",
     "routing": {
       "pending_implementation": [
@@ -12,7 +12,7 @@
         "evidence",
         "compliance"
       ],
-      "reason": "Both evidence and compliance agents are required to extract document fields and screen the entity for a new supplier packet.",
+      "reason": "Both evidence and compliance agents are required to extract corporate fields and perform sanctions screening for a new supplier packet.",
       "refused": null,
       "route": [
         "evidence",
@@ -23,49 +23,47 @@
       "candidate_count": 5,
       "candidates": [
         {
+          "id": "syn-co-006",
+          "match": false,
+          "score": 0.1923076923076923
+        },
+        {
           "id": "syn-co-001",
-          "match": true,
-          "score": 1.0
+          "match": false,
+          "score": 0.18918918918918917
         },
         {
           "id": "syn-co-008",
           "match": false,
-          "score": 0.5263157894736842
-        },
-        {
-          "id": "syn-co-006",
-          "match": false,
-          "score": 0.1923076923076923
+          "score": 0.18918918918918917
         }
       ],
       "endpoint": "http://10.10.0.2:8000",
-      "flagged": [
-        "syn-co-001"
-      ],
+      "flagged": [],
       "reachable": true
     },
-    "supplier": "Comercializadora Andes Verde SAS",
-    "updated_at": "2026-08-13 22:18:09.433000+00:00"
+    "supplier": "Suministros Altiplano Cauca SAS",
+    "updated_at": "2026-08-13 23:24:44.619000+00:00"
   },
-  "case_id": "TV-27BAAF948F",
+  "case_id": "TV-AC18109EA3",
   "command": {
     "action": "create_supplier",
     "attempts": 1,
-    "case_id": "TV-27BAAF948F",
-    "command_id": "TV-27BAAF948F:create_supplier",
-    "created_at": "2026-08-13 22:18:13.951000+00:00",
+    "case_id": "TV-AC18109EA3",
+    "command_id": "TV-AC18109EA3:create_supplier",
+    "created_at": "2026-08-13 23:24:49.260000+00:00",
     "error": null,
-    "external_id": "Comercializadora Andes Verde SAS",
+    "external_id": "Suministros Altiplano Cauca SAS",
     "payload": {
       "country": "Colombia",
-      "supplier_name": "Comercializadora Andes Verde SAS"
+      "supplier_name": "Suministros Altiplano Cauca SAS"
     },
     "result": {
-      "created": false,
-      "external_id": "Comercializadora Andes Verde SAS"
+      "created": true,
+      "external_id": "Suministros Altiplano Cauca SAS"
     },
     "status": "done",
-    "updated_at": "2026-08-13 22:18:14.556000+00:00"
+    "updated_at": "2026-08-13 23:24:49.861000+00:00"
   },
   "criteria": {
     "case_at_version_1": true,
@@ -78,11 +76,11 @@
   "duplicate_replay": {
     "attempts": 1,
     "case_version_after": 1,
-    "message_id": "21004182761115108"
+    "message_id": "21004787563435806"
   },
-  "event_id": "evt-bbcdda7ee7",
+  "event_id": "evt-81b55d58dd",
   "passed": true,
-  "published_message_id": "21003945086243695",
+  "published_message_id": "20837692674530654",
   "routing": {
     "pending_implementation": [
       "evidence"
@@ -91,7 +89,7 @@
       "evidence",
       "compliance"
     ],
-    "reason": "Both evidence and compliance agents are required to extract document fields and screen the entity for a new supplier packet.",
+    "reason": "Both evidence and compliance agents are required to extract corporate fields and perform sanctions screening for a new supplier packet.",
     "refused": null,
     "route": [
       "evidence",
@@ -102,50 +100,24 @@
     "candidate_count": 5,
     "candidates": [
       {
+        "id": "syn-co-006",
+        "match": false,
+        "score": 0.1923076923076923
+      },
+      {
         "id": "syn-co-001",
-        "match": true,
-        "score": 1.0
+        "match": false,
+        "score": 0.18918918918918917
       },
       {
         "id": "syn-co-008",
         "match": false,
-        "score": 0.5263157894736842
-      },
-      {
-        "id": "syn-co-006",
-        "match": false,
-        "score": 0.1923076923076923
+        "score": 0.18918918918918917
       }
     ],
     "endpoint": "http://10.10.0.2:8000",
-    "flagged": [
-      "syn-co-001"
-    ],
+    "flagged": [],
     "reachable": true
-  },
-  "trace_id": "f4e8d546d01ac07571758c19095935b1",
-  "traces": {
-    "ingress_anonymous_refused": {
-      "http_status": 403,
-      "span": "/pubsub/push",
-      "start": "2026-08-13T22:18:06.128796Z",
-      "trace_id": "215dd170c64d074495a8dfcfe0de69c3"
-    },
-    "ingress_push_accepted": {
-      "http_status": 200,
-      "span": "/pubsub/push",
-      "start": "2026-08-13T22:18:18.319917Z",
-      "trace_id": "2955faf8b660c05fa6071cbdeef241e3"
-    },
-    "source": "Cloud Trace, project keplaria, captured for this run",
-    "workflow_invocation": {
-      "end": "2026-08-13T22:18:14.182381233Z",
-      "engine": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
-      "engine_service_version": "6",
-      "span": "invoke_workflow keplaria_workflow",
-      "start": "2026-08-13T22:18:10.445539794Z",
-      "trace_id": "f4e8d546d01ac07571758c19095935b1"
-    }
   },
   "unauthenticated_status": {
     "get_root": "403",

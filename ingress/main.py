@@ -15,11 +15,20 @@ right after a successful engine invocation, and again, best-effort, on a
 duplicate-event redelivery.
 
 Every response is 200 unless the request itself is malformed, the engine call
-failed, or draining the outbox after a fresh claim failed: Pub/Sub retries
-non-2xx forever, which is exactly what we want for a malformed envelope (fix
-the producer), a transient engine failure, or a failed command execution
-(retry), and exactly what we don't want for an unparseable event (no retry can
-fix it, so it is acked). A duplicate is always acked too, deliberately,
+failed, or draining the outbox after a fresh claim failed: Pub/Sub retries a
+non-2xx response with backoff until the message's retention window (not
+forever) elapses, after which it is dropped — there is no dead-letter topic
+configured, so a message that keeps failing past retention is simply lost,
+not parked anywhere for later inspection. That retry-with-eventual-drop
+behaviour is exactly what we want for a malformed envelope (a structurally
+broken Pub/Sub push payload — fix the producer) or a transient engine
+failure or failed command execution (both worth retrying), and exactly what
+we don't want for an unparseable event (a well-formed envelope whose inner
+event data fails schema validation — no retry can fix that, so it is acked
+immediately instead). A persistently failing engine call will eventually be
+dropped once retention expires rather than retried indefinitely; building a
+dead-letter path for that case is still open work. A duplicate is always
+acked too, deliberately,
 *regardless of whether draining the outbox there succeeds* — the alternative
 (503 on a failed drain) would make Pub/Sub redeliver the duplicate itself,
 recreating the redelivery storm this project already had once. This means

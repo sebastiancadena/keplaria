@@ -15,6 +15,21 @@ state: app.nodes persists a compact summary onto `cases/{case_id}` at
 execution time (see queue_supplier / quarantine_case), which is what makes
 those decisions inspectable from outside the engine.
 
+SUPPLIER is deliberately a name that does NOT match any sanctioned entity in
+fixtures/watchlist/entities.ftm.json. Screening still executes and still
+proves yente reachability over the private network; it just returns no
+match, which is the honest picture of a legitimate supplier being onboarded.
+Screening is recorded but advisory-only in this slice — see
+app.nodes.queue_supplier — so this script must never be pointed at a
+fixture entity: the resulting evidence.json would otherwise read as "a
+sanctioned entity was onboarded and called success."
+
+Note: evidence.json also carries a top-level `trace_id` and a `traces` block
+that this script does NOT write — they are merged in by hand after a run
+from Cloud Trace lookups. A re-run of this script overwrites evidence.json
+and drops those fields; re-merge them afterwards if they're needed, don't
+fabricate replacements.
+
 Run: uv run --env-file .env python spikes/thin_vertical/verify.py
 """
 
@@ -38,7 +53,7 @@ from app.state.firestore import get_client  # noqa: E402
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "keplaria")
 TOPIC = "keplaria-events"
 EVIDENCE_PATH = os.path.join(os.path.dirname(__file__), "evidence.json")
-SUPPLIER = "Comercializadora Andes Verde SAS"
+SUPPLIER = "Suministros Altiplano Cauca SAS"
 
 evidence: dict = {"criteria": {}}
 

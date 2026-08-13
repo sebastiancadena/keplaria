@@ -10,9 +10,10 @@ document, so a reviewer (and verify.py) can see why a case was blocked.
 
 from __future__ import annotations
 
+import app.nodes as nodes_module
 from app.nodes import apply_route, quarantine_case
 from app.state.commands import get_command
-from app.state.firestore import CASES, get_client
+from app.state.firestore import CASES
 
 
 class _StubContext:
@@ -94,12 +95,15 @@ def test_unknown_event_type_is_blocked():
     assert result.output["refused"] is not None
 
 
-def test_quarantine_case_claims_no_command_but_records_the_refusal(case_id):
-    # quarantine_case resolves its own Firestore client via get_client() (same
-    # as every other node), so seeding and assertions must use that client
-    # too — the `db` fixture deliberately points at a separate test database
-    # and would silently check the wrong place.
-    db = get_client()
+def test_quarantine_case_claims_no_command_but_records_the_refusal(
+    db, case_id, monkeypatch
+):
+    # quarantine_case resolves its own Firestore client via get_client(),
+    # which defaults to the live `(default)` database — the one the deployed
+    # system uses. Point it at the `db` fixture's isolated test database
+    # instead, so this test seeds and cleans up in the test database rather
+    # than leaving a stray case document behind in production Firestore.
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
     # quarantine_case only ever runs on a case claim_event already created —
     # seed that precondition rather than relying on an unrealistic empty doc.
     db.collection(CASES).document(case_id).set({"case_id": case_id, "case_version": 1})
