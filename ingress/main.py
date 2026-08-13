@@ -7,11 +7,22 @@ invoked only after a successful claim, and the claim is only marked dispatched
 once the engine call actually succeeds — so a transient engine failure is
 retried by Pub/Sub redelivery instead of silently dropping the case.
 
-Every response is 200 unless the request itself is malformed, or the engine
-call failed: Pub/Sub retries non-2xx forever, which is exactly what we want
-for a malformed envelope (fix the producer) or a transient engine failure
-(retry), and exactly what we don't want for a duplicate or an unparseable
-event (no retry can fix either, so those are acked).
+The engine's graph only ever queues the ERP command (see app.nodes.queue_supplier
+for why: no public internet egress from the PSC-attached engine). This ingress
+adapter, an ordinary Cloud Run service with normal egress, is what actually
+drains the outbox via app.executor.runner.execute_pending_commands — once
+right after a successful engine invocation, and again, opportunistically, on
+every duplicate-event redelivery, so a failed ERP write self-heals without
+spending the engine's scarce quota.
+
+Every response is 200 unless the request itself is malformed, the engine call
+failed, or draining the outbox after a fresh claim failed: Pub/Sub retries
+non-2xx forever, which is exactly what we want for a malformed envelope (fix
+the producer), a transient engine failure, or a failed command execution
+(retry), and exactly what we don't want for an unparseable event (no retry can
+fix it, so it is acked). A duplicate is always acked too — draining the
+outbox there is a bonus repair attempt, not something Pub/Sub retrying the
+push itself could ever guarantee; the next natural redelivery tries again.
 """
 
 from __future__ import annotations
@@ -22,9 +33,11 @@ import json
 import logging
 from typing import Any
 
+import httpx
 from fastapi import Body, FastAPI, HTTPException
 from pydantic import ValidationError
 
+from app.executor.runner import execute_pending_commands
 from app.schemas import CanonicalEvent
 from app.state.firestore import claim_event, get_client, mark_dispatched
 from ingress.engine_client import invoke_engine
@@ -81,6 +94,26 @@ def push(envelope: Any = Body(...)) -> dict:
             event.case_id,
             claim.reason,
         )
+        if claim.reason == "duplicate_event":
+            # Opportunistic repair: a duplicate delivery costs nothing to the
+            # engine (it is never invoked here), so it is a free chance to
+            # retry any outbox command still not DONE. A case whose commands
+            # are all DONE drains to a no-op, so this never disturbs the
+            # exactly-once guarantee this branch exists to preserve. Errors
+            # are logged, not raised — a duplicate is always acked; the fix
+            # (if any is still needed) gets another chance on the next
+            # natural redelivery, not a forced retry of this one.
+            try:
+                execute_pending_commands(db, event.case_id)
+            except Exception as exc:
+                logger.warning(
+                    "command execution failed while draining duplicate event "
+                    "%s case %s: %s: %s",
+                    event.event_id,
+                    event.case_id,
+                    type(exc).__name__,
+                    str(exc)[:200],
+                )
         return {
             "status": "duplicate" if claim.reason == "duplicate_event" else claim.reason,
             "case_version": claim.case_version,
@@ -100,16 +133,59 @@ def push(envelope: Any = Body(...)) -> dict:
         # makes Pub/Sub redeliver, which claim_event now treats as a
         # redispatch rather than a duplicate, so the case is retried instead
         # of permanently stranded.
+        #
+        # The Agent Runtime engine allows only 1 concurrent query and 30/min;
+        # a 429 here is expected load shedding, not a broken engine. It gets
+        # its own greppable log line so an operator can tell "rate limited,
+        # the subscription's backoff will handle it" apart from "the engine
+        # is actually down" at a glance — both still return 503 to Pub/Sub,
+        # since the subscription's retry backoff (not a loop in this handler)
+        # is what should absorb it.
+        if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+            logger.warning(
+                "engine rate limited for event %s case %s (429) — deferring to "
+                "subscription backoff",
+                event.event_id,
+                event.case_id,
+            )
+        else:
+            logger.warning(
+                "engine invocation failed for event %s case %s: %s: %s",
+                event.event_id,
+                event.case_id,
+                type(exc).__name__,
+                str(exc)[:200],
+            )
+        raise HTTPException(status_code=503, detail="engine invocation failed") from exc
+
+    mark_dispatched(db, event.case_id, event.event_id)
+
+    try:
+        command_results = execute_pending_commands(db, event.case_id)
+    except Exception as exc:
+        # The engine already ran and was already marked dispatched — it must
+        # never be re-invoked over this. A non-2xx here only makes Pub/Sub
+        # redeliver, which is a duplicate_event by now (dispatched=True), so
+        # the retry re-enters the opportunistic-repair branch above instead
+        # of spending engine quota again.
         logger.warning(
-            "engine invocation failed for event %s case %s: %s: %s",
+            "command execution failed for event %s case %s: %s: %s",
             event.event_id,
             event.case_id,
             type(exc).__name__,
             str(exc)[:200],
         )
-        raise HTTPException(status_code=503, detail="engine invocation failed") from exc
+        raise HTTPException(status_code=503, detail="command execution failed") from exc
 
-    mark_dispatched(db, event.case_id, event.event_id)
+    if any(r.get("status") == "failed" for r in command_results):
+        logger.warning(
+            "command execution reported a failure for event %s case %s: %s",
+            event.event_id,
+            event.case_id,
+            command_results,
+        )
+        raise HTTPException(status_code=503, detail="command execution failed")
+
     return {
         "status": "claimed",
         "case_version": claim.case_version,

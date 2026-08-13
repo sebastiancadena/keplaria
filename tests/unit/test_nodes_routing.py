@@ -3,13 +3,16 @@
 apply_route must route to 'blocked' on any coordinator proposal validate_route
 rejects, and reach 'screen'/'skip' only for accepted proposals — including the
 legitimately empty route for an event type that requires no agents at all.
-quarantine_case, the 'blocked' terminal, must never write anything.
+quarantine_case, the 'blocked' terminal, must never claim the create_supplier
+command or call the ERP — but it does record the refusal onto the case
+document, so a reviewer (and verify.py) can see why a case was blocked.
 """
 
 from __future__ import annotations
 
 from app.nodes import apply_route, quarantine_case
 from app.state.commands import get_command
+from app.state.firestore import CASES, get_client
 
 
 class _StubContext:
@@ -70,7 +73,7 @@ def test_empty_route_when_agents_are_required_is_blocked_not_skipped():
 def test_empty_route_when_no_agents_are_required_skips_not_blocked():
     """The crux of the fix: 'no agents required' must not collapse into
     'refused'. evidence_overdue maps to an empty ALLOWED_ROUTES set, so an
-    empty proposal is legitimate and must reach execute_supplier via 'skip',
+    empty proposal is legitimate and must reach queue_supplier via 'skip',
     not be quarantined."""
     ctx = _StubContext({"case": _case("CASE-5", "evidence_overdue")})
     node_input = {"route": [], "reason": "deterministic, no agents needed"}
@@ -91,7 +94,16 @@ def test_unknown_event_type_is_blocked():
     assert result.output["refused"] is not None
 
 
-def test_quarantine_case_writes_nothing(db, case_id):
+def test_quarantine_case_claims_no_command_but_records_the_refusal(case_id):
+    # quarantine_case resolves its own Firestore client via get_client() (same
+    # as every other node), so seeding and assertions must use that client
+    # too — the `db` fixture deliberately points at a separate test database
+    # and would silently check the wrong place.
+    db = get_client()
+    # quarantine_case only ever runs on a case claim_event already created —
+    # seed that precondition rather than relying on an unrealistic empty doc.
+    db.collection(CASES).document(case_id).set({"case_id": case_id, "case_version": 1})
+
     routing = {
         "proposed": ["finance_bot"],
         "route": [],
@@ -111,3 +123,8 @@ def test_quarantine_case_writes_nothing(db, case_id):
     assert result.output["status"] == "quarantined"
     assert result.output["case_id"] == case_id
     assert get_command(db, case_id, "create_supplier") is None
+
+    case = db.collection(CASES).document(case_id).get().to_dict()
+    assert case["phase"] == "quarantined"
+    assert case["routing"] == routing
+    assert case["screening"] is None

@@ -75,5 +75,8 @@ def test_agent_stream() -> None:
 
     outputs = [ev.output for ev in events if ev.output is not None]
     assert outputs, "Expected the graph to produce at least one structured output"
-    assert outputs[-1]["status"] == "executed"
+    # The graph only ever queues the create_supplier command now — see
+    # app.nodes.queue_supplier — since the Agent Runtime engine has no public
+    # internet path to Frappe Cloud. Execution happens outside the graph.
+    assert outputs[-1]["status"] == "command_queued"
     assert outputs[-1]["case_id"] == case_id

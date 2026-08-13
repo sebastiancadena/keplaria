@@ -14,11 +14,10 @@ from google.adk.agents.context import Context
 from google.adk.events.event import Event
 from opentelemetry import trace
 
-from app.executor.frappe import FrappeError, create_or_update_supplier, frappe_client
 from app.policy import PolicyError, validate_route
 from app.schemas import CanonicalEvent, ScreeningResult
-from app.state.commands import DONE, claim_command, record_failure, record_success
-from app.state.firestore import get_client
+from app.state.commands import DONE, claim_command
+from app.state.firestore import CASES, get_client
 
 YENTE_BASE_URL = os.environ.get("YENTE_BASE_URL", "http://10.10.0.2:8000")
 YENTE_DATASET = os.environ.get("YENTE_DATASET", "keplaria_synthetic")
@@ -27,6 +26,35 @@ YENTE_DATASET = os.environ.get("YENTE_DATASET", "keplaria_synthetic")
 YENTE_CUTOFF = 0.0
 
 tracer = trace.get_tracer("keplaria.nodes")
+
+
+def _record_outcome(db, case_id: str, phase: str, routing: dict | None, screening: dict | None) -> None:
+    """Persist a compact routing/screening summary onto the case doc.
+
+    Session state is invisible outside the engine; this is what lets
+    verify.py (and anyone else reading Firestore) substantiate the routing
+    and screening decisions without reaching into the graph.
+    """
+    summary = None
+    if screening:
+        candidates = screening.get("candidates", [])
+        summary = {
+            "reachable": screening.get("reachable"),
+            "endpoint": screening.get("endpoint"),
+            "flagged": screening.get("flagged", []),
+            "candidate_count": len(candidates),
+            "candidates": [
+                {"id": c["id"], "score": c["score"], "match": c["match"]}
+                for c in candidates[:3]
+            ],
+        }
+    # merge=True rather than update(): queue_supplier/quarantine_case run
+    # after claim_event in production (the case doc always exists by then),
+    # but integration tests that drive the graph directly without going
+    # through the ingress adapter never create it — merge tolerates both.
+    db.collection(CASES).document(case_id).set(
+        {"phase": phase, "routing": routing, "screening": summary}, merge=True
+    )
 
 
 def parse_case(node_input, ctx: Context) -> Event:
@@ -48,7 +76,7 @@ def apply_route(node_input, ctx: Context) -> Event:
     """Validate the coordinator's proposal and pick the executable branch.
 
     Any PolicyError blocks the case rather than skipping it: a refused
-    proposal must never reach execute_supplier. validate_route already
+    proposal must never reach queue_supplier. validate_route already
     encodes the one legitimate empty route (an event type that requires no
     agents, e.g. evidence_overdue) as a normal return rather than a raise, so
     checking `refused is not None` here is sufficient to distinguish
@@ -103,10 +131,12 @@ def quarantine_case(node_input, ctx: Context) -> Event:
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
+    routing = ctx.state.get("routing")
 
     with tracer.start_as_current_span("quarantine_case") as span:
         span.set_attribute("keplaria.case_id", case_id)
         span.set_attribute("keplaria.quarantined", True)
+        _record_outcome(get_client(), case_id, "quarantined", routing, ctx.state.get("screening"))
 
     return Event(
         output={
@@ -168,10 +198,23 @@ def screen_supplier(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"screening": payload})
 
 
-def execute_supplier(node_input, ctx: Context) -> Event:
-    """Claim the command, create the supplier, record the external ID.
+def queue_supplier(node_input, ctx: Context) -> Event:
+    """Claim the create_supplier command and stop. Never calls the ERP.
 
-    This is the only node permitted to write to the ERP.
+    The Agent Runtime engine's PSC-I network attachment routes egress through
+    keplaria-vpc, whose Cloud NAT is ENDPOINT_TYPE_VM only — it does not cover
+    a PSC-I NIC, so the engine has a path to the private VPC (yente) but none
+    to the public internet. A Frappe Cloud call from inside this node times
+    out on TCP connect every time, deterministically; it is not a transient
+    fault to retry around.
+
+    This is also the architecturally correct split, not just a network
+    workaround: the ERP executor is a deterministic non-agent component and a
+    separate authorization boundary from the graph. This node's only job is
+    to record the deterministic command via claim_command; the actual write
+    happens in app.executor.runner.execute_pending_commands, run from the
+    ingress (ordinary Cloud Run, normal egress) after the engine call
+    returns, and again — idempotently — on any duplicate-event redelivery.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
@@ -180,12 +223,13 @@ def execute_supplier(node_input, ctx: Context) -> Event:
     db = get_client()
     payload = {"supplier_name": supplier, "country": "Colombia"}
 
-    with tracer.start_as_current_span("execute_supplier") as span:
+    with tracer.start_as_current_span("queue_supplier") as span:
         span.set_attribute("keplaria.case_id", case_id)
         claim = claim_command(db, case_id, "create_supplier", payload)
 
         if not claim.acquired and claim.status == DONE:
             span.set_attribute("keplaria.command_replayed", True)
+            _record_outcome(db, case_id, "executed", ctx.state.get("routing"), ctx.state.get("screening"))
             return Event(
                 output={
                     "status": "already_executed",
@@ -196,29 +240,13 @@ def execute_supplier(node_input, ctx: Context) -> Event:
                 }
             )
 
-        try:
-            with frappe_client() as client:
-                result = create_or_update_supplier(client, supplier)
-        except (FrappeError, httpx.HTTPError) as exc:
-            record_failure(db, case_id, "create_supplier", f"{type(exc).__name__}: {exc}")
-            span.set_attribute("keplaria.command_failed", True)
-            return Event(
-                output={
-                    "status": "failed",
-                    "case_id": case_id,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-            )
-
-        record_success(db, case_id, "create_supplier", result["external_id"], result)
-        span.set_attribute("keplaria.external_id", result["external_id"])
+        span.set_attribute("keplaria.command_queued", True)
+        _record_outcome(db, case_id, "queued", ctx.state.get("routing"), ctx.state.get("screening"))
 
     return Event(
         output={
-            "status": "executed",
+            "status": "command_queued",
             "case_id": case_id,
-            "external_id": result["external_id"],
-            "created": result["created"],
             "screening": ctx.state.get("screening"),
             "routing": ctx.state.get("routing"),
         }

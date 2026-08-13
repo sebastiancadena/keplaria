@@ -15,13 +15,18 @@
 """Keplaria workflow — the thin vertical.
 
 event → canonical parse → structured routing decision → validated branch →
-idempotent ERP supplier creation. The coordinator proposes a route; deterministic
+deterministic command queue. The coordinator proposes a route; deterministic
 policy code decides whether it is allowed, so no model output reaches a side
 effect unvalidated.
 
 The screening node reaches the self-hosted yente service on the private VM. It
 has no public address, so that call only succeeds when the serving workload has
 private VPC connectivity — on Agent Runtime, a PSC-I network attachment.
+
+The graph never calls the ERP itself: queue_supplier only claims the
+create_supplier command (see app/nodes.py's docstring for why — the same
+PSC-I attachment has no public internet egress). app.executor.runner, driven
+by the ingress, does the actual write.
 """
 
 from google.adk.agents import LlmAgent
@@ -31,9 +36,9 @@ from google.genai import types
 
 from app.nodes import (
     apply_route,
-    execute_supplier,
     parse_case,
     quarantine_case,
+    queue_supplier,
     screen_supplier,
 )
 from app.schemas import RoutingDecision
@@ -74,17 +79,17 @@ root_agent = Workflow(
         # A routing-map chain element is this ADK version's syntax for a
         # conditional edge; it expands to the same (from, to, route) pairs
         # the design calls for: "screen" -> screen_supplier, "skip" ->
-        # execute_supplier, "blocked" -> quarantine_case (a refused proposal
-        # must never reach the executor).
+        # queue_supplier, "blocked" -> quarantine_case (a refused proposal
+        # must never reach the command queue).
         (
             apply_route,
             {
                 "screen": screen_supplier,
-                "skip": execute_supplier,
+                "skip": queue_supplier,
                 "blocked": quarantine_case,
             },
         ),
-        (screen_supplier, execute_supplier),
+        (screen_supplier, queue_supplier),
     ],
 )
 

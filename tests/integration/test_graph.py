@@ -28,7 +28,7 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types
 
 from app.agent import app
-from app.state.commands import DONE, get_command
+from app.state.commands import DONE, PENDING, get_command, record_success
 from app.state.firestore import get_client
 
 pytestmark = pytest.mark.skipif(
@@ -70,7 +70,11 @@ def _event(case_id: str, event_type: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_new_supplier_packet_screens_and_creates_the_supplier():
+async def test_new_supplier_packet_screens_and_queues_the_command():
+    """The graph stops at queueing — see app.nodes.queue_supplier: the Agent
+    Runtime engine has no public internet path to Frappe Cloud, so ERP
+    execution happens outside the graph (app.executor.runner, driven by the
+    ingress). No Frappe call is made from this test."""
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
 
     outputs = await _run(_event(case_id, "new_supplier_packet"))
@@ -84,11 +88,12 @@ async def test_new_supplier_packet_screens_and_creates_the_supplier():
     assert screening[0]["endpoint"]
 
     final = outputs[-1]
-    assert final["status"] == "executed"
-    assert final["external_id"] == "Comercializadora Andes Verde SAS"
+    assert final["status"] == "command_queued"
+    assert final["case_id"] == case_id
 
     command = get_command(get_client(), case_id, "create_supplier")
-    assert command["status"] == DONE
+    assert command["status"] == PENDING
+    assert command["payload"]["supplier_name"] == "Comercializadora Andes Verde SAS"
 
 
 @pytest.mark.asyncio
@@ -100,15 +105,35 @@ async def test_certificate_received_skips_screening():
 
     screening = [o for o in outputs if isinstance(o, dict) and "reachable" in o]
     assert not screening, "certificate_received must not engage compliance"
-    assert outputs[-1]["status"] == "executed"
+    assert outputs[-1]["status"] == "command_queued"
 
 
 @pytest.mark.asyncio
-async def test_replayed_case_does_not_write_the_supplier_twice():
+async def test_replayed_case_does_not_reclaim_a_done_command():
+    """The graph's own idempotency guarantee: once a command is DONE — which,
+    since queue_supplier never calls Frappe, only ever happens via
+    app.executor.runner.execute_pending_commands running outside the graph —
+    running the graph again for the same case must report 'already_executed'
+    without re-claiming (bumping attempts on) the command."""
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
-    await _run(_event(case_id, "new_supplier_packet"))
+    db = get_client()
 
-    outputs = await _run(_event(case_id, "new_supplier_packet"))
+    first = await _run(_event(case_id, "new_supplier_packet"))
+    assert first[-1]["status"] == "command_queued"
+    assert get_command(db, case_id, "create_supplier")["status"] == PENDING
 
-    assert outputs[-1]["status"] == "already_executed"
-    assert get_command(get_client(), case_id, "create_supplier")["attempts"] == 1
+    # Simulate the ingress's out-of-band executor completing the command.
+    record_success(
+        db,
+        case_id,
+        "create_supplier",
+        "Comercializadora Andes Verde SAS",
+        {"external_id": "Comercializadora Andes Verde SAS", "created": True},
+    )
+
+    second = await _run(_event(case_id, "new_supplier_packet"))
+
+    assert second[-1]["status"] == "already_executed"
+    command = get_command(db, case_id, "create_supplier")
+    assert command["status"] == DONE
+    assert command["attempts"] == 1
