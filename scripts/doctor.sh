@@ -29,6 +29,18 @@ echo "== project =="
 [ -d .venv ] && uv lock --check >/dev/null 2>&1 \
   && ok "uv.lock consistent with pyproject" || meh ".venv/lock drift (run: uv sync)"
 
+echo "== cloud infra (read-only) =="
+state=$(gcloud functions describe billing-killswitch --region=us-central1 --gen2 \
+  --format='value(state,serviceConfig.environmentVariables.DRY_RUN)' --project=keplaria 2>/dev/null)
+echo "$state" | grep -q 'ACTIVE' && ok "billing kill switch deployed" || bad "billing kill switch not ACTIVE"
+echo "$state" | grep -qi 'false' && ok "billing kill switch ARMED (DRY_RUN=false)" || meh "billing kill switch in dry-run mode"
+gcloud pubsub topics describe billing-killswitch --project=keplaria >/dev/null 2>&1 \
+  && ok "billing-killswitch topic" || bad "billing-killswitch topic missing"
+gcloud compute networks describe keplaria-vpc --project=keplaria >/dev/null 2>&1 \
+  && ok "keplaria-vpc network" || bad "keplaria-vpc missing"
+gcloud compute instances list --filter=name=keplaria-yente --format='value(name,status)' --project=keplaria 2>/dev/null \
+  | grep -q keplaria-yente && ok "keplaria-yente VM exists" || meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)"
+
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
 if command -v uvx >/dev/null; then

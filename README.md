@@ -93,9 +93,9 @@ Stay on 3.13 unless there is a concrete reason to move.
 
 | | |
 |---|---|
-| Project ID | `keplaria` |
+| Project ID | `keplaria` (project number `584548214478`) |
 | Region | `us-central1` |
-| APIs enabled | `aiplatform.googleapis.com` (Agent Platform API), `artifactregistry.googleapis.com` |
+| APIs enabled | Agent Platform (`aiplatform`), Run, Compute, Firestore, Pub/Sub, Secret Manager, Cloud Scheduler, BigQuery, Cloud Trace, IAP, Model Armor, Cloud Build, Artifact Registry, Cloud Functions, Eventarc, Cloud Billing (+Budgets) |
 
 Authentication is via Application Default Credentials. Verify with:
 
@@ -106,6 +106,30 @@ gcloud auth application-default print-access-token  # expect a token
 
 `aiplatform.googleapis.com` is now surfaced as the **Agent Platform API** — the
 Vertex AI API under its current name, not a separate product.
+
+### Provisioned infrastructure
+
+- **Network:** `keplaria-vpc` (custom mode), subnet `keplaria-uscentral1`
+  `10.10.0.0/24` with Private Google Access, Cloud NAT (`keplaria-nat` on
+  `keplaria-router`). Ingress: IAP-range SSH only (`keplaria-allow-iap-ssh`)
+  plus intra-subnet tcp 8000/9200 (`keplaria-allow-internal`).
+- **VM `keplaria-yente`** (`us-central1-c`): `t2d-standard-4` (e2 was stocked
+  out region-wide on creation day), 60 GB pd-ssd, **no external IP**
+  (10.10.0.2), service account `yente-vm@`. Nightly stop 01:00
+  America/Bogota (`keplaria-nightly-stop`), daily snapshots, 7-day retention
+  (`keplaria-daily-snap`). SSH:
+  `gcloud compute ssh keplaria-yente --zone us-central1-c --tunnel-through-iap`
+- **Billing guardrails:** budget `keplaria-build` alerts at $100/$130; budget
+  `keplaria-killswitch` ($200) publishes to Pub/Sub topic `billing-killswitch`,
+  where the Cloud Function in [`infra/billing-killswitch/`](infra/billing-killswitch/)
+  **detaches billing from the project** once reported cost exceeds the budget
+  (its SA holds `roles/billing.projectManager`, project-scoped). If it trips,
+  everything stops — re-attach billing manually in the console to recover.
+- `scripts/doctor.sh` verifies all of the above read-only.
+
+Provisioning note: project-level IAM bindings and billing-account IAM cannot be
+granted from an agent session (permission classifier); run those as the human
+via `!`-prefixed commands.
 
 ## Configuration
 
@@ -166,19 +190,44 @@ Both `.agents/` and `skills-lock.json` are committed, so the skill set is pinned
 rather than re-resolved per machine. `agents-cli info` should report
 `Installed skills: 7 (project)`. Refresh with `agents-cli update`.
 
-### Open: this is not yet an agents-cli project
+### Scaffolded project (2026-08-12)
 
-Bootstrapped with `uv init`, not `agents-cli create`, so `agents-cli info`
-reports *"No agent project found"* and there is no `agents-cli-manifest.yaml`.
-Anything dispatching off the manifest — notably `agents-cli deploy` — will not
-work until that is resolved, via either:
+`agents-cli scaffold enhance` ran with `--deployment-target cloud_run
+--session-type agent_platform_sessions --region us-central1`. Result:
+`agents-cli-manifest.yaml`, agent code under `app/` (workflow in `agent.py`,
+server in `fast_api_app.py`), `tests/`, `deployment/` (Terraform), `Dockerfile`.
+Sessions are persistent: `app/app_utils/services.py` resolves an
+`agentengine://` session service against the Agent Engine with display name
+`keplaria` (created on first boot).
 
-- `agents-cli scaffold enhance .` — adds deployment/CI-CD scaffolding in place,
-  or
-- `agents-cli deploy --deployment-target cloud_run` — bypasses the manifest for
-  a one-off deploy.
+**Scaffold gotcha:** `scaffold enhance` runs in overwrite mode and
+`shutil.rmtree`s existing directories — it **crashes on symlinked dirs**
+(e.g. `strategy/`). To re-run it: copy the repo (minus symlinks and `.env`)
+to a scratch dir, enhance there, port the output back, and fix the project
+name it embeds from the directory name.
 
-**Deploy target has not been chosen yet.**
+Spike harnesses (HITL resume across SIGKILL, retry-on-503, ERP capability
+checks) live under `spikes/` — each is a standalone
+`uv run python spikes/<name>/spike.py`.
+
+## ERPNext (Frappe Cloud)
+
+- Site: **`andina-foods.v.frappe.cloud`** on the $10 shared plan. The site was
+  renamed after creation, so **dashboard URLs use the immutable internal name
+  `erpnext-ojg-vfe.v.frappe.cloud`** (old host 308-redirects; note HTTP clients
+  drop `Authorization` on cross-host redirects).
+- Company: **Andina Foods** — currency USD, country Colombia, abbreviation
+  `AF`, no demo data.
+- API credentials: Secret Manager `frappe-api-key` / `frappe-api-secret`
+  (mirrored in local `.env` as `FRAPPE_SITE` / `FRAPPE_API_KEY` /
+  `FRAPPE_API_SECRET`). These are the owner's keys — rotate once a scoped
+  executor identity exists.
+- **Known issue:** the site's cron scheduler has never ticked (Frappe Cloud
+  support ticket filed 2026-08-12), so Email Queue does not auto-flush.
+  Outbound email works via API dispatch instead: queue with
+  `communication.email.make`, then `email_queue.send_now` — proven in
+  `spikes/frappe_capability/`. Probe for the fix: Email Queue `f7pj5o8901`
+  flushing on its own + fresh `Scheduled Job Log` entries.
 
 ## MCP servers
 
