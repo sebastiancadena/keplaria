@@ -1,0 +1,130 @@
+{
+  "case": {
+    "case_id": "TV-586B407C5C",
+    "case_version": 1,
+    "created_at": "2026-08-13 22:05:49.255000+00:00",
+    "phase": "failed",
+    "routing": {
+      "pending_implementation": [
+        "evidence"
+      ],
+      "proposed": [
+        "evidence",
+        "compliance"
+      ],
+      "reason": "Both evidence and compliance agents are required for a new supplier packet to extract document fields and perform sanctions screening.",
+      "refused": null,
+      "route": [
+        "evidence",
+        "compliance"
+      ]
+    },
+    "screening": {
+      "candidate_count": 5,
+      "candidates": [
+        {
+          "id": "syn-co-001",
+          "match": true,
+          "score": 1.0
+        },
+        {
+          "id": "syn-co-008",
+          "match": false,
+          "score": 0.5263157894736842
+        },
+        {
+          "id": "syn-co-006",
+          "match": false,
+          "score": 0.1923076923076923
+        }
+      ],
+      "endpoint": "http://10.10.0.2:8000",
+      "flagged": [
+        "syn-co-001"
+      ],
+      "reachable": true
+    },
+    "supplier": "Comercializadora Andes Verde SAS",
+    "updated_at": "2026-08-13 22:05:49.255000+00:00"
+  },
+  "case_id": "TV-586B407C5C",
+  "command": {
+    "action": "create_supplier",
+    "attempts": 1,
+    "case_id": "TV-586B407C5C",
+    "command_id": "TV-586B407C5C:create_supplier",
+    "created_at": "2026-08-13 22:05:53.674000+00:00",
+    "error": null,
+    "external_id": "Comercializadora Andes Verde SAS",
+    "payload": {
+      "country": "Colombia",
+      "supplier_name": "Comercializadora Andes Verde SAS"
+    },
+    "result": {
+      "created": false,
+      "external_id": "Comercializadora Andes Verde SAS"
+    },
+    "status": "done",
+    "updated_at": "2026-08-13 22:06:24.609000+00:00"
+  },
+  "criteria": {
+    "case_at_version_1": true,
+    "duplicate_produced_no_second_write": true,
+    "erp_supplier_created": true,
+    "ingress_requires_authentication": true,
+    "routing_decision_persisted": true,
+    "screening_summary_persisted": true
+  },
+  "duplicate_replay": {
+    "attempts": 1,
+    "case_version_after": 1,
+    "message_id": "21004017357842751"
+  },
+  "event_id": "evt-ad006ad6d9",
+  "passed": true,
+  "published_message_id": "21003785585284761",
+  "routing": {
+    "pending_implementation": [
+      "evidence"
+    ],
+    "proposed": [
+      "evidence",
+      "compliance"
+    ],
+    "reason": "Both evidence and compliance agents are required for a new supplier packet to extract document fields and perform sanctions screening.",
+    "refused": null,
+    "route": [
+      "evidence",
+      "compliance"
+    ]
+  },
+  "screening": {
+    "candidate_count": 5,
+    "candidates": [
+      {
+        "id": "syn-co-001",
+        "match": true,
+        "score": 1.0
+      },
+      {
+        "id": "syn-co-008",
+        "match": false,
+        "score": 0.5263157894736842
+      },
+      {
+        "id": "syn-co-006",
+        "match": false,
+        "score": 0.1923076923076923
+      }
+    ],
+    "endpoint": "http://10.10.0.2:8000",
+    "flagged": [
+      "syn-co-001"
+    ],
+    "reachable": true
+  },
+  "unauthenticated_status": {
+    "get_root": "403",
+    "post_pubsub_push": "403"
+  }
+}

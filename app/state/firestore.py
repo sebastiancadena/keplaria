@@ -19,9 +19,28 @@ OUTBOX = "outbox"
 
 
 def get_client(database: str | None = None) -> firestore.Client:
-    """Firestore client for the configured project and database."""
+    """Firestore client for the configured project and database.
+
+    FIRESTORE_PROJECT_ID, not GOOGLE_CLOUD_PROJECT: on Agent Runtime,
+    GOOGLE_CLOUD_PROJECT is a reserved env var the platform injects itself
+    (agents-cli deploy silently drops whatever value ships in .env, warning
+    "Ignoring reserved Agent Runtime env var"), and what it injects is the
+    numeric project number, not the project ID string. Firestore's resource
+    path requires the string ID — a client built with the numeric project
+    number 404s with "The database (default) does not exist for project
+    <number>" even though the database is real, because queue_supplier's
+    claim_command call is the only Firestore write made from inside the
+    engine. The ingress adapter (Cloud Run) never hits this: it has no
+    GOOGLE_CLOUD_PROJECT override at all, so it falls through to this
+    function's own "keplaria" default and works by accident. Same pattern as
+    AGENT_ENGINE_LOCATION vs GOOGLE_CLOUD_LOCATION in ingress/engine_client.py
+    — two consumers needing different values for what looks like one setting.
+    """
+    project = os.environ.get("FIRESTORE_PROJECT_ID") or os.environ.get(
+        "GOOGLE_CLOUD_PROJECT", "keplaria"
+    )
     return firestore.Client(
-        project=os.environ.get("GOOGLE_CLOUD_PROJECT", "keplaria"),
+        project=project,
         database=database or os.environ.get("FIRESTORE_DATABASE", "(default)"),
     )
 

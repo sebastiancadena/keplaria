@@ -103,6 +103,54 @@ else
   bad "expected 1 engine named keplaria, found $count: $(printf '%s' "$names" | tr '\n' ' ')— strays surface in Agent Registry"
 fi
 
+echo "== thin vertical =="
+gcloud firestore databases list --format='value(name)' --project=keplaria 2>/dev/null \
+  | grep -q '(default)$' \
+  && ok "firestore (default) database" || bad "firestore (default) database missing"
+gcloud pubsub topics describe keplaria-events --project=keplaria >/dev/null 2>&1 \
+  && ok "keplaria-events topic" || bad "keplaria-events topic missing"
+gcloud pubsub subscriptions describe keplaria-events-push --project=keplaria \
+  --format='value(pushConfig.oidcToken.serviceAccountEmail)' 2>/dev/null \
+  | grep -q 'keplaria-pubsub-push' \
+  && ok "push subscription authenticates with OIDC" \
+  || bad "keplaria-events-push missing its OIDC service account — the endpoint would accept anonymous pushes"
+ingress_url=$(gcloud run services describe keplaria-ingress --region=us-central1 \
+  --format='value(status.url)' --project=keplaria 2>/dev/null)
+if [ -n "$ingress_url" ]; then
+  # /healthz is NOT valid auth evidence here: it 404s both anonymously and
+  # with a valid identity token, so it proves nothing about the IAM check.
+  # POST /pubsub/push goes through the same Cloud Run IAM gate and is
+  # rejected before the app code ever sees it, so it is a real witness.
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${ingress_url}/pubsub/push" \
+    -H 'Content-Type: application/json' -d '{"message":{"data":""}}' 2>/dev/null)
+  case "$code" in
+    401|403) ok "ingress rejects anonymous POST /pubsub/push ($code)" ;;
+    *)       bad "ingress returned $code to an anonymous POST /pubsub/push — expected 401/403" ;;
+  esac
+else
+  bad "keplaria-ingress service not deployed"
+fi
+gcloud components list --filter='id=cloud-firestore-emulator' --format='value(state)' 2>/dev/null \
+  | grep -q 'Installed' \
+  && ok "firestore emulator component installed" \
+  || meh "firestore emulator component not installed (gcloud components install cloud-firestore-emulator)"
+# The Agent Runtime engine allows only 1 concurrent query; a serialised
+# ingress is what stops a single 429 from becoming a redelivery storm (see
+# infra/events/setup.sh for the incident this guards against).
+concurrency_scale=$(gcloud run services describe keplaria-ingress --region=us-central1 \
+  --project=keplaria \
+  --format='value(spec.template.spec.containerConcurrency,spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"])' 2>/dev/null)
+if [ "$concurrency_scale" = "$(printf '1\t1')" ]; then
+  ok "ingress containerConcurrency=1 and maxScale=1 (serialised against the engine's 1-concurrent-query quota)"
+else
+  bad "ingress concurrency/maxScale = '${concurrency_scale:-unknown}', expected 1 and 1 — a 429 can become a redelivery storm"
+fi
+retry_backoff=$(gcloud pubsub subscriptions describe keplaria-events-push --project=keplaria \
+  --format='value(retryPolicy.minimumBackoff)' 2>/dev/null)
+[ -n "$retry_backoff" ] \
+  && ok "keplaria-events-push has a retry policy (minimumBackoff=$retry_backoff)" \
+  || bad "keplaria-events-push has no retry policy — a 429/503 redelivers near-instantly and can exhaust the engine quota"
+
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
 if command -v uvx >/dev/null; then

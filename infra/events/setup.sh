@@ -14,9 +14,17 @@
 #     binding targets a Cloud Run service that doesn't exist yet the first
 #     time this script runs, so it happens after the service is deployed
 #     (see the "Deploying" section of README.md).
-#   - Create the keplaria-events-push subscription. It needs the deployed
-#     service's URL as its push endpoint, so it is created in the same
-#     post-deploy step as the run.invoker grant above.
+#
+# The keplaria-events-push subscription IS managed below, but only once
+# keplaria-ingress is deployed (it needs the service URL as its push
+# endpoint) — re-run this script after deploying to provision or repair it.
+# Its retry policy matters for correctness, not just cost: with no minimum
+# backoff, a single engine 429 (the Agent Runtime query quota allows only 1
+# concurrent request) becomes a redelivery storm — ingress 503s, Pub/Sub
+# redelivers near-instantly, claim_event honours it as a legitimate
+# redispatch, another engine call burns quota, guaranteed 429, repeat. A
+# minimum backoff is what turns that into a slow, quota-friendly retry
+# instead.
 set -euo pipefail
 
 PROJECT="${PROJECT:-keplaria}"
@@ -55,6 +63,27 @@ done
 echo "== push SA =="
 echo "  created above; roles/run.invoker on keplaria-ingress is granted after"
 echo "  that service is deployed — see README.md 'Deploying' section."
+
+echo "== push subscription =="
+MIN_RETRY_DELAY="60s"
+MAX_RETRY_DELAY="600s"
+INGRESS_URL=$(gcloud run services describe keplaria-ingress --region=us-central1 \
+  --project="$PROJECT" --format='value(status.url)' 2>/dev/null || true)
+if [ -z "$INGRESS_URL" ]; then
+  echo "keplaria-ingress not deployed yet — skipping subscription create/update."
+  echo "Re-run this script after deploying it to provision keplaria-events-push."
+elif gcloud pubsub subscriptions describe keplaria-events-push --project="$PROJECT" >/dev/null 2>&1; then
+  echo "subscription keplaria-events-push already exists — ensuring retry policy is set"
+  gcloud pubsub subscriptions update keplaria-events-push --project="$PROJECT" \
+    --min-retry-delay="$MIN_RETRY_DELAY" --max-retry-delay="$MAX_RETRY_DELAY" >/dev/null
+else
+  gcloud pubsub subscriptions create keplaria-events-push --project="$PROJECT" \
+    --topic="$TOPIC" \
+    --push-endpoint="${INGRESS_URL}/pubsub/push" \
+    --push-auth-service-account="$PUSH_SA" \
+    --min-retry-delay="$MIN_RETRY_DELAY" --max-retry-delay="$MAX_RETRY_DELAY" \
+    --ack-deadline=600
+fi
 
 echo "== done =="
 echo "topic:      $(gcloud pubsub topics describe "$TOPIC" --project="$PROJECT" --format='value(name)')"
