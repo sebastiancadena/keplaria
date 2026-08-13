@@ -4,6 +4,86 @@ Agent project built on the [Google Agent Development Kit (ADK)](https://adk.dev)
 for Python, targeting the
 [Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start).
 
+## Architecture
+
+The agent graph and its adapters run on two different runtimes:
+
+- **Agent Runtime** hosts the ADK graph — reasoning engine `keplaria`
+  (`projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416`).
+  It reaches the private yente screening VM over the `keplaria-psc2` PSC-I
+  network attachment and keeps agent execution state in Agent Platform
+  Sessions.
+- **Cloud Run** hosts `keplaria-ingress`, the authenticated Pub/Sub push
+  adapter — the only public-facing entry point, and the component that talks
+  to both Firestore and the ERP.
+
+Everything is in `us-central1`.
+
+### Event flow
+
+```text
+topic keplaria-events
+  -> OIDC-authenticated push subscription keplaria-events-push
+  -> private Cloud Run ingress (keplaria-ingress)
+  -> Firestore inbox transaction (claims event_id, creates/advances the
+     case, bumps case_version)
+  -> Agent Runtime graph: parse -> LLM coordinator routing proposal ->
+     deterministic policy validation (app/policy.py) -> yente screening
+     over PSC-I -> queue ERP command
+  -> ingress drains the command outbox and performs the ERP write
+```
+
+**The ERP executor runs in the ingress, not in the graph.** The
+PSC-attached engine has no public internet egress — Cloud NAT is
+`ENDPOINT_TYPE_VM`, which does not cover a PSC interface NIC — so the engine
+itself cannot reach Frappe Cloud. The deterministic executor that performs
+ERP writes therefore lives in the ingress process. This is a genuinely
+separate component from the agent graph, by design, not a workaround.
+
+**Fail-closed routing.** The LLM coordinator only proposes a route; a
+deterministic policy layer (`app/policy.py`) decides whether it is
+permitted. A refused proposal routes to a `quarantine_case` terminal node
+that performs no Firestore command claim and no ERP write.
+
+**Idempotency.** Every side effect is a Firestore command with a
+deterministic ID (`{case_id}:{action}`). A command already `DONE` is never
+re-driven, so a replayed event produces exactly one ERP write. ERP records
+are keyed by supplier name, so a duplicate create collides natively (409)
+and is reported rather than retried blindly.
+
+### Operational constraints
+
+- **Agent Runtime allows 1 concurrent query and 30 queries/min per
+  region.** `keplaria-ingress` is deployed with `--concurrency=1
+  --max-instances=1`, and the `keplaria-events-push` subscription carries an
+  explicit retry policy (`60s`–`600s` backoff). Without both, a single
+  rate-limit error becomes a self-sustaining redelivery storm: the ingress
+  503s, Pub/Sub redelivers near-instantly, the engine takes another hit,
+  guaranteed 429, repeat.
+- **`GOOGLE_CLOUD_LOCATION` must be `global`, not `us-central1`** —
+  `gemini-3.6-flash` 404s at the regional endpoint. `AGENT_ENGINE_LOCATION`
+  is a deliberately separate variable (`us-central1`) that addresses only
+  the Agent Engine REST endpoint. These two are kept apart on purpose:
+  collapsing them into one variable is the obvious "simplification" that
+  breaks the deployment, because the model-serving endpoint and the Agent
+  Engine endpoint are different hosts.
+- **`GOOGLE_CLOUD_PROJECT` is platform-reserved on Agent Runtime** and is
+  overwritten with the numeric project number, which the Firestore client
+  rejects. `FIRESTORE_PROJECT_ID` carries the project ID for the Firestore
+  client instead.
+- **Frappe credentials reach the ingress from Secret Manager**, not as
+  plaintext environment variables.
+
+### Verification
+
+- `scripts/doctor.sh` — 36 read-only checks covering toolchain, auth,
+  provisioned infra, and the event-flow wiring (topic, push subscription
+  OIDC, ingress auth, concurrency/maxScale, retry policy).
+- `spikes/thin_vertical/verify.py` — proves the vertical end to end against
+  the deployed engine and ingress, and writes
+  `spikes/thin_vertical/evidence.json`. This is the current post-deploy
+  verification script — see [Deploying](#deploying-to-agent-runtime).
+
 ## Setup from a fresh clone
 
 Requires [uv](https://docs.astral.sh/uv/) and the `gcloud` CLI. uv provisions its
@@ -257,13 +337,23 @@ checks, Agent Runtime criteria) live under `spikes/` — each is a standalone
 ## Deploying to Agent Runtime
 
 ```bash
-agents-cli deploy \
+agents-cli deploy --project keplaria --region us-central1 \
   --network-attachment projects/keplaria/regions/us-central1/networkAttachments/keplaria-psc2
 ```
 
-Verify afterwards with `uv run python spikes/agent_runtime/spike.py`, which
-exercises private screening, pause/resume, and session persistence against the
-deployed engine and writes `spikes/agent_runtime/evidence.json`.
+`--project` is required in non-interactive use — without it, `agents-cli`
+falls back to an interactive project picker.
+
+Verify afterwards with `uv run python spikes/thin_vertical/verify.py`, which
+proves the event-to-ERP vertical end to end against the deployed engine and
+ingress, and writes `spikes/thin_vertical/evidence.json`.
+
+`spikes/agent_runtime/spike.py` and `spikes/hitl_resume/spike.py` are
+point-in-time records from when the graph still paused mid-run on a public
+`RequestInput`. The graph no longer does that, so re-running either spike
+against the current deployment fails; they and their `evidence.json` files
+are kept as historical proof of what was verified at the time, not as
+current verification tooling.
 
 ### `.gcloudignore` is mandatory
 
