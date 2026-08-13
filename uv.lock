@@ -1284,6 +1284,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "gcsfs" },
     { name = "google-adk", extra = ["gcp", "otel-gcp"] },
+    { name = "httpx" },
     { name = "opentelemetry-resourcedetector-gcp" },
 ]
 
@@ -1293,6 +1294,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.4" },
     { name = "gcsfs", specifier = ">=2024.11.0" },
     { name = "google-adk", extras = ["gcp", "otel-gcp"], specifier = ">=2.5.0,<3.0.0" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "opentelemetry-resourcedetector-gcp", specifier = "<=1.12.0a0" },
 ]
 

@@ -1,0 +1,39 @@
+# Controls what `agents-cli deploy` packages into the Agent Runtime container.
+# This file REPLACES .gitignore for deploy-time file selection, so every
+# .gitignore pattern that matters must be repeated here.
+
+# --- Private strategy layer — MUST NEVER be packaged -----------------------
+# These are symlinks into the private keplaria-strategy repo. Beyond the
+# confidentiality rule, the packager resolves symlinks and aborts with
+# "path is outside the project directory" if they are included.
+strategy
+.claude
+CLAUDE.md
+
+# --- Secrets ---------------------------------------------------------------
+.env
+
+# --- Python-generated ------------------------------------------------------
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+
+# --- Not needed at runtime -------------------------------------------------
+.git
+.gitignore
+.codex
+.agents
+deployment/
+infra/
+spikes/
+scripts/
+tests/
+docs/
+GEMINI.md
+agents-cli-manifest.yaml
+skills-lock.json
+.rumdl_cache

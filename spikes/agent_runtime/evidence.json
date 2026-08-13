@@ -1,0 +1,132 @@
+{
+  "criteria": {
+    "psci_reaches_yente": true,
+    "paused_with_request_input": true,
+    "resumed_after_pause": true,
+    "events_persisted_in_sessions": true
+  },
+  "resource": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
+  "session_id": "8410575039732121600",
+  "screening": {
+    "endpoint": "http://10.10.0.2:8000",
+    "supplier": "Comercializadora Andes Verde SAS",
+    "reachable": true,
+    "candidates": [
+      {
+        "id": "syn-co-001",
+        "caption": "Comercializadora Andes Verde S.A.S.",
+        "score": 1.0,
+        "match": true,
+        "topics": [
+          "sanction"
+        ]
+      },
+      {
+        "id": "syn-co-008",
+        "caption": "Andes Verde Logistica S.A.S.",
+        "score": 0.5263157894736842,
+        "match": false,
+        "topics": [
+          "sanction.linked"
+        ]
+      },
+      {
+        "id": "syn-co-006",
+        "caption": "Frigorificos Cordillera Central S.A.S.",
+        "score": 0.1923076923076923,
+        "match": false,
+        "topics": [
+          "debarment"
+        ]
+      },
+      {
+        "id": "syn-co-002",
+        "caption": "Transportes Maritimos Delta Sur Ltda",
+        "score": 0.14358974358974355,
+        "match": false,
+        "topics": [
+          "sanction"
+        ]
+      },
+      {
+        "id": "syn-co-004",
+        "caption": "Empaques Norte\u00f1os Bahia Blanca S.R.L.",
+        "score": 0.14358974358974355,
+        "match": false,
+        "topics": [
+          "export.control"
+        ]
+      }
+    ],
+    "flagged": [
+      "syn-co-001"
+    ]
+  },
+  "interrupt_id": "f718a04c-a1e8-4a96-b3fa-55c1fa070f57",
+  "final_output": {
+    "status": "approved",
+    "case": {
+      "case_id": "RUNTIME-SPIKE-001",
+      "event_type": "new_supplier_packet",
+      "supplier": "Comercializadora Andes Verde SAS",
+      "amount": 4200
+    },
+    "screening": {
+      "endpoint": "http://10.10.0.2:8000",
+      "supplier": "Comercializadora Andes Verde SAS",
+      "reachable": true,
+      "candidates": [
+        {
+          "id": "syn-co-001",
+          "caption": "Comercializadora Andes Verde S.A.S.",
+          "score": 1,
+          "match": true,
+          "topics": [
+            "sanction"
+          ]
+        },
+        {
+          "id": "syn-co-008",
+          "caption": "Andes Verde Logistica S.A.S.",
+          "score": 0.5263157894736842,
+          "match": false,
+          "topics": [
+            "sanction.linked"
+          ]
+        },
+        {
+          "id": "syn-co-006",
+          "caption": "Frigorificos Cordillera Central S.A.S.",
+          "score": 0.1923076923076923,
+          "match": false,
+          "topics": [
+            "debarment"
+          ]
+        },
+        {
+          "id": "syn-co-002",
+          "caption": "Transportes Maritimos Delta Sur Ltda",
+          "score": 0.14358974358974355,
+          "match": false,
+          "topics": [
+            "sanction"
+          ]
+        },
+        {
+          "id": "syn-co-004",
+          "caption": "Empaques Norte\u00f1os Bahia Blanca S.R.L.",
+          "score": 0.14358974358974355,
+          "match": false,
+          "topics": [
+            "export.control"
+          ]
+        }
+      ],
+      "flagged": [
+        "syn-co-001"
+      ]
+    }
+  },
+  "session_event_count": 6,
+  "verdict": "PASS"
+}

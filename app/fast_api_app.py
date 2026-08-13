@@ -15,6 +15,7 @@
 import contextlib
 import os
 from collections.abc import AsyncIterator
+from typing import Any
 
 import google.auth
 from a2a.server.tasks import InMemoryTaskStore
@@ -26,12 +27,34 @@ from google.cloud import logging as google_cloud_logging
 
 from app.app_utils import services
 from app.app_utils.a2a import attach_a2a_routes
+from app.app_utils.reasoning_engine_adapter import attach_reasoning_engine_routes
 from app.app_utils.typing import Feedback
 
 load_dotenv()
+otel_to_cloud = os.environ.get(
+    "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", ""
+).lower() in ("true", "1")
 _, project_id = google.auth.default()
-logging_client = google_cloud_logging.Client()
-logger = logging_client.logger(__name__)
+
+# Constructing the Cloud Logging client at import time makes module import a
+# network operation. If it raises inside a serving container the process dies
+# before any logging exists, so the failure is invisible — which is exactly how
+# an Agent Runtime "failed to start and cannot serve traffic" presents. Degrade
+# to stdlib logging instead of taking the app down with it.
+logger: Any
+try:
+    logging_client = google_cloud_logging.Client()
+    logger = logging_client.logger(__name__)
+except Exception:  # noqa: BLE001 — never let telemetry setup kill startup
+    import logging as _stdlib_logging
+
+    _stdlib_logging.exception("Cloud Logging unavailable; using stdlib logging")
+
+    class _FallbackLogger:
+        def log_struct(self, payload: dict, severity: str = "INFO") -> None:
+            _stdlib_logging.getLogger(__name__).info("%s: %s", severity, payload)
+
+    logger = _FallbackLogger()
 allow_origins = (
     os.getenv("ALLOW_ORIGINS", "").split(",") if os.getenv("ALLOW_ORIGINS") else None
 )
@@ -68,11 +91,16 @@ app: FastAPI = get_fast_api_app(
     artifact_service_uri=services.ARTIFACT_SERVICE_URI,
     allow_origins=allow_origins,
     session_service_uri=services.SESSION_SERVICE_URI,
-    otel_to_cloud=True,
+    otel_to_cloud=otel_to_cloud,
     lifespan=lifespan,
 )
 app.title = "keplaria"
 app.description = "API for interacting with the Agent keplaria"
+
+# Serves the reasoning_engine {class_method, input} contract that Agent Runtime
+# forwards to /api/reasoning_engine and /api/stream_reasoning_engine. The
+# cloud_run scaffold omits this module; Agent Runtime cannot serve without it.
+attach_reasoning_engine_routes(app)
 
 
 @app.post("/feedback")

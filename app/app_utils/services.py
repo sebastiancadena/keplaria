@@ -46,6 +46,26 @@ def get_session_service():
         "yes",
     )
     if not use_in_memory_session:
+        # On Agent Runtime the platform injects the engine ID: bind straight to
+        # it. The list/create branch below must NOT run there — the container IS
+        # the agent engine, so calling agent_engines.list()/create() while it is
+        # still booting blocks startup and the deploy fails with "failed to
+        # start and cannot serve traffic", before any logging exists to say so.
+        if agent_engine_id := os.environ.get("GOOGLE_CLOUD_AGENT_ENGINE_ID"):
+            from google.adk.sessions.vertex_ai_session_service import (
+                VertexAiSessionService,
+            )
+
+            return VertexAiSessionService(
+                project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+                # Runtime-injected agent-engine region, not GOOGLE_CLOUD_LOCATION.
+                location=os.environ.get("GOOGLE_CLOUD_AGENT_ENGINE_LOCATION")
+                or os.environ.get("GOOGLE_CLOUD_LOCATION"),
+                agent_engine_id=agent_engine_id,
+            )
+
+        # Cloud Run (and local) path: find or create the engine that backs
+        # Agent Platform Sessions.
         default_agent_name = "keplaria"
         agent_name = os.environ.get("AGENT_ENGINE_SESSION_NAME", default_agent_name)
         existing_agents = list(agent_engines.list(filter=f"display_name={agent_name}"))

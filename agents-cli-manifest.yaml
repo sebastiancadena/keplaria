@@ -6,8 +6,8 @@ base_template: "local_keplaria"
 generated_at: "2026-08-12T22:36:39.567599+00:00"
 language: "python"
 create_params:
-  deployment_target: "cloud_run"
-  session_type: "agent_platform_sessions"
+  deployment_target: "agent_runtime"
+  session_type: "none"
   cicd_runner: "skip"
   is_a2a: true
   agent_guidance_filename: "GEMINI.md"

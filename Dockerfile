@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:3.12-slim
+# Must match `requires-python` in pyproject.toml. uv.lock is resolved for
+# >=3.13; installing it into a 3.12 venv builds cleanly but produces an
+# environment that fails on import at container start, which Agent Runtime
+# reports only as "failed to start and cannot serve traffic" with no logs.
+FROM python:3.13-slim
 
 RUN pip install --no-cache-dir uv==0.8.13
 
