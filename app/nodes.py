@@ -47,6 +47,14 @@ def parse_case(node_input, ctx: Context) -> Event:
 def apply_route(node_input, ctx: Context) -> Event:
     """Validate the coordinator's proposal and pick the executable branch.
 
+    Any PolicyError blocks the case rather than skipping it: a refused
+    proposal must never reach execute_supplier. validate_route already
+    encodes the one legitimate empty route (an event type that requires no
+    agents, e.g. evidence_overdue) as a normal return rather than a raise, so
+    checking `refused is not None` here is sufficient to distinguish
+    "genuinely nothing to do" from "the proposal was rejected" without
+    duplicating the ALLOWED_ROUTES policy table in this module.
+
     The evidence agent is not built yet, so a permitted 'evidence' selection is
     recorded and skipped rather than silently dropped.
     """
@@ -60,8 +68,9 @@ def apply_route(node_input, ctx: Context) -> Event:
         route = validate_route(event_type, proposed)
         refused = None
     except PolicyError as exc:
-        # A rejected proposal is a policy outcome the trace must show, and the
-        # case still proceeds deterministically rather than failing open.
+        # A rejected proposal is a policy outcome the trace must show, and it
+        # must never fall through to a side effect — quarantine_case is the
+        # only node this can reach next.
         route, refused = [], str(exc)
 
     decision = {
@@ -71,10 +80,40 @@ def apply_route(node_input, ctx: Context) -> Event:
         "refused": refused,
         "pending_implementation": [a for a in route if a == "evidence"],
     }
+
+    if refused is not None:
+        next_route = "blocked"
+    elif "compliance" in route:
+        next_route = "screen"
+    else:
+        next_route = "skip"
+
     return Event(
         output=decision,
         state={"routing": decision},
-        route="screen" if "compliance" in route else "skip",
+        route=next_route,
+    )
+
+
+def quarantine_case(node_input, ctx: Context) -> Event:
+    """Terminal node for a refused routing proposal.
+
+    Records the refusal and stops. No Firestore command claim, no ERP call —
+    a rejected coordinator proposal must produce zero writes.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+
+    with tracer.start_as_current_span("quarantine_case") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.quarantined", True)
+
+    return Event(
+        output={
+            "status": "quarantined",
+            "case_id": case_id,
+            "routing": ctx.state.get("routing"),
+        }
     )
 
 

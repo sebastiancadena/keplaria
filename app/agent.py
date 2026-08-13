@@ -29,7 +29,13 @@ from google.adk.apps import App, ResumabilityConfig
 from google.adk.workflow import Workflow
 from google.genai import types
 
-from app.nodes import apply_route, execute_supplier, parse_case, screen_supplier
+from app.nodes import (
+    apply_route,
+    execute_supplier,
+    parse_case,
+    quarantine_case,
+    screen_supplier,
+)
 from app.schemas import RoutingDecision
 
 coordinator = LlmAgent(
@@ -68,8 +74,16 @@ root_agent = Workflow(
         # A routing-map chain element is this ADK version's syntax for a
         # conditional edge; it expands to the same (from, to, route) pairs
         # the design calls for: "screen" -> screen_supplier, "skip" ->
-        # execute_supplier.
-        (apply_route, {"screen": screen_supplier, "skip": execute_supplier}),
+        # execute_supplier, "blocked" -> quarantine_case (a refused proposal
+        # must never reach the executor).
+        (
+            apply_route,
+            {
+                "screen": screen_supplier,
+                "skip": execute_supplier,
+                "blocked": quarantine_case,
+            },
+        ),
         (screen_supplier, execute_supplier),
     ],
 )
