@@ -50,6 +50,38 @@ gcloud compute firewall-rules describe keplaria-allow-internal --project=keplari
   --format='value(allowed[].map().firewall_rule().list())' 2>/dev/null | grep -q 'tcp:8000' \
   && ok "yente port 8000 open inside keplaria-vpc" || bad "keplaria-allow-internal missing tcp:8000 (PSC-I → yente will fail)"
 
+echo "== Agent Runtime deploy preconditions =="
+[ -f .gcloudignore ] && grep -q '^strategy$' .gcloudignore \
+  && ok ".gcloudignore excludes the private strategy symlinks" \
+  || bad ".gcloudignore missing/incomplete — a deploy would package strategy/ into the container"
+gcloud compute network-attachments describe keplaria-psc2 --region=us-central1 \
+  --project=keplaria >/dev/null 2>&1 \
+  && ok "network attachment keplaria-psc2" || bad "keplaria-psc2 missing (PSC-I → yente will fail)"
+gcloud compute firewall-rules describe keplaria-allow-psc-to-yente --project=keplaria \
+  --format='value(allowed[].map().firewall_rule().list())' 2>/dev/null | grep -q 'tcp:8000' \
+  && ok "PSC subnet may reach yente on 8000" \
+  || bad "keplaria-allow-psc-to-yente missing tcp:8000 — the attachment NIC lands in 10.10.1.0/24, which keplaria-allow-internal does NOT cover"
+# The producer PATCHes the attachment, so networkAdmin (not just networkUser) is required.
+sa_roles=$(gcloud projects get-iam-policy keplaria --flatten='bindings[].members' \
+  --filter='bindings.members:service-584548214478@gcp-sa-aiplatform.iam.gserviceaccount.com' \
+  --format='value(bindings.role)' 2>/dev/null)
+echo "$sa_roles" | grep -q 'compute.networkAdmin' \
+  && ok "aiplatform SA has compute.networkAdmin (networkAttachments.update)" \
+  || bad "aiplatform SA lacks compute.networkAdmin — PSC deploys 403 on networkAttachments.update"
+re_roles=$(gcloud projects get-iam-policy keplaria --flatten='bindings[].members' \
+  --filter='bindings.members:service-584548214478@gcp-sa-aiplatform-re.iam.gserviceaccount.com' \
+  --format='value(bindings.role)' 2>/dev/null)
+echo "$re_roles" | grep -q 'compute.networkUser' \
+  && ok "aiplatform-re SA has compute.networkUser" || bad "aiplatform-re SA lacks compute.networkUser"
+gcloud services list --enabled --project=keplaria 2>/dev/null | grep -q 'cloudresourcemanager' \
+  && ok "cloudresourcemanager API enabled" || bad "cloudresourcemanager disabled (Cloud Logging + OTel resource detector need it)"
+# Base image and requires-python must agree or the lock installs into the wrong venv.
+img=$(grep -oP '^FROM python:\K[0-9]+\.[0-9]+' Dockerfile 2>/dev/null | head -1)
+req=$(grep -oP 'requires-python\s*=\s*">=\K[0-9]+\.[0-9]+' pyproject.toml 2>/dev/null | head -1)
+[ -n "$img" ] && [ "$img" = "$req" ] \
+  && ok "Dockerfile python:$img matches requires-python >=$req" \
+  || bad "Dockerfile python:${img:-?} vs requires-python >=${req:-?} — builds clean, dies on import"
+
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
 if command -v uvx >/dev/null; then

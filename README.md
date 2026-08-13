@@ -95,7 +95,11 @@ Stay on 3.13 unless there is a concrete reason to move.
 |---|---|
 | Project ID | `keplaria` (project number `584548214478`) |
 | Region | `us-central1` |
-| APIs enabled | Agent Platform (`aiplatform`), Run, Compute, Firestore, Pub/Sub, Secret Manager, Cloud Scheduler, BigQuery, Cloud Trace, IAP, Model Armor, Cloud Build, Artifact Registry, Cloud Functions, Eventarc, Cloud Billing (+Budgets) |
+| APIs enabled | Agent Platform (`aiplatform`), **Agent Registry (`agentregistry`)**, **Cloud Resource Manager**, Run, Compute, Firestore, Pub/Sub, Secret Manager, Cloud Scheduler, BigQuery, Cloud Trace, IAP, Model Armor, Cloud Build, Artifact Registry, Cloud Functions, Eventarc, Cloud Billing (+Budgets) |
+
+`cloudresourcemanager.googleapis.com` is not optional: the GCP OpenTelemetry
+resource detector and the Cloud Logging client both call it, and it was disabled
+until 2026-08-13.
 
 Authentication is via Application Default Credentials. Verify with:
 
@@ -113,6 +117,16 @@ Vertex AI API under its current name, not a separate product.
   `10.10.0.0/24` with Private Google Access, Cloud NAT (`keplaria-nat` on
   `keplaria-router`). Ingress: IAP-range SSH only (`keplaria-allow-iap-ssh`)
   plus intra-subnet tcp 8000/9200 (`keplaria-allow-internal`).
+- **Private Service Connect interface (PSC-I)** — how the deployed agent reaches
+  the yente VM, which has no public address. Dedicated subnet
+  `keplaria-psc-subnet` `10.10.1.0/24` (a network attachment should not share a
+  subnet with VMs), network attachment `keplaria-psc2` (`ACCEPT_AUTOMATIC`), and
+  firewall `keplaria-allow-psc-to-yente` allowing tcp:8000 from `10.10.1.0/24`.
+  The attachment NIC lands in the PSC subnet, **not** in `10.10.0.0/24`, so
+  `keplaria-allow-internal` alone does not cover it.
+- **Agent Runtime deployment:** reasoning engine `keplaria-psc2`
+  (`2127503872455868416`) — the promoted agent graph. See
+  [Deploying](#deploying-to-agent-runtime).
 - **VM `keplaria-yente`** (`us-central1-c`): `t2d-standard-4` (e2 was stocked
   out region-wide on creation day), 60 GB pd-ssd, **no external IP**
   (10.10.0.2), service account `yente-vm@`. Nightly stop 01:00
@@ -199,15 +213,34 @@ Both `.agents/` and `skills-lock.json` are committed, so the skill set is pinned
 rather than re-resolved per machine. `agents-cli info` should report
 `Installed skills: 7 (project)`. Refresh with `agents-cli update`.
 
-### Scaffolded project (2026-08-12)
+**Read these before improvising — they are more current than model priors, and
+the 2026-08-13 deploy debugging burned ~40 minutes rediscovering things already
+written down here:**
 
-`agents-cli scaffold enhance` ran with `--deployment-target cloud_run
+| Question | File |
+|---|---|
+| What must the container expose on Agent Runtime? PSC, DNS peering, `deployment_metadata.json` | `google-agents-cli-deploy/references/agent-runtime.md` |
+| How do I call a deployed agent? (the `/api/...` passthrough, and how it differs from the `reasoning_engine` adapter) | `google-agents-cli-deploy/references/testing-deployed-agents.md` |
+| Where do the logs and traces actually go? Agent Runtime stdout arrives as `aiplatform_googleapis_com_reasoning_engine_stdout` | `google-agents-cli-observability/references/cloud-trace-and-logging.md` |
+| Scaffold flags and what each deployment target generates | `google-agents-cli-scaffold/references/flags.md` |
+
+When a reference names a helper that does not exist in site-packages, assume it
+is a **project-local scaffold file** before assuming the docs are stale — that
+exact misread is what cost the 40 minutes.
+
+### Scaffolded project (2026-08-12), promoted to Agent Runtime (2026-08-13)
+
+`agents-cli scaffold enhance` originally ran with `--deployment-target cloud_run
 --session-type agent_platform_sessions --region us-central1`. Result:
 `agents-cli-manifest.yaml`, agent code under `app/` (workflow in `agent.py`,
 server in `fast_api_app.py`), `tests/`, `deployment/` (Terraform), `Dockerfile`.
-Sessions are persistent: `app/app_utils/services.py` resolves an
-`agentengine://` session service against the Agent Engine with display name
-`keplaria` (created on first boot).
+
+On 2026-08-13 the graph was promoted to **Agent Runtime** and the manifest now
+declares `deployment_target: agent_runtime` / `session_type: none` (Agent
+Runtime manages sessions itself). Sessions resolve two ways in
+`app/app_utils/services.py`: on Agent Runtime it binds directly to the injected
+`GOOGLE_CLOUD_AGENT_ENGINE_ID`; elsewhere (Cloud Run, local) it falls back to
+finding or creating the Agent Engine named `keplaria`.
 
 **Scaffold gotcha:** `scaffold enhance` runs in overwrite mode and
 `shutil.rmtree`s existing directories — it **crashes on symlinked dirs**
@@ -216,8 +249,91 @@ to a scratch dir, enhance there, port the output back, and fix the project
 name it embeds from the directory name.
 
 Spike harnesses (HITL resume across SIGKILL, retry-on-503, ERP capability
-checks) live under `spikes/` — each is a standalone
+checks, Agent Runtime criteria) live under `spikes/` — each is a standalone
 `uv run python spikes/<name>/spike.py`.
+
+## Deploying to Agent Runtime
+
+```bash
+agents-cli deploy \
+  --network-attachment projects/keplaria/regions/us-central1/networkAttachments/keplaria-psc2
+```
+
+Verify afterwards with `uv run python spikes/agent_runtime/spike.py`, which
+exercises private screening, pause/resume, and session persistence against the
+deployed engine and writes `spikes/agent_runtime/evidence.json`.
+
+### `.gcloudignore` is mandatory
+
+Without it the packager falls back to `.gitignore`, which excludes none of the
+`strategy`, `.claude`, or `CLAUDE.md` symlinks — **the private strategy layer
+would be packaged into the deployed container.** It fails loudly today only
+because the packager rejects symlinks resolving outside the project root; that
+is a guardrail, not the protection. Never deploy without `.gcloudignore`.
+
+### Required IAM (grant as the human, then wait)
+
+PSC-I needs the Vertex AI service agents to both read *and modify* the network
+attachment — the producer PATCHes it to register its endpoint. `networkUser`
+alone grants only get/list and the deploy fails as a bare "failed to start".
+
+```bash
+SA=service-584548214478@gcp-sa-aiplatform.iam.gserviceaccount.com
+RE=service-584548214478@gcp-sa-aiplatform-re.iam.gserviceaccount.com
+gcloud projects add-iam-policy-binding keplaria --member=serviceAccount:$SA \
+  --role=roles/compute.networkUser  --condition=None
+gcloud projects add-iam-policy-binding keplaria --member=serviceAccount:$RE \
+  --role=roles/compute.networkUser  --condition=None
+gcloud projects add-iam-policy-binding keplaria --member=serviceAccount:$SA \
+  --role=roles/compute.networkAdmin --condition=None
+```
+
+**Grants take ~2 minutes to propagate — the first retry after granting still
+returns 403.** `roles/compute.networkAdmin` is broad (firewalls, routes, and
+subnets project-wide); acceptable for a throwaway project, revisit otherwise.
+
+### PSC config is immutable after deployment
+
+Adding, removing, or changing `--network-attachment` on an existing engine fails
+with *"The Reasoning Engine failed to be updated."* Delete the engine and create
+it again instead.
+
+### The one failure mode you will actually hit
+
+Nearly every misconfiguration surfaces as the identical, useless error:
+
+> `Reasoning Engine resource [...] failed to start and cannot serve traffic.`
+
+with **zero container logs** — the build logs
+(`aiplatform.googleapis.com/reasoning_engine_build`) succeed, and the stdout log
+(`aiplatform_googleapis_com_reasoning_engine_stdout`) is never created at all,
+because the container dies before logging exists. Absence of that log stream is
+itself the diagnosis: the container never ran.
+
+**Do not debug this by reading logs. Bisect against a throwaway scaffold:**
+
+```bash
+cd "$(mktemp -d)"   # NEVER in the repo — scaffold create writes to CWD
+agents-cli scaffold create probe --deployment-target agent_runtime \
+  --cicd-runner skip --region us-central1 --auto-approve
+```
+
+Deploy that stock project (it works), then copy your files across one group at a
+time until it breaks. Three real defects were found this way on 2026-08-13, all
+of which also affect the Cloud Run fallback:
+
+| Defect | Why it breaks | Fix |
+|---|---|---|
+| `app_utils/reasoning_engine_adapter.py` missing | The `cloud_run` scaffold omits it, so the container cannot serve the `reasoning_engine` contract. It is a **project-local scaffold file**, not an ADK export — grepping site-packages for `attach_reasoning_engine_routes` finds nothing and is misleading | Port it from an `agent_runtime` scaffold |
+| `services.py` called `agent_engines.list()/create()` at import | On Agent Runtime the container **is** an agent engine, so it blocked its own boot | Prefer the injected `GOOGLE_CLOUD_AGENT_ENGINE_ID` |
+| `Dockerfile` `python:3.12-slim` vs `requires-python >=3.13` | Installs a 3.13-resolved `uv.lock` into a 3.12 venv; builds clean, dies on import | Keep the base image and `requires-python` in lockstep |
+
+### Secrets
+
+`agents-cli deploy` reads `.env` and injects every key as a **plaintext runtime
+env var, echoing them to stdout** — `FRAPPE_API_KEY` / `FRAPPE_API_SECRET`
+currently ship this way. Move them to `--secrets ENV=SECRET` (Secret Manager)
+when the scoped executor identity is built, and rotate.
 
 ## ERPNext (Frappe Cloud)
 
