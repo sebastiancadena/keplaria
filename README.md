@@ -296,9 +296,39 @@ subnets project-wide); acceptable for a throwaway project, revisit otherwise.
 
 ### PSC config is immutable after deployment
 
-Adding, removing, or changing `--network-attachment` on an existing engine fails
-with *"The Reasoning Engine failed to be updated."* Delete the engine and create
-it again instead.
+**Changing** PSC config on an existing engine — adding, removing, or swapping
+`--network-attachment` — fails with *"The Reasoning Engine failed to be
+updated."* Delete the engine and create it again instead.
+
+Redeploying with the **same** attachment is a normal update and works fine, so
+routine code deploys need no special handling. Only the PSC value itself is
+frozen.
+
+### Renaming an engine does not rename its Agent Registry entry
+
+Agent Registry snapshots `displayName` at registration and does not follow a
+later engine rename — it will show the stale name indefinitely, and `PATCH` on
+the registry entry returns 404 (the entries are system-managed). **A redeploy is
+what refreshes it.** This matters because Agent Registry is the cataloging
+surface the Fleet track claim points at, so a stale or debugging-flavoured name
+is judge-visible.
+
+Prefer deploying with the final name via `--service-name` from the start.
+
+### Keep exactly one engine
+
+`app/app_utils/services.py` finds-or-creates a session backend **by display
+name** (`keplaria`) whenever `GOOGLE_CLOUD_AGENT_ENGINE_ID` is absent — i.e. on
+Cloud Run and local runs. Two consequences:
+
+- Deleting a stray engine does not stick; the next local run recreates it.
+  Keeping the real deployment named `keplaria` is what makes the fallback bind
+  to it instead of manufacturing a duplicate.
+- Local runs share the deployed engine's session store. Set
+  `USE_IN_MEMORY_SESSION=true` (or `AGENT_ENGINE_SESSION_NAME`) if you need to
+  keep local experiments out of it — relevant during the judging window.
+
+`scripts/doctor.sh` asserts the one-engine invariant.
 
 ### The one failure mode you will actually hit
 

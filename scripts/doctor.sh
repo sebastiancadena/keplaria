@@ -82,6 +82,27 @@ req=$(grep -oP 'requires-python\s*=\s*">=\K[0-9]+\.[0-9]+' pyproject.toml 2>/dev
   && ok "Dockerfile python:$img matches requires-python >=$req" \
   || bad "Dockerfile python:${img:-?} vs requires-python >=${req:-?} — builds clean, dies on import"
 
+# One engine named keplaria. services.py finds-or-creates by display name, so a
+# second engine means a stray duplicate and a non-deterministic session backend.
+# There is no `gcloud ai reasoning-engines` surface — this is REST-only.
+names=$(curl -s -m 30 -H "Authorization: Bearer $(gcloud auth print-access-token 2>/dev/null)" \
+  "https://us-central1-aiplatform.googleapis.com/v1/projects/584548214478/locations/us-central1/reasoningEngines" \
+  2>/dev/null | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(1)
+print("\n".join(e.get("displayName","?") for e in d.get("reasoningEngines",[])))' 2>/dev/null)
+rc=$?
+count=$(printf '%s' "$names" | grep -c . || true)
+if [ "$rc" -ne 0 ]; then
+  meh "could not list reasoning engines (API/auth?)"
+elif [ "$count" -eq 1 ] && [ "$names" = "keplaria" ]; then
+  ok "exactly one reasoning engine, named keplaria"
+elif [ "$count" -eq 0 ]; then
+  bad "no reasoning engine deployed — the agent graph is down (judging needs it through Oct 1)"
+else
+  bad "expected 1 engine named keplaria, found $count: $(printf '%s' "$names" | tr '\n' ' ')— strays surface in Agent Registry"
+fi
+
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
 if command -v uvx >/dev/null; then
