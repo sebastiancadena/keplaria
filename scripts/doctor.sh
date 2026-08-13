@@ -38,8 +38,17 @@ gcloud pubsub topics describe billing-killswitch --project=keplaria >/dev/null 2
   && ok "billing-killswitch topic" || bad "billing-killswitch topic missing"
 gcloud compute networks describe keplaria-vpc --project=keplaria >/dev/null 2>&1 \
   && ok "keplaria-vpc network" || bad "keplaria-vpc missing"
-gcloud compute instances list --filter=name=keplaria-yente --format='value(name,status)' --project=keplaria 2>/dev/null \
-  | grep -q keplaria-yente && ok "keplaria-yente VM exists" || meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)"
+yente_status=$(gcloud compute instances list --filter=name=keplaria-yente \
+  --format='value(status)' --project=keplaria 2>/dev/null)
+case "$yente_status" in
+  RUNNING)    ok "keplaria-yente VM RUNNING" ;;
+  TERMINATED) meh "keplaria-yente VM TERMINATED — nightly stop fired, no start schedule exists; start it (expect us-central1-c stockout retries)" ;;
+  "")         meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)" ;;
+  *)          meh "keplaria-yente VM in state $yente_status" ;;
+esac
+gcloud compute firewall-rules describe keplaria-allow-internal --project=keplaria \
+  --format='value(allowed[].map().firewall_rule().list())' 2>/dev/null | grep -q 'tcp:8000' \
+  && ok "yente port 8000 open inside keplaria-vpc" || bad "keplaria-allow-internal missing tcp:8000 (PSC-I → yente will fail)"
 
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'

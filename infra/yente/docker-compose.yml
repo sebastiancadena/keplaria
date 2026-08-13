@@ -1,0 +1,61 @@
+# Self-hosted yente screening service on the private `keplaria-yente` VM.
+#
+# Network posture: the VM has no external IP. `app` publishes on 0.0.0.0:8000
+# so that workloads reaching the VPC through a PSC-I network attachment can
+# call it at 10.10.0.2:8000; ingress is confined by the `keplaria-allow-internal`
+# firewall rule (tcp:8000,9200 from 10.10.0.0/24 only). Elasticsearch is NOT
+# published — it is reachable only on the compose-internal network.
+
+services:
+  index:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+    container_name: yente-index
+    restart: unless-stopped
+    environment:
+      - node.name=index
+      - cluster.name=keplaria-index
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms4g -Xmx4g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - index-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  app:
+    image: ghcr.io/opensanctions/yente:5.5.0
+    container_name: yente-app
+    restart: unless-stopped
+    depends_on:
+      index:
+        condition: service_healthy
+    ports:
+      - "0.0.0.0:8000:8000"
+    environment:
+      YENTE_INDEX_TYPE: elasticsearch
+      YENTE_INDEX_URL: http://index:9200
+      YENTE_MANIFEST: /manifest/manifest.yml
+      # No scheduled refresh. Nothing is ever fetched from OpenSanctions hosts.
+      YENTE_AUTO_REINDEX: "false"
+      YENTE_UPDATE_TOKEN: ${YENTE_UPDATE_TOKEN:?set YENTE_UPDATE_TOKEN in .env}
+    volumes:
+      - ./manifest.yml:/manifest/manifest.yml:ro
+      - ./data:/data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  index-data:

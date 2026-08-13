@@ -1,0 +1,17 @@
+# yente manifest — FIXTURE ONLY.
+#
+# `catalogs` is deliberately empty: no OpenSanctions catalog is fetched from
+# data.opensanctions.org or delivery.opensanctions.com. Data rights for the
+# bulk dataset have been requested and are unconfirmed, so the standing cut
+# rule is fixtures only. Combined with YENTE_AUTO_REINDEX=false, this instance
+# makes zero outbound data-fetch calls.
+#
+# Do NOT add a catalog entry without a written rights confirmation on file.
+catalogs: []
+
+datasets:
+  - name: keplaria_synthetic
+    title: Keplaria synthetic screening watchlist
+    path: /data/entities.ftm.json
+    # Monotonic. Bump on every fixture edit or yente will not re-import.
+    version: "20260813001"
