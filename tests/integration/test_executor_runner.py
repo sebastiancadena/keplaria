@@ -15,8 +15,9 @@ import uuid
 
 import pytest
 
+import app.executor.runner as runner_module
 from app.executor.runner import execute_pending_commands
-from app.state.commands import DONE, claim_command, get_command, record_success
+from app.state.commands import DONE, FAILED, claim_command, get_command, record_success
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("FRAPPE_API_KEY"),
@@ -62,3 +63,33 @@ def test_done_command_is_skipped_not_reexecuted(db, case_id):
 
     assert results == [], "a DONE command must never be re-driven"
     assert get_command(db, case_id, "create_supplier")["status"] == DONE
+
+
+def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
+    db, case_id, monkeypatch
+):
+    """Only FrappeError/httpx.HTTPError were originally caught, so a bug
+    elsewhere in the response handling — e.g. a KeyError from a malformed
+    Frappe reply — used to propagate uncaught, leaving the command PENDING
+    with no record_failure call and no trace in the returned results. That
+    made the failure invisible in the case document and the evidence until
+    something happened to raise a caught type. This proves any exception
+    type ends up recorded as `failed`, not silently PENDING. No real Frappe
+    call is made — create_or_update_supplier is monkeypatched to raise
+    before any network I/O happens."""
+    supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
+    claim_command(db, case_id, "create_supplier", _payload(supplier))
+
+    def _boom(client, name):
+        raise KeyError("data")
+
+    monkeypatch.setattr(runner_module, "create_or_update_supplier", _boom)
+
+    results = execute_pending_commands(db, case_id)
+
+    assert results == [
+        {"action": "create_supplier", "status": "failed", "error": "KeyError: 'data'"}
+    ]
+    command = get_command(db, case_id, "create_supplier")
+    assert command["status"] == FAILED
+    assert "KeyError" in command["error"]

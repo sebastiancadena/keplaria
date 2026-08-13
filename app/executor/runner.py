@@ -3,10 +3,19 @@
 The graph (app.nodes.queue_supplier) only ever claims a command; it never
 calls Frappe, because the Agent Runtime engine's PSC-I network attachment has
 no public internet egress. This module does the actual write, and is run
-from the ingress (ordinary Cloud Run, normal egress) — both right after a
-successful engine invocation and, opportunistically, on every duplicate-event
-redelivery, so a failed ERP write self-heals without spending the engine's
-scarce quota.
+from the ingress (ordinary Cloud Run, normal egress) — right after a
+successful engine invocation, and again, best-effort, on a duplicate-event
+redelivery.
+
+That redelivery path is a bounded repair attempt, not a standing
+self-healing guarantee: the ingress always acks a duplicate_event with 200
+regardless of whether the drain here succeeds (see ingress/main.py), so
+Pub/Sub never redelivers that specific message again over a failed drain. A
+persistently failing command (bad credentials, an ERP outage) gets exactly
+one bonus attempt per delivery that happens to arrive — not an ongoing
+retry loop — and stays `failed` until some unrelated later event for the
+same case triggers another drain, or until a dedicated retry/DLQ path is
+built (not yet).
 """
 
 from __future__ import annotations
@@ -29,7 +38,9 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     never re-driven — the same guarantee claim_command gives the graph side.
     Safe to call unconditionally on every ingress invocation, including a
     duplicate-event redelivery: a case whose commands are all DONE drains to
-    a no-op.
+    a no-op. Every failure — expected (FrappeError/httpx) or not — is
+    recorded via record_failure before this returns, so a command is never
+    left PENDING with no trace of what went wrong.
     """
     outbox_ref = db.collection(CASES).document(case_id).collection(OUTBOX)
     results: list[dict] = []
@@ -51,6 +62,20 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
                 result = create_or_update_supplier(client, supplier)
         except (FrappeError, httpx.HTTPError) as exc:
             error = f"{type(exc).__name__}: {exc}"
+            record_failure(db, case_id, action, error)
+            results.append({"action": action, "status": "failed", "error": error})
+            continue
+        except Exception as exc:
+            # Not FrappeError/httpx.HTTPError — e.g. a malformed Frappe
+            # response raising KeyError/TypeError out of
+            # create_or_update_supplier. Still a failed command, not a crash
+            # this module should let propagate silently: leaving it PENDING
+            # with no record_failure would make the failure invisible in the
+            # case document and the evidence until some later drain happens
+            # to hit a caught type. Record it the same way, then continue
+            # draining the rest of the outbox rather than aborting on the
+            # first unexpected error.
+            error = f"{type(exc).__name__}: {exc}"[:300]
             record_failure(db, case_id, action, error)
             results.append({"action": action, "status": "failed", "error": error})
             continue

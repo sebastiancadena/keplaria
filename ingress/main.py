@@ -11,18 +11,25 @@ The engine's graph only ever queues the ERP command (see app.nodes.queue_supplie
 for why: no public internet egress from the PSC-attached engine). This ingress
 adapter, an ordinary Cloud Run service with normal egress, is what actually
 drains the outbox via app.executor.runner.execute_pending_commands — once
-right after a successful engine invocation, and again, opportunistically, on
-every duplicate-event redelivery, so a failed ERP write self-heals without
-spending the engine's scarce quota.
+right after a successful engine invocation, and again, best-effort, on a
+duplicate-event redelivery.
 
 Every response is 200 unless the request itself is malformed, the engine call
 failed, or draining the outbox after a fresh claim failed: Pub/Sub retries
 non-2xx forever, which is exactly what we want for a malformed envelope (fix
 the producer), a transient engine failure, or a failed command execution
 (retry), and exactly what we don't want for an unparseable event (no retry can
-fix it, so it is acked). A duplicate is always acked too — draining the
-outbox there is a bonus repair attempt, not something Pub/Sub retrying the
-push itself could ever guarantee; the next natural redelivery tries again.
+fix it, so it is acked). A duplicate is always acked too, deliberately,
+*regardless of whether draining the outbox there succeeds* — the alternative
+(503 on a failed drain) would make Pub/Sub redeliver the duplicate itself,
+recreating the redelivery storm this project already had once. This means
+the duplicate-path drain is a bounded, best-effort repair, not a standing
+self-healing guarantee: it only ever gets one attempt per duplicate delivery
+that happens to arrive, and a persistently failing command (bad credentials,
+an ERP outage) stays `failed` until some unrelated later event for the case
+triggers another drain, or until a dedicated retry/DLQ path exists (not
+built yet). See app/executor/runner.py's module docstring for the same point
+in more detail.
 """
 
 from __future__ import annotations
@@ -99,10 +106,16 @@ def push(envelope: Any = Body(...)) -> dict:
             # engine (it is never invoked here), so it is a free chance to
             # retry any outbox command still not DONE. A case whose commands
             # are all DONE drains to a no-op, so this never disturbs the
-            # exactly-once guarantee this branch exists to preserve. Errors
-            # are logged, not raised — a duplicate is always acked; the fix
-            # (if any is still needed) gets another chance on the next
-            # natural redelivery, not a forced retry of this one.
+            # exactly-once guarantee this branch exists to preserve.
+            #
+            # This is a bounded, one-shot attempt, not a standing guarantee:
+            # errors are logged, not raised, and this exact message is always
+            # acked below regardless of the outcome, so Pub/Sub will never
+            # redeliver *this* message again to retry the drain. A command
+            # that keeps failing here stays `failed` until some other,
+            # unrelated event for the same case happens to arrive and
+            # triggers another drain — there is no dedicated retry/DLQ path
+            # for it yet. See app/executor/runner.py's module docstring.
             try:
                 execute_pending_commands(db, event.case_id)
             except Exception as exc:
