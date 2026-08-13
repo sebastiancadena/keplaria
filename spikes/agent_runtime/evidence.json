@@ -6,7 +6,7 @@
     "events_persisted_in_sessions": true
   },
   "resource": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
-  "session_id": "8410575039732121600",
+  "session_id": "983294829268041728",
   "screening": {
     "endpoint": "http://10.10.0.2:8000",
     "supplier": "Comercializadora Andes Verde SAS",
@@ -62,7 +62,7 @@
       "syn-co-001"
     ]
   },
-  "interrupt_id": "f718a04c-a1e8-4a96-b3fa-55c1fa070f57",
+  "interrupt_id": "c113ef7e-73ef-4d12-84c7-3b5f01fa58ae",
   "final_output": {
     "status": "approved",
     "case": {

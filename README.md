@@ -124,8 +124,10 @@ Vertex AI API under its current name, not a separate product.
   firewall `keplaria-allow-psc-to-yente` allowing tcp:8000 from `10.10.1.0/24`.
   The attachment NIC lands in the PSC subnet, **not** in `10.10.0.0/24`, so
   `keplaria-allow-internal` alone does not cover it.
-- **Agent Runtime deployment:** reasoning engine `keplaria-psc2`
-  (`2127503872455868416`) — the promoted agent graph. See
+- **Agent Runtime deployment:** reasoning engine `keplaria`
+  (`2127503872455868416`) — the promoted agent graph, and the only engine in the
+  project. It is also what `services.py` binds to as the session backend on
+  Cloud Run / local, via its find-or-create-by-display-name fallback. See
   [Deploying](#deploying-to-agent-runtime).
 - **VM `keplaria-yente`** (`us-central1-c`): `t2d-standard-4` (e2 was stocked
   out region-wide on creation day), 60 GB pd-ssd, **no external IP**

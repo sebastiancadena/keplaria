@@ -1,0 +1,275 @@
+{
+  "gate": "HITL resume spike (kill process) \u2014 day 2",
+  "verdict": "PASS",
+  "recorded": "2026-08-12",
+  "exported": "2026-08-13",
+  "note": "Exported from Agent Platform Sessions on engine 'keplaria' (5131193717679456256) because the original evidence JSON was written to a session scratchpad and lost. The request_input functionCall and its functionResponse are 14s apart, spanning the SIGKILL of the serving process.",
+  "engine": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256",
+  "session": {
+    "name": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256/sessions/6717652588398903296",
+    "createTime": "2026-08-12T23:01:29.313027Z",
+    "updateTime": "2026-08-12T23:01:53.707543Z",
+    "sessionState": {
+      "case_data": {
+        "case_id": "SPIKE-001",
+        "event_type": "new_supplier_packet",
+        "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+        "amount": 4200
+      }
+    },
+    "userId": "spike-user",
+    "expireTime": "2027-08-12T23:01:29.305913Z"
+  },
+  "events": [
+    {
+      "name": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256/sessions/6717652588398903296/events/3095052896350240768",
+      "author": "user",
+      "content": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "{\"case_id\": \"SPIKE-001\", \"event_type\": \"new_supplier_packet\", \"supplier\": \"Fictional Supplies S.A.S. (synthetic fixture)\", \"amount\": 4200.0}"
+          }
+        ]
+      },
+      "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+      "actions": {},
+      "timestamp": "2026-08-12T23:01:31.759395Z",
+      "eventMetadata": {},
+      "rawEvent": {
+        "content": {
+          "parts": [
+            {
+              "text": "{\"case_id\": \"SPIKE-001\", \"event_type\": \"new_supplier_packet\", \"supplier\": \"Fictional Supplies S.A.S. (synthetic fixture)\", \"amount\": 4200.0}"
+            }
+          ],
+          "role": "user"
+        },
+        "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+        "author": "user",
+        "actions": {
+          "stateDelta": {},
+          "artifactDelta": {},
+          "requestedAuthConfigs": {},
+          "requestedToolConfirmations": {}
+        },
+        "nodeInfo": {
+          "path": ""
+        },
+        "id": "2fd2dbb1-2c7d-4210-a546-d8a5b759a441",
+        "timestamp": 1786575691.759395
+      }
+    },
+    {
+      "name": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256/sessions/6717652588398903296/events/1372426038881026048",
+      "author": "keplaria_workflow",
+      "content": {},
+      "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+      "actions": {
+        "stateDelta": {
+          "case_data": {
+            "case_id": "SPIKE-001",
+            "event_type": "new_supplier_packet",
+            "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+            "amount": 4200
+          }
+        }
+      },
+      "timestamp": "2026-08-12T23:01:33.524155Z",
+      "eventMetadata": {},
+      "rawEvent": {
+        "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+        "author": "keplaria_workflow",
+        "actions": {
+          "stateDelta": {
+            "case_data": {
+              "case_id": "SPIKE-001",
+              "event_type": "new_supplier_packet",
+              "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+              "amount": 4200
+            }
+          },
+          "artifactDelta": {},
+          "requestedAuthConfigs": {},
+          "requestedToolConfirmations": {}
+        },
+        "output": {
+          "case_id": "SPIKE-001",
+          "event_type": "new_supplier_packet",
+          "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+          "amount": 4200
+        },
+        "nodeInfo": {
+          "path": "keplaria_workflow@1/parse_case@1",
+          "outputFor": [
+            "keplaria_workflow@1/parse_case@1"
+          ]
+        },
+        "id": "7e8855aa-8df4-4049-83e7-0495e6558988",
+        "timestamp": 1786575693.5241554
+      }
+    },
+    {
+      "name": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256/sessions/6717652588398903296/events/9060070602802462720",
+      "author": "keplaria_workflow",
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "adk_request_input",
+              "args": {
+                "interruptId": "2f6e3c2d-f47e-466b-b461-f831ab95aa80",
+                "payload": {
+                  "case_id": "SPIKE-001",
+                  "event_type": "new_supplier_packet",
+                  "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+                  "amount": 4200
+                },
+                "message": "Case requires human approval. Approve or reject.",
+                "response_schema": null
+              },
+              "id": "2f6e3c2d-f47e-466b-b461-f831ab95aa80"
+            }
+          }
+        ]
+      },
+      "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+      "actions": {},
+      "timestamp": "2026-08-12T23:01:35.573972Z",
+      "eventMetadata": {
+        "longRunningToolIds": [
+          "2f6e3c2d-f47e-466b-b461-f831ab95aa80"
+        ]
+      },
+      "rawEvent": {
+        "content": {
+          "parts": [
+            {
+              "functionCall": {
+                "id": "2f6e3c2d-f47e-466b-b461-f831ab95aa80",
+                "args": {
+                  "interruptId": "2f6e3c2d-f47e-466b-b461-f831ab95aa80",
+                  "payload": {
+                    "case_id": "SPIKE-001",
+                    "event_type": "new_supplier_packet",
+                    "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+                    "amount": 4200
+                  },
+                  "message": "Case requires human approval. Approve or reject.",
+                  "response_schema": null
+                },
+                "name": "adk_request_input"
+              }
+            }
+          ],
+          "role": "model"
+        },
+        "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+        "author": "keplaria_workflow",
+        "actions": {
+          "stateDelta": {},
+          "artifactDelta": {},
+          "requestedAuthConfigs": {},
+          "requestedToolConfirmations": {}
+        },
+        "nodeInfo": {
+          "path": "keplaria_workflow@1/request_approval@1"
+        },
+        "longRunningToolIds": [
+          "2f6e3c2d-f47e-466b-b461-f831ab95aa80"
+        ],
+        "id": "d39d686f-1826-4a90-b864-273330ee5aaa",
+        "timestamp": 1786575695.5739722
+      }
+    },
+    {
+      "name": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256/sessions/6717652588398903296/events/3713171945206841344",
+      "author": "user",
+      "content": {
+        "role": "user",
+        "parts": [
+          {
+            "functionResponse": {
+              "name": "adk_request_input",
+              "response": {
+                "result": "{\"decision\": \"approve\"}"
+              },
+              "id": "2f6e3c2d-f47e-466b-b461-f831ab95aa80"
+            }
+          }
+        ]
+      },
+      "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+      "actions": {},
+      "timestamp": "2026-08-12T23:01:49.849050Z",
+      "eventMetadata": {},
+      "rawEvent": {
+        "content": {
+          "parts": [
+            {
+              "functionResponse": {
+                "id": "2f6e3c2d-f47e-466b-b461-f831ab95aa80",
+                "name": "adk_request_input",
+                "response": {
+                  "result": "{\"decision\": \"approve\"}"
+                }
+              }
+            }
+          ],
+          "role": "user"
+        },
+        "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+        "author": "user",
+        "actions": {
+          "stateDelta": {},
+          "artifactDelta": {},
+          "requestedAuthConfigs": {},
+          "requestedToolConfirmations": {}
+        },
+        "nodeInfo": {
+          "path": ""
+        },
+        "id": "9e844d60-2114-457e-aa77-d5eed91434a8",
+        "timestamp": 1786575709.8490496
+      }
+    },
+    {
+      "name": "projects/584548214478/locations/us-central1/reasoningEngines/5131193717679456256/sessions/6717652588398903296/events/7672961917572349952",
+      "author": "keplaria_workflow",
+      "content": {},
+      "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+      "actions": {},
+      "timestamp": "2026-08-12T23:01:51.870787Z",
+      "eventMetadata": {},
+      "rawEvent": {
+        "invocationId": "e-b457f9a3-d390-4c6d-8556-c52bacbfbbce",
+        "author": "keplaria_workflow",
+        "actions": {
+          "stateDelta": {},
+          "artifactDelta": {},
+          "requestedAuthConfigs": {},
+          "requestedToolConfirmations": {}
+        },
+        "output": {
+          "status": "approved",
+          "case": {
+            "case_id": "SPIKE-001",
+            "event_type": "new_supplier_packet",
+            "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
+            "amount": 4200
+          }
+        },
+        "nodeInfo": {
+          "path": "keplaria_workflow@1/process_decision@1",
+          "outputFor": [
+            "keplaria_workflow@1/process_decision@1",
+            "keplaria_workflow@1"
+          ]
+        },
+        "id": "742602d3-0fdb-4589-85d0-51e5a6cb1c8d",
+        "timestamp": 1786575711.8707871
+      }
+    }
+  ]
+}
