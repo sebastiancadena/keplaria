@@ -119,6 +119,15 @@ Vertex AI API under its current name, not a separate product.
   America/Bogota (`keplaria-nightly-stop`), daily snapshots, 7-day retention
   (`keplaria-daily-snap`). SSH:
   `gcloud compute ssh keplaria-yente --zone us-central1-c --tunnel-through-iap`
+  — **the nightly stop has no matching start schedule, so the VM is
+  `TERMINATED` most mornings and must be started by hand; `us-central1-c`
+  returns capacity errors on start often enough to need a retry loop.**
+- **Screening service** on that VM: yente + Elasticsearch, serving
+  `10.10.0.2:8000` inside the VPC. Runbook, network posture, and the
+  `/match` cutoff/threshold gotcha are in
+  [`infra/yente/README.md`](infra/yente/README.md); the indexed data is the
+  synthetic watchlist in [`fixtures/watchlist/`](fixtures/watchlist/).
+  It fetches nothing from OpenSanctions — bulk-data rights are unconfirmed.
 - **Billing guardrails:** budget `keplaria-build` alerts at $100/$130; budget
   `keplaria-killswitch` ($200) publishes to Pub/Sub topic `billing-killswitch`,
   where the Cloud Function in [`infra/billing-killswitch/`](infra/billing-killswitch/)
