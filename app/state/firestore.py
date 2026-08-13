@@ -28,7 +28,12 @@ def get_client(database: str | None = None) -> firestore.Client:
 
 @dataclass(frozen=True)
 class ClaimResult:
-    """Outcome of an inbox claim. `reason` is empty when `claimed` is True."""
+    """Outcome of an inbox claim.
+
+    `reason` is empty on a fresh claim, `"redispatch"` when `claimed` is True
+    but this event was already claimed and never successfully dispatched, and
+    `"duplicate_event"` / `"stale_event"` when `claimed` is False.
+    """
 
     claimed: bool
     case_version: int
@@ -40,9 +45,16 @@ def claim_event(
 ) -> ClaimResult:
     """Claim `event_id` for `case_id`, creating or advancing the case.
 
-    Rejects a duplicate `event_id` and an event whose declared
-    `expected_case_version` no longer matches the stored one. Both rejections
-    leave the case untouched.
+    Rejects a duplicate `event_id` that was already dispatched, and an event
+    whose declared `expected_case_version` no longer matches the stored one.
+    Both rejections leave the case untouched.
+
+    An `event_id` that was claimed but never marked dispatched (the engine
+    call after the original claim failed, or is still in flight) is a
+    *redispatch*: the claim is honoured again, at the `case_version` recorded
+    on the original claim, without bumping `case_version` a second time. This
+    is what lets a transient engine failure be retried by Pub/Sub redelivery
+    instead of permanently stranding the case.
     """
     case_ref = db.collection(CASES).document(case_id)
     inbox_ref = case_ref.collection(INBOX).document(event_id)
@@ -56,7 +68,12 @@ def claim_event(
         current_version = int(case.get("case_version", 0))
 
         if inbox_snap.exists:
-            return ClaimResult(False, current_version, "duplicate_event")
+            inbox_data = inbox_snap.to_dict() or {}
+            if inbox_data.get("dispatched"):
+                return ClaimResult(False, current_version, "duplicate_event")
+            return ClaimResult(
+                True, int(inbox_data.get("case_version", current_version)), "redispatch"
+            )
 
         expected = event.get("expected_case_version")
         if expected is not None and int(expected) != current_version:
@@ -92,9 +109,21 @@ def claim_event(
                 "event_type": event.get("event_type"),
                 "schema_version": event.get("schema_version"),
                 "case_version": version,
+                "dispatched": False,
                 "claimed_at": firestore.SERVER_TIMESTAMP,
             },
         )
         return ClaimResult(True, version)
 
     return _claim(db.transaction())
+
+
+def mark_dispatched(db: firestore.Client, case_id: str, event_id: str) -> None:
+    """Record that `event_id` was successfully handed off to the engine.
+
+    Called only after the engine invocation for a claimed event succeeds.
+    Until this is called, a redelivery of the same event is a *redispatch*,
+    not a *duplicate* — see `claim_event`.
+    """
+    inbox_ref = db.collection(CASES).document(case_id).collection(INBOX).document(event_id)
+    inbox_ref.update({"dispatched": True})

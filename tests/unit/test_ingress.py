@@ -1,7 +1,9 @@
 """The push handler must ack duplicates without invoking the engine.
 
 Redelivery is normal Pub/Sub behaviour, not an error, so a duplicate has to
-return 200 — a non-2xx would make Pub/Sub redeliver forever.
+return 200 — a non-2xx would make Pub/Sub redeliver forever. The opposite
+case matters just as much: an engine failure after a successful claim must
+return non-2xx so Pub/Sub retries, or the case would be stranded forever.
 """
 
 import base64
@@ -80,3 +82,41 @@ def test_malformed_event_is_acked_not_retried(client):
 
 def test_malformed_envelope_is_rejected(client):
     assert client.post("/pubsub/push", json={"not": "an envelope"}).status_code == 400
+
+
+def test_non_dict_envelope_is_rejected(client):
+    assert client.post("/pubsub/push", json=["not", "an", "envelope"]).status_code == 400
+
+
+def test_non_mapping_event_payload_is_acked_not_retried(client):
+    response = client.post("/pubsub/push", json=_push(["not", "a", "mapping"]))
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "invalid"
+    assert client.app.state.calls == []
+
+
+def test_engine_failure_is_retried_not_stranded(client, case_id, monkeypatch):
+    """A claim already landed once the engine call runs; a transient engine
+    failure must not silently drop the case — Pub/Sub has to redeliver it."""
+    import ingress.main as main
+
+    event = _event(case_id)
+    attempts = []
+
+    def flaky_invoke(evt):
+        attempts.append(evt)
+        if len(attempts) == 1:
+            raise RuntimeError("engine unavailable")
+        return {}
+
+    monkeypatch.setattr(main, "invoke_engine", flaky_invoke)
+
+    first = client.post("/pubsub/push", json=_push(event))
+    assert first.status_code == 503
+
+    second = client.post("/pubsub/push", json=_push(event))
+    assert second.status_code == 200
+    assert second.json()["status"] == "claimed"
+    assert second.json()["case_version"] == 1, "a retry must not bump the version again"
+    assert len(attempts) == 2, "the redelivered event must reach the engine again"
