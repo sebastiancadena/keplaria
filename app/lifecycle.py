@@ -58,8 +58,17 @@ def _parse(value: str | None) -> date | None:
         return None
 
 
+def _to_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _expiry_from_evidence(evidence: dict | None) -> date | None:
-    for field in (evidence or {}).get("fields") or []:
+    if not isinstance(evidence, dict):
+        return None
+    for field in evidence.get("fields") or []:
         if isinstance(field, dict) and field.get("name") == EXPIRY_FIELD:
             return _parse(field.get("value"))
     return None
@@ -73,10 +82,14 @@ def decide(
     timing: LifecycleTiming,
 ) -> LifecycleDecision:
     """Return the next lifecycle state and the commands it implies."""
-    lifecycle = case_state.get("lifecycle") or {}
-    certificate = case_state.get("certificate") or {}
+    lifecycle = case_state.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        lifecycle = {}
+    certificate = case_state.get("certificate")
+    if not isinstance(certificate, dict):
+        certificate = {}
     state = lifecycle.get("state") or ONBOARDING
-    cycle = int(lifecycle.get("cycle") or 0)
+    cycle = _to_int(lifecycle.get("cycle"))
     supplier = case_state.get("supplier") or event.get("supplier") or ""
     event_type = event.get("event_type") or ""
 
@@ -88,7 +101,7 @@ def decide(
         return no_op("BAD_EFFECTIVE_DATE")
 
     expiry = _parse(certificate.get("expiry_date"))
-    evidence_version = int(certificate.get("evidence_version") or 0)
+    evidence_version = _to_int(certificate.get("evidence_version"))
 
     if event_type == "new_supplier_packet":
         if state != ONBOARDING:

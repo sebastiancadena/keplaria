@@ -14,6 +14,7 @@ from app.lifecycle import (
 from app.risk import LifecycleTiming
 
 TIMING = LifecycleTiming(renewal_window_days=35, overdue_grace_days=0)
+TIMING_WITH_GRACE = LifecycleTiming(renewal_window_days=35, overdue_grace_days=5)
 
 
 def _case(state, cycle=1, expiry="2027-01-01", evidence_version=1):
@@ -199,3 +200,83 @@ def test_decide_never_raises_on_a_malformed_effective_date():
 
     assert decision.commands == []
     assert decision.reason == "BAD_EFFECTIVE_DATE"
+
+
+def test_overdue_hold_respects_a_nonzero_grace_period():
+    # expiry 2027-01-01 + a 5-day grace: the boundary day (2027-01-06) is
+    # still within grace and must not fire; the day after (2027-01-07) must.
+    case = _case(RENEWAL_REQUESTED, expiry="2027-01-01")
+
+    boundary = decide(
+        case_state=case,
+        event=_event("evidence_overdue", "2027-01-06"),
+        evidence=None,
+        timing=TIMING_WITH_GRACE,
+    )
+    assert boundary.commands == []
+    assert boundary.reason == "NOT_DUE"
+
+    day_after = decide(
+        case_state=case,
+        event=_event("evidence_overdue", "2027-01-07"),
+        evidence=None,
+        timing=TIMING_WITH_GRACE,
+    )
+    assert _actions(day_after) == [APPLY_HOLD]
+    assert day_after.state == HELD
+
+
+def test_a_non_numeric_cycle_does_not_raise():
+    case = _case(ACTIVE, expiry="2027-01-01")
+    case["lifecycle"]["cycle"] = "not-a-number"
+
+    decision = decide(
+        case_state=case,
+        event=_event("renewal_due", "2026-10-01"),
+        evidence=None,
+        timing=TIMING,
+    )
+
+    assert decision.commands == []
+    assert decision.reason == "NOT_DUE"
+
+
+def test_a_non_numeric_evidence_version_does_not_raise():
+    case = _case(HELD, expiry="2027-01-01")
+    case["certificate"]["evidence_version"] = "bogus"
+
+    decision = decide(
+        case_state=case,
+        event=_event("certificate_received", "2027-01-20"),
+        evidence=_evidence("2026-06-01"),
+        timing=TIMING,
+    )
+
+    assert decision.commands == []
+    assert decision.reason == "STALE_DOCUMENT"
+
+
+def test_a_non_dict_lifecycle_does_not_raise():
+    case = {"case_id": "CASE-1", "supplier": "Andes", "lifecycle": ["bad"]}
+
+    decision = decide(
+        case_state=case,
+        event=_event("something_else", "2027-01-20"),
+        evidence=None,
+        timing=TIMING,
+    )
+
+    assert decision.commands == []
+    assert decision.reason == "UNKNOWN_EVENT_TYPE"
+
+
+def test_a_non_dict_evidence_does_not_raise():
+    decision = decide(
+        case_state=_case(ACTIVE, expiry="2027-01-01"),
+        event=_event("certificate_received", "2027-01-20"),
+        evidence=["not", "a", "dict"],
+        timing=TIMING,
+    )
+
+    assert decision.commands == []
+    assert decision.reason == "NO_EXPIRY_FOUND"
