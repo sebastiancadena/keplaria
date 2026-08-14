@@ -13,10 +13,23 @@ if [ "$(sysctl -n vm.max_map_count)" -lt 262144 ]; then
 fi
 echo 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-elasticsearch.conf >/dev/null
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# On the VM push.sh flattens everything into ~/yente-stack/, so the fixture
+# sits next to this script; in the repo it lives at fixtures/watchlist/.
+FIXTURE="$SCRIPT_DIR/entities.ftm.json"
+if [ ! -f "$FIXTURE" ]; then
+  FIXTURE="$SCRIPT_DIR/../../fixtures/watchlist/entities.ftm.json"
+fi
+if [ ! -f "$FIXTURE" ]; then
+  echo "entities.ftm.json not found next to the script or at fixtures/watchlist/" >&2
+  exit 1
+fi
+
 sudo mkdir -p "$STACK_DIR/data"
-sudo cp "$(dirname "$0")/docker-compose.yml" "$STACK_DIR/docker-compose.yml"
-sudo cp "$(dirname "$0")/manifest.yml" "$STACK_DIR/manifest.yml"
-sudo cp "$(dirname "$0")/entities.ftm.json" "$STACK_DIR/data/entities.ftm.json"
+sudo cp "$SCRIPT_DIR/docker-compose.yml" "$STACK_DIR/docker-compose.yml"
+sudo cp "$SCRIPT_DIR/manifest.yml" "$STACK_DIR/manifest.yml"
+sudo cp "$FIXTURE" "$STACK_DIR/data/entities.ftm.json"
 
 # Local admin token guarding the manual reindex endpoint. Generated once and
 # kept root-only; the service is VPC-internal and never publicly reachable.
@@ -31,10 +44,15 @@ cd "$STACK_DIR"
 sudo docker compose pull -q
 sudo docker compose up -d
 echo "--- waiting for elasticsearch ---"
+healthy=false
 for _ in $(seq 1 60); do
   if sudo docker compose ps index --format '{{.Health}}' | grep -q healthy; then
-    echo "index healthy"; break
+    echo "index healthy"; healthy=true; break
   fi
   sleep 5
 done
 sudo docker compose ps
+if [ "$healthy" != true ]; then
+  echo "ERROR: elasticsearch did not become healthy within 300s" >&2
+  exit 1
+fi

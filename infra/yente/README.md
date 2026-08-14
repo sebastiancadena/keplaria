@@ -10,6 +10,7 @@ agent calls.
 |---|---|
 | `docker-compose.yml` | The two-container stack (`yente-app`, `yente-index`) |
 | `manifest.yml` | yente data manifest — **fixture only**, `catalogs: []` |
+| `push.sh` | Copies these files + the fixture to the VM's `~/yente-stack/`, run from the workstation |
 | `deploy.sh` | Idempotent deploy/redeploy, run on the VM |
 | `check.py` | Screening assertions (stdlib only), run on the VM |
 | `verify.sh` | `check.py` + an egress assertion |
@@ -38,7 +39,14 @@ Everything runs from the VM. Get in with:
 gcloud compute ssh keplaria-yente --zone us-central1-c --tunnel-through-iap
 ```
 
-Deploy or redeploy (idempotent; generates `/opt/yente/.env` on first run):
+Push the current stack files there first (from the workstation):
+
+```bash
+bash infra/yente/push.sh
+```
+
+Deploy or redeploy (idempotent; generates `/opt/yente/.env` on first run;
+fails loudly if Elasticsearch does not report healthy within 300s):
 
 ```bash
 bash ~/yente-stack/deploy.sh
