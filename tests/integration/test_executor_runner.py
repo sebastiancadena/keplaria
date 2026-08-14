@@ -37,7 +37,7 @@ def _payload(name: str) -> dict:
 
 def test_pending_command_executes_and_reaches_done(db, case_id):
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
-    claim_command(db, case_id, "create_supplier", _payload(supplier))
+    claim_command(db, case_id, "create_supplier", 1, _payload(supplier))
     # The runner's policy guard refuses to drain any command whose case is
     # not `clear` — seed a cleared verdict so this test exercises the path
     # it was written for, not the refusal guard.
@@ -53,16 +53,16 @@ def test_pending_command_executes_and_reaches_done(db, case_id):
             "created": True,
         }
     ]
-    command = get_command(db, case_id, "create_supplier")
+    command = get_command(db, case_id, "create_supplier", 1)
     assert command["status"] == DONE
     assert command["external_id"] == supplier
 
 
 def test_done_command_is_skipped_not_reexecuted(db, case_id):
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
-    claim_command(db, case_id, "create_supplier", _payload(supplier))
+    claim_command(db, case_id, "create_supplier", 1, _payload(supplier))
     record_success(
-        db, case_id, "create_supplier", supplier, {"external_id": supplier, "created": True}
+        db, case_id, "create_supplier", 1, supplier, {"external_id": supplier, "created": True}
     )
 
     # No real Frappe call happens here at all — the DONE check short-circuits
@@ -72,7 +72,7 @@ def test_done_command_is_skipped_not_reexecuted(db, case_id):
     results = execute_pending_commands(db, case_id)
 
     assert results == [], "a DONE command must never be re-driven"
-    assert get_command(db, case_id, "create_supplier")["status"] == DONE
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == DONE
 
 
 def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
@@ -88,7 +88,7 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     call is made — create_supplier_if_absent is monkeypatched to raise
     before any network I/O happens."""
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
-    claim_command(db, case_id, "create_supplier", _payload(supplier))
+    claim_command(db, case_id, "create_supplier", 1, _payload(supplier))
     # Same guard as above: without a `clear` verdict on the case, the runner
     # refuses before the monkeypatched call below is ever reached.
     db.collection(CASES).document(case_id).set({"policy": {"band": "clear", "policy_version": 1}})
@@ -103,6 +103,6 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     assert results == [
         {"action": "create_supplier", "status": "failed", "error": "KeyError: 'data'"}
     ]
-    command = get_command(db, case_id, "create_supplier")
+    command = get_command(db, case_id, "create_supplier", 1)
     assert command["status"] == FAILED
     assert "KeyError" in command["error"]

@@ -88,11 +88,11 @@ def publish(event: dict) -> str:
 def wait_for_command(db, case_id: str, timeout: int = 180) -> dict | None:
     deadline = time.time() + timeout
     while time.time() < deadline:
-        command = get_command(db, case_id, "create_supplier")
+        command = get_command(db, case_id, "create_supplier", 1)
         if command and command.get("status") == DONE:
             return command
         time.sleep(5)
-    return get_command(db, case_id, "create_supplier")
+    return get_command(db, case_id, "create_supplier", 1)
 
 
 def ingress_url() -> str:
@@ -171,7 +171,7 @@ def main() -> int:
     log(f"republished the SAME event as message {replay_id}")
     time.sleep(30)
 
-    replayed = get_command(db, case_id, "create_supplier")
+    replayed = get_command(db, case_id, "create_supplier", 1)
     case_after = case_ref.get().to_dict() or {}
     evidence["duplicate_replay"] = {
         "message_id": replay_id,

@@ -85,6 +85,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     for snap in outbox_ref.stream():
         command = snap.to_dict() or {}
         action = command.get("action")
+        cycle = int(command.get("cycle") or 1)
 
         if command.get("status") == DONE:
             continue
@@ -114,7 +115,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
                 result = create_supplier_if_absent(client, supplier)
         except (FrappeError, httpx.HTTPError) as exc:
             error = f"{type(exc).__name__}: {exc}"
-            record_failure(db, case_id, action, error)
+            record_failure(db, case_id, action, cycle, error)
             results.append({"action": action, "status": "failed", "error": error})
             continue
         except Exception as exc:
@@ -128,11 +129,11 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
             # draining the rest of the outbox rather than aborting on the
             # first unexpected error.
             error = f"{type(exc).__name__}: {exc}"[:300]
-            record_failure(db, case_id, action, error)
+            record_failure(db, case_id, action, cycle, error)
             results.append({"action": action, "status": "failed", "error": error})
             continue
 
-        record_success(db, case_id, action, result["external_id"], result)
+        record_success(db, case_id, action, cycle, result["external_id"], result)
         results.append(
             {
                 "action": action,

@@ -126,7 +126,7 @@ def test_quarantine_case_claims_no_command_but_records_the_refusal(
 
     assert result.output["status"] == "quarantined"
     assert result.output["case_id"] == case_id
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None
 
     case = db.collection(CASES).document(case_id).get().to_dict()
     assert case["phase"] == "quarantined"

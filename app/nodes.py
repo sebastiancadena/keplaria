@@ -327,7 +327,7 @@ def queue_supplier(node_input, ctx: Context) -> Event:
 
     with tracer.start_as_current_span("queue_supplier") as span:
         span.set_attribute("keplaria.case_id", case_id)
-        claim = claim_command(db, case_id, "create_supplier", payload)
+        claim = claim_command(db, case_id, "create_supplier", 1, payload)
 
         if not claim.acquired and claim.status == DONE:
             span.set_attribute("keplaria.command_replayed", True)

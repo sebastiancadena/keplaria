@@ -20,9 +20,15 @@ DONE = "done"
 FAILED = "failed"
 
 
-def command_id(case_id: str, action: str) -> str:
-    """Deterministic command ID. Same case and action always collide."""
-    return f"{case_id}:{action}"
+def command_id(case_id: str, action: str, cycle: int) -> str:
+    """Deterministic command ID, unique per case, action, and cycle.
+
+    The cycle is part of the identity because the lifecycle repeats: a
+    supplier renewed in cycle 2 issues the same `action` as in cycle 1, and
+    without the discriminator the second claim would find cycle 1's record
+    already `done` and silently skip the work.
+    """
+    return f"{case_id}:{action}:c{cycle}"
 
 
 @dataclass(frozen=True)
@@ -39,20 +45,20 @@ class CommandClaim:
     result: dict | None = None
 
 
-def _ref(db: firestore.Client, case_id: str, action: str):
+def _ref(db: firestore.Client, case_id: str, action: str, cycle: int):
     return (
         db.collection(CASES)
         .document(case_id)
         .collection(OUTBOX)
-        .document(command_id(case_id, action))
+        .document(command_id(case_id, action, cycle))
     )
 
 
 def claim_command(
-    db: firestore.Client, case_id: str, action: str, payload: dict
+    db: firestore.Client, case_id: str, action: str, cycle: int, payload: dict
 ) -> CommandClaim:
     """Claim the command for execution, or refuse if it already completed."""
-    ref = _ref(db, case_id, action)
+    ref = _ref(db, case_id, action, cycle)
 
     @firestore.transactional
     def _claim(txn: firestore.Transaction) -> CommandClaim:
@@ -77,9 +83,10 @@ def claim_command(
         txn.set(
             ref,
             {
-                "command_id": command_id(case_id, action),
+                "command_id": command_id(case_id, action, cycle),
                 "case_id": case_id,
                 "action": action,
+                "cycle": cycle,
                 "payload": payload,
                 "status": PENDING,
                 "attempts": 1,
@@ -93,10 +100,15 @@ def claim_command(
 
 
 def record_success(
-    db: firestore.Client, case_id: str, action: str, external_id: str, result: dict
+    db: firestore.Client,
+    case_id: str,
+    action: str,
+    cycle: int,
+    external_id: str,
+    result: dict,
 ) -> None:
     """Mark the command done and store the destination's identifier."""
-    _ref(db, case_id, action).update(
+    _ref(db, case_id, action, cycle).update(
         {
             "status": DONE,
             "external_id": external_id,
@@ -107,9 +119,11 @@ def record_success(
     )
 
 
-def record_failure(db: firestore.Client, case_id: str, action: str, error: str) -> None:
+def record_failure(
+    db: firestore.Client, case_id: str, action: str, cycle: int, error: str
+) -> None:
     """Mark the command failed, leaving it eligible for a later retry."""
-    _ref(db, case_id, action).update(
+    _ref(db, case_id, action, cycle).update(
         {
             "status": FAILED,
             "error": error,
@@ -118,6 +132,8 @@ def record_failure(db: firestore.Client, case_id: str, action: str, error: str) 
     )
 
 
-def get_command(db: firestore.Client, case_id: str, action: str) -> dict | None:
-    snap = _ref(db, case_id, action).get()
+def get_command(
+    db: firestore.Client, case_id: str, action: str, cycle: int
+) -> dict | None:
+    snap = _ref(db, case_id, action, cycle).get()
     return snap.to_dict() if snap.exists else None

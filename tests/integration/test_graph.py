@@ -97,7 +97,7 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
     assert final["case_id"] == case_id
     assert final["policy"]["band"] == "review"
 
-    command = get_command(get_client(), case_id, "create_supplier")
+    command = get_command(get_client(), case_id, "create_supplier", 1)
     assert command is None, "an unreachable screening service must claim no command"
 
 
@@ -128,9 +128,9 @@ async def test_replayed_case_does_not_reclaim_a_done_command():
 
     first = await _run(_event(case_id, "new_supplier_packet"))
     assert first[-1]["status"] == "awaiting_approval"
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None
 
     second = await _run(_event(case_id, "new_supplier_packet"))
 
     assert second[-1]["status"] == "awaiting_approval"
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None

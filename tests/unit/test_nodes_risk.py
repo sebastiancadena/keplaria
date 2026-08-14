@@ -104,7 +104,7 @@ def test_park_case_claims_no_command(db, case_id):
     result = park_case(None, ctx)
 
     assert result.output["status"] == "awaiting_approval"
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None
 
 
 def test_park_case_persists_phase_and_verdict(db, case_id):
@@ -149,7 +149,7 @@ def test_queue_supplier_persists_a_clear_verdict_alongside_the_claim(db, case_id
 
     assert result.output["status"] == "command_queued"
 
-    command = get_command(db, case_id, "create_supplier")
+    command = get_command(db, case_id, "create_supplier", 1)
     assert command is not None
     assert command["status"] == PENDING
 
