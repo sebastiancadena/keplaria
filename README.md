@@ -79,7 +79,10 @@ and is reported rather than retried blindly.
   503s, Pub/Sub redelivers near-instantly, the engine takes another hit,
   guaranteed 429, repeat.
 - **`GOOGLE_CLOUD_LOCATION` must be `global`, not `us-central1`** —
-  `gemini-3.6-flash` 404s at the regional endpoint. `AGENT_ENGINE_LOCATION`
+  `gemini-3.6-flash` 404s at the regional endpoint. This is documented, not
+  incidental: the [official model card](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-6-flash)
+  lists only `global` and the `us`/`eu` multi-regions as supported — no single
+  regions — so there is no regional endpoint to migrate to. `AGENT_ENGINE_LOCATION`
   is a deliberately separate variable (`us-central1`) that addresses only
   the Agent Engine REST endpoint. These two are kept apart on purpose:
   collapsing them into one variable is the obvious "simplification" that
