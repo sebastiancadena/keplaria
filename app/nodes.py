@@ -170,9 +170,19 @@ def apply_route(node_input, ctx: Context) -> Event:
     checking `refused is not None` here is sufficient to distinguish
     "genuinely nothing to do" from "the proposal was rejected" without
     duplicating the ALLOWED_ROUTES policy table in this module.
+
+    Evidence only has a document to extract from when the event actually
+    carries a `document_ref`. A packet with no document is not a failure —
+    app.lifecycle's AWAITING_EVIDENCE branch onboards the supplier and waits
+    for a certificate to arrive later — so a permitted "evidence" route with
+    no document reaches the gate as if evidence had nothing to do, not as a
+    quarantine. validate_evidence's own NO_DOCUMENT path is reserved for the
+    other case: a document_ref was given and could not be loaded, which is a
+    real failure of a promise someone made.
     """
     case = ctx.state.get("case", {})
     event_type = case.get("event_type", "")
+    has_document = bool(case.get("document_ref"))
 
     proposed = list((node_input or {}).get("route", []))
     reason = (node_input or {}).get("reason", "")
@@ -186,16 +196,19 @@ def apply_route(node_input, ctx: Context) -> Event:
         # only node this can reach next.
         route, refused = [], str(exc)
 
+    evidence_skipped_no_document = "evidence" in route and not has_document
+
     decision = {
         "proposed": proposed,
         "route": route,
         "reason": reason,
         "refused": refused,
+        "evidence_skipped_no_document": evidence_skipped_no_document,
     }
 
     if refused is not None:
         next_route = "blocked"
-    elif "evidence" in route:
+    elif "evidence" in route and has_document:
         next_route = "evidence"
     elif "compliance" in route:
         next_route = "screen"

@@ -51,32 +51,69 @@ class _StubContext:
         self.state = state
 
 
-def _case(case_id: str, event_type: str) -> dict:
-    return {"case_id": case_id, "event_type": event_type}
+def _case(case_id: str, event_type: str, document_ref: str | None = None) -> dict:
+    case = {"case_id": case_id, "event_type": event_type}
+    if document_ref is not None:
+        case["document_ref"] = document_ref
+    return case
 
 
 def test_valid_proposal_with_evidence_and_compliance_reaches_evidence_first():
     """Evidence must run — and be validated — before compliance ever sees a
     field it extracted, so any route containing 'evidence' goes to the
-    evidence agent regardless of what else is requested. validate_evidence
-    is what routes on to 'screen' afterward."""
-    ctx = _StubContext({"case": _case("CASE-1", "new_supplier_packet")})
+    evidence agent regardless of what else is requested, as long as the
+    event actually carries a document to extract from. validate_evidence is
+    what routes on to 'screen' afterward."""
+    ctx = _StubContext({
+        "case": _case("CASE-1", "new_supplier_packet", document_ref="fixture:x"),
+    })
     node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
 
     result = apply_route(node_input, ctx)
 
     assert result.actions.route == "evidence"
     assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is False
 
 
 def test_valid_proposal_with_evidence_only_reaches_evidence():
-    ctx = _StubContext({"case": _case("CASE-2", "certificate_received")})
+    ctx = _StubContext({
+        "case": _case("CASE-2", "certificate_received", document_ref="fixture:x"),
+    })
     node_input = {"route": ["evidence"], "reason": "cert received"}
 
     result = apply_route(node_input, ctx)
 
     assert result.actions.route == "evidence"
     assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is False
+
+
+def test_evidence_and_compliance_with_no_document_falls_through_to_screening():
+    """A brand-new packet with no certificate attached yet is not a failure —
+    app.lifecycle's AWAITING_EVIDENCE branch onboards the supplier and waits
+    for a certificate to arrive later. Evidence has nothing to extract from,
+    so the case must still reach compliance screening rather than quarantine
+    at the evidence gate."""
+    ctx = _StubContext({"case": _case("CASE-7", "new_supplier_packet")})
+    node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "screen"
+    assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is True
+
+
+def test_evidence_only_with_no_document_falls_through_to_skip():
+    ctx = _StubContext({"case": _case("CASE-8", "certificate_received")})
+    node_input = {"route": ["evidence"], "reason": "cert received"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "skip"
+    assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is True
 
 
 def test_unknown_agent_name_is_blocked_not_skipped():
