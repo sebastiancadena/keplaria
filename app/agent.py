@@ -25,10 +25,10 @@ The screening node reaches the self-hosted yente service on the private VM. It
 has no public address, so that call only succeeds when the serving workload has
 private VPC connectivity — on Agent Runtime, a PSC-I network attachment.
 
-The graph never calls the ERP itself: queue_supplier only claims the
-create_supplier command (see app/nodes.py's docstring for why — the same
-PSC-I attachment has no public internet egress). app.executor.runner, driven
-by the ingress, does the actual write.
+The graph never calls the ERP itself: commit_commands only claims the
+commands `app.lifecycle.decide` names (see app/nodes.py's docstring for why —
+the same PSC-I attachment has no public internet egress). app.executor.runner,
+driven by the ingress, does the actual write.
 """
 
 from google.adk.agents import LlmAgent
@@ -39,11 +39,11 @@ from google.genai import types
 from app.nodes import (
     apply_route,
     assess_risk,
+    commit_commands,
     load_case_state,
     park_case,
     parse_case,
     quarantine_case,
-    queue_supplier,
     screen_supplier,
     validate_evidence,
 )
@@ -148,14 +148,11 @@ root_agent = Workflow(
             },
         ),
         (screen_supplier, assess_risk),
-        # The gate. Only "clear" reaches the command queue.
+        # The gate. Only "clear" reaches the write terminal.
         (
             assess_risk,
             {
-                # queue_supplier is replaced by commit_commands in Task 10.
-                # It stays here for now so this task's commit is green on its
-                # own — do not import a name that does not exist yet.
-                "clear": queue_supplier,
+                "clear": commit_commands,
                 "review": park_case,
                 "blocked": quarantine_case,
             },

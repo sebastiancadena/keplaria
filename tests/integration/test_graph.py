@@ -110,7 +110,7 @@ async def test_certificate_received_skips_screening():
 
     screening = [o for o in outputs if isinstance(o, dict) and "reachable" in o]
     assert not screening, "certificate_received must not engage compliance"
-    assert outputs[-1]["status"] == "command_queued"
+    assert outputs[-1]["status"] == "no_action"
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 """Drives pending outbox commands against the ERP from outside the graph.
 
-The graph (app.nodes.queue_supplier) only ever claims a command; it never
+The graph (app.nodes.commit_commands) only ever claims a command; it never
 calls Frappe, because the Agent Runtime engine's PSC-I network attachment has
 no public internet egress. This module does the actual write, and is run
 from the ingress (ordinary Cloud Run, normal egress) — right after a

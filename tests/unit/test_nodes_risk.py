@@ -3,13 +3,13 @@
 assess_risk must route on the band and never on model output; park_case must
 be a true terminal that claims no command. Together these close the defect
 this branch exists to fix at the graph level: a flagged supplier can no
-longer reach queue_supplier.
+longer reach commit_commands.
 """
 
 from __future__ import annotations
 
 import app.nodes as nodes_module
-from app.nodes import assess_risk, park_case, queue_supplier
+from app.nodes import assess_risk, commit_commands, park_case
 from app.state.commands import PENDING, get_command
 from app.state.firestore import CASES
 
@@ -210,11 +210,11 @@ def test_a_fresh_screening_still_scores_normally():
     assert event.actions.state_delta["policy"]["score"] == 0.0
 
 
-def test_queue_supplier_persists_a_clear_verdict_alongside_the_claim(db, case_id, monkeypatch):
+def test_commit_commands_persists_a_clear_verdict_alongside_the_claim(db, case_id, monkeypatch):
     """This is the branch's central invariant, made hermetic: no path reaches
-    the command queue without a persisted `clear` verdict. app.executor.runner
+    the write terminal without a persisted `clear` verdict. app.executor.runner
     re-reads cases/{case_id}.policy before draining a command and refuses
-    anything that isn't `clear` — if queue_supplier's `policy` argument to
+    anything that isn't `clear` — if commit_commands' `policy` argument to
     _record_outcome were ever dropped, every drain would silently refuse and
     the default suite would still be green. This pins the persisted verdict
     directly, rather than deferring it to a live-marked graph test."""
@@ -230,15 +230,16 @@ def test_queue_supplier_persists_a_clear_verdict_alongside_the_claim(db, case_id
     }
     ctx = _StubContext(
         {
-            "case": _case(case_id),
+            "case": {**_case(case_id), "effective_date": "2026-01-01"},
+            "case_state": {},
             "screening": _screening(candidates=[{"id": "x", "score": 0.1, "match": False}]),
             "policy": verdict,
         }
     )
 
-    result = queue_supplier(None, ctx)
+    result = commit_commands(None, ctx)
 
-    assert result.output["status"] == "command_queued"
+    assert result.output["status"] == "committed"
 
     command = get_command(db, case_id, "create_supplier", 1)
     assert command is not None

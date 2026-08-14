@@ -28,7 +28,7 @@ def get_client(database: str | None = None) -> firestore.Client:
     Agent Runtime env var"). Firestore's resource path requires the string
     ID — a client built with the numeric project number 404s with "The
     database (default) does not exist for project <number>" even though the
-    database is real, because queue_supplier's claim_command call is the
+    database is real, because commit_commands's claim_command call is the
     only Firestore write made from inside the engine, and it is the call
     that would hit this. FIRESTORE_PROJECT_ID exists specifically to give
     that call the string ID back. Both FIRESTORE_PROJECT_ID and

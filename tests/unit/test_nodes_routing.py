@@ -19,7 +19,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 
 import app.nodes as nodes_module
-from app.nodes import apply_route, load_case_state, quarantine_case
+from app.nodes import apply_route, commit_commands, load_case_state, quarantine_case
 from app.state.commands import get_command
 from app.state.firestore import CASES
 
@@ -277,6 +277,68 @@ def test_an_unresolvable_document_reference_does_not_raise(db, case_id):
     assert event.actions.state_delta["derivative"] is None, (
         "an unreadable document must reach the grounding gate as absent "
         "evidence, not crash the graph"
+    )
+
+
+def test_every_path_into_the_write_terminal_carries_a_verdict():
+    """The invariant the executor's backstop depends on.
+
+    If any edge reached commit_commands without passing assess_risk, a
+    command could be claimed for a case with no policy band — and the
+    executor would have to tolerate a missing verdict instead of treating it
+    as an anomaly to refuse.
+    """
+    from app.agent import root_agent
+    from app.nodes import assess_risk, commit_commands
+
+    predecessors = set()
+    for source, target in root_agent.edges:
+        targets = target.values() if isinstance(target, dict) else [target]
+        if commit_commands in targets:
+            predecessors.add(source)
+
+    assert predecessors == {assess_risk}, (
+        f"commit_commands must be reachable only from the gate; found {predecessors}"
+    )
+
+
+def test_onboarding_claims_the_create_supplier_command_at_cycle_one(db, case_id):
+    ctx = _StubContext({
+        "case": {"case_id": case_id, "event_type": "new_supplier_packet",
+                 "supplier": "Andes", "effective_date": "2026-01-01"},
+        "case_state": {},
+        "evidence": {"document_checksum": "abc123",
+                     "fields": [{"name": "certificate_expiry", "value": "2027-01-01",
+                                 "page": 0, "span": "Expiry: 2027-01-01",
+                                 "confidence": 0.9}]},
+    })
+
+    event = commit_commands(None, ctx)
+
+    assert event.output["reason"] == "ONBOARDED"
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == "pending"
+    stored = db.collection("cases").document(case_id).get().to_dict()
+    assert stored["lifecycle"]["state"] == "active"
+    assert stored["certificate"]["expiry_date"] == "2027-01-01"
+
+
+def test_a_refused_decision_claims_nothing(db, case_id):
+    db.collection("cases").document(case_id).set(
+        {"case_id": case_id, "supplier": "Andes",
+         "lifecycle": {"state": "active", "cycle": 1},
+         "certificate": {"expiry_date": "2027-01-01", "evidence_version": 1}}
+    )
+    ctx = _StubContext({
+        "case": {"case_id": case_id, "event_type": "renewal_due",
+                 "supplier": "Andes", "effective_date": "2026-06-01"},
+        "case_state": db.collection("cases").document(case_id).get().to_dict(),
+    })
+
+    event = commit_commands(None, ctx)
+
+    assert event.output["reason"] == "NOT_DUE"
+    assert get_command(db, case_id, "request_renewal", 1) is None, (
+        "a refused decision must produce zero outbox writes"
     )
 
 

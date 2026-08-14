@@ -81,5 +81,5 @@ def test_agent_stream() -> None:
     # The graph only ever queues the create_supplier command now — see
     # app.nodes.queue_supplier — since the Agent Runtime engine has no public
     # internet path to Frappe Cloud. Execution happens outside the graph.
-    assert outputs[-1]["status"] == "command_queued"
+    assert outputs[-1]["status"] == "no_action"
     assert outputs[-1]["case_id"] == case_id

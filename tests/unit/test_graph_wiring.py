@@ -1,10 +1,10 @@
-"""Graph wiring is load-bearing: every path to the command queue passes the gate.
+"""Graph wiring is load-bearing: every path to the write terminal passes the gate.
 
 This module pins the invariant that prevents a critical bypass: a flagged supplier
-must never reach the ERP command queue. The workflow's `assess_risk` node implements
+must never reach the write terminal. The workflow's `assess_risk` node implements
 the policy gate and must sit in the critical path from BOTH the screening branch
 (screen_supplier) and the non-screening branch (skip). If a later change shortcuts
-one of these paths directly to queue_supplier, this test fails loudly rather than
+one of these paths directly to commit_commands, this test fails loudly rather than
 silently shipping an onboarding of a flagged entity.
 
 All assertions read `root_agent.edges` directly — no model calls, no network, no
@@ -18,20 +18,20 @@ from app.agent import evidence_agent, root_agent
 from app.nodes import (
     MAX_EVIDENCE_ATTEMPTS,
     assess_risk,
+    commit_commands,
     park_case,
-    queue_supplier,
     quarantine_case,
     screen_supplier,
     validate_evidence,
 )
 
 
-def test_flagged_supplier_never_reaches_the_command_queue():
-    """Every path to queue_supplier passes through assess_risk.
+def test_flagged_supplier_never_reaches_the_write_terminal():
+    """Every path to commit_commands passes through assess_risk.
 
     The risk gate (assess_risk) must be the sole point where a policy verdict is
-    applied before the command queue. Both the screening branch and the skip branch
-    feed into it, ensuring no path bypasses the verdict.
+    applied before the write terminal. Both the screening branch and the skip
+    branch feed into it, ensuring no path bypasses the verdict.
     """
     edges = {}
     for edge in root_agent.edges:
@@ -42,7 +42,7 @@ def test_flagged_supplier_never_reaches_the_command_queue():
 
     assert edges["screen_supplier"] is assess_risk, "screening must feed the gate"
     assert edges["assess_risk"] == {
-        "clear": queue_supplier,
+        "clear": commit_commands,
         "review": park_case,
         "blocked": quarantine_case,
     }

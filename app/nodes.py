@@ -17,8 +17,9 @@ from pydantic import ValidationError
 
 from app.documents import DocumentUnavailable, load_document
 from app.grounding import RedactedDerivative, validate as grounding_validate
+from app.lifecycle import decide
 from app.policy import CLOCK_EVENTS, PolicyError, validate_route
-from app.risk import BLOCKED, RiskVerdict, assess_case
+from app.risk import BLOCKED, RiskVerdict, assess_case, lifecycle_timing
 from app.schemas import CanonicalEvent, ScreeningResult
 from app.state.commands import DONE, claim_command
 from app.state.firestore import CASES, get_client
@@ -495,65 +496,89 @@ def assess_risk(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"policy": payload}, route=verdict.band)
 
 
-def queue_supplier(node_input, ctx: Context) -> Event:
-    """Claim the create_supplier command and stop. Never calls the ERP.
+def commit_commands(node_input, ctx: Context) -> Event:
+    """The single write terminal. Claims commands; never calls the ERP.
 
-    Reached only via the assess_risk gate's `clear` branch, so by the time
-    this node runs the case already carries a policy verdict that permits an
-    ERP command. A flagged or near-match supplier terminates at
-    quarantine_case or park_case instead and never arrives here.
+    Every path that may write converges here — onboarding and every clock
+    branch alike — so there is one place that decides what a case does next
+    and one audit record of why. Reached only via the assess_risk gate's
+    `clear` branch, so by the time this node runs the case already carries a
+    policy verdict that permits a write. A flagged or near-match supplier
+    terminates at quarantine_case or park_case instead and never arrives
+    here.
 
-    The Agent Runtime engine's PSC-I network attachment routes egress through
-    keplaria-vpc, whose Cloud NAT is ENDPOINT_TYPE_VM only — it does not cover
-    a PSC-I NIC, so the engine has a path to the private VPC (yente) but none
-    to the public internet. A Frappe Cloud call from inside this node times
-    out on TCP connect every time, deterministically; it is not a transient
-    fault to retry around.
+    The graph still never calls the ERP itself. The Agent Runtime engine's
+    PSC-I network attachment routes egress through keplaria-vpc, whose Cloud
+    NAT is ENDPOINT_TYPE_VM only — it does not cover a PSC-I NIC, so the
+    engine has a path to the private VPC (yente) but none to the public
+    internet. A Frappe Cloud call from inside this node times out on TCP
+    connect every time, deterministically; it is not a transient fault to
+    retry around.
 
     This is also the architecturally correct split, not just a network
     workaround: the ERP executor is a deterministic non-agent component and a
     separate authorization boundary from the graph. This node's only job is
-    to record the deterministic command via claim_command; the actual write
-    happens in app.executor.runner.execute_pending_commands, run from the
-    ingress (ordinary Cloud Run, normal egress) after the engine call
-    returns, and again — idempotently — on any duplicate-event redelivery.
+    to record each deterministic command `decide()` names via claim_command;
+    the actual write happens in app.executor.runner.execute_pending_commands,
+    run from the ingress (ordinary Cloud Run, normal egress) after the engine
+    call returns, and again — idempotently — on any duplicate-event
+    redelivery.
+
+    A decision with zero commands (a refusal — e.g. NOT_DUE, ALREADY_HELD)
+    must write nothing to the outbox: only the lifecycle/certificate blocks
+    and the outcome summary are persisted, exactly like quarantine_case and
+    park_case.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
-    supplier = case.get("supplier", "")
+    case_state = ctx.state.get("case_state") or {}
+
+    decision = decide(
+        case_state=case_state or {"supplier": case.get("supplier")},
+        event=case,
+        evidence=ctx.state.get("evidence"),
+        timing=lifecycle_timing(),
+    )
 
     db = get_client()
-    payload = {"supplier_name": supplier, "country": "Colombia"}
+    claimed: list[dict] = []
 
-    with tracer.start_as_current_span("queue_supplier") as span:
+    with tracer.start_as_current_span("commit_commands") as span:
         span.set_attribute("keplaria.case_id", case_id)
-        claim = claim_command(db, case_id, "create_supplier", 1, payload)
+        span.set_attribute("keplaria.lifecycle_reason", decision.reason)
+        span.set_attribute("keplaria.lifecycle_state", decision.state)
+        span.set_attribute("keplaria.cycle", decision.cycle)
+        span.set_attribute(
+            "keplaria.commands", [c.action for c in decision.commands]
+        )
 
-        if not claim.acquired and claim.status == DONE:
-            span.set_attribute("keplaria.command_replayed", True)
-            _record_outcome(
-                db,
-                case_id,
-                "executed",
-                ctx.state.get("routing"),
-                ctx.state.get("screening"),
-                ctx.state.get("policy"),
+        for command in decision.commands:
+            claim = claim_command(
+                db, case_id, command.action, decision.cycle, command.payload
             )
-            return Event(
-                output={
-                    "status": "already_executed",
-                    "case_id": case_id,
-                    "external_id": claim.external_id,
-                    "screening": ctx.state.get("screening"),
-                    "routing": ctx.state.get("routing"),
-                }
-            )
+            claimed.append({
+                "action": command.action,
+                "cycle": decision.cycle,
+                "status": "already_done" if (not claim.acquired and claim.status == DONE)
+                else "queued",
+                "external_id": claim.external_id,
+            })
 
-        span.set_attribute("keplaria.command_queued", True)
+        lifecycle_block = {
+            "state": decision.state,
+            "cycle": decision.cycle,
+            "last_effective_date": case.get("effective_date"),
+            "last_reason": decision.reason,
+        }
+        update = {"lifecycle": lifecycle_block}
+        if decision.certificate is not None:
+            update["certificate"] = decision.certificate
+
+        db.collection(CASES).document(case_id).set(update, merge=True)
         _record_outcome(
             db,
             case_id,
-            "queued",
+            "committed" if decision.commands else "no_action",
             ctx.state.get("routing"),
             ctx.state.get("screening"),
             ctx.state.get("policy"),
@@ -561,9 +586,11 @@ def queue_supplier(node_input, ctx: Context) -> Event:
 
     return Event(
         output={
-            "status": "command_queued",
+            "status": "committed" if decision.commands else "no_action",
             "case_id": case_id,
-            "screening": ctx.state.get("screening"),
-            "routing": ctx.state.get("routing"),
+            "reason": decision.reason,
+            "state": decision.state,
+            "cycle": decision.cycle,
+            "commands": claimed,
         }
     )
