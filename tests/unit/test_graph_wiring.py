@@ -12,6 +12,8 @@ external state. This is pure structural introspection and belongs in the default
 suite, not in live-marked tests.
 """
 
+import pytest
+
 from app.agent import evidence_agent, root_agent
 from app.nodes import (
     MAX_EVIDENCE_ATTEMPTS,
@@ -69,6 +71,52 @@ def test_the_evidence_agent_holds_no_operational_tools():
     )
     assert evidence_agent.disallow_transfer_to_parent is True
     assert evidence_agent.disallow_transfer_to_peers is True
+
+
+def test_the_evidence_agent_instruction_references_the_document_state_keys():
+    """The only thing that gets the document into the model's prompt is a
+    {key} placeholder in a plain-string instruction — ADK's state-injection
+    resolves those against top-level session-state keys
+    (google.adk.utils.instructions_utils.inject_session_state). If a future
+    edit drops the placeholder, the agent silently goes back to being asked
+    to cite a document it was never shown; this pins the placeholder's
+    presence so that edit fails loudly instead."""
+    assert isinstance(evidence_agent.instruction, str), (
+        "state injection only runs for a plain string instruction "
+        "(LlmAgent.canonical_instruction bypasses it for a callable one)"
+    )
+    assert "{document_checksum}" in evidence_agent.instruction
+    assert "{document_pages}" in evidence_agent.instruction
+
+
+@pytest.mark.asyncio
+async def test_the_evidence_agent_instruction_renders_the_actual_document():
+    """Exercises ADK's real state-injection mechanism end to end, rather than
+    trusting that the placeholders in the instruction are wired to anything.
+    load_case_state populates document_checksum/document_pages in session
+    state; this proves inject_session_state — the same function ADK's LLM
+    flow calls before every model turn — actually substitutes them into the
+    rendered prompt text."""
+    from google.adk.agents.invocation_context import InvocationContext
+    from google.adk.agents.readonly_context import ReadonlyContext
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.utils.instructions_utils import inject_session_state
+
+    service = InMemorySessionService()
+    session = await service.create_session(
+        app_name="test",
+        user_id="u1",
+        state={
+            "document_checksum": "abc123",
+            "document_pages": "Page 0:\nExpiry: 2027-01-01",
+        },
+    )
+    ctx = InvocationContext(session_service=service, invocation_id="inv-1", session=session)
+
+    rendered = await inject_session_state(evidence_agent.instruction, ReadonlyContext(ctx))
+
+    assert "abc123" in rendered
+    assert "Expiry: 2027-01-01" in rendered
 
 
 def _routing_maps(workflow):

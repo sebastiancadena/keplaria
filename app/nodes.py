@@ -86,6 +86,17 @@ def _record_outcome(
     )
 
 
+def _format_pages(pages: list[str]) -> str:
+    """Render page text with explicit zero-based page markers.
+
+    The Evidence agent must cite a page index for every field it extracts,
+    and app.grounding.validate checks that index against the derivative's
+    page list — so the prompt must make the index-to-text mapping explicit,
+    not just concatenate the pages and hope the model counts correctly.
+    """
+    return "\n\n".join(f"Page {i}:\n{text}" for i, text in enumerate(pages))
+
+
 def load_case_state(node_input, ctx: Context) -> Event:
     """Reload durable case state, then classify the event.
 
@@ -97,6 +108,14 @@ def load_case_state(node_input, ctx: Context) -> Event:
     agents, so sending it to an LlmAgent would spend a model call to be told
     'no agents' and would put a delegation decision in the trace that was
     never made.
+
+    Also publishes the derivative as flat, top-level state keys
+    (`document_checksum`, `document_pages`) rather than only the nested
+    `derivative` dict. ADK's instruction-template state injection
+    (instructions_utils.inject_session_state) only resolves a bare
+    identifier against a top-level session-state key — it has no subscript
+    or attribute syntax for reaching into a nested dict — so evidence_agent's
+    instruction templates against these flat keys, not `{derivative}`.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
@@ -128,6 +147,12 @@ def load_case_state(node_input, ctx: Context) -> Event:
                 span.set_attribute("keplaria.case_id", case_id)
                 span.set_attribute("keplaria.document_error", type(exc).__name__)
 
+    document_checksum = ""
+    document_pages = ""
+    if derivative:
+        document_checksum = derivative.get("checksum", "")
+        document_pages = _format_pages(derivative.get("pages") or [])
+
     route = "clock" if event_type in CLOCK_EVENTS else "agentic"
 
     with tracer.start_as_current_span("load_case_state") as span:
@@ -140,7 +165,12 @@ def load_case_state(node_input, ctx: Context) -> Event:
 
     return Event(
         output={"event_class": route},
-        state={"case_state": case_state, "derivative": derivative},
+        state={
+            "case_state": case_state,
+            "derivative": derivative,
+            "document_checksum": document_checksum,
+            "document_pages": document_pages,
+        },
         route=route,
     )
 

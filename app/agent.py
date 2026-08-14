@@ -79,13 +79,23 @@ coordinator = LlmAgent(
 evidence_agent = LlmAgent(
     name="evidence_agent",
     model="gemini-3.6-flash",
+    # {document_checksum} and {document_pages} are ADK state-template
+    # placeholders, not Python format fields — a plain str instruction is
+    # run through instructions_utils.inject_session_state, which resolves a
+    # bare {identifier} against a top-level session-state key. app.nodes
+    # .load_case_state is what populates these two keys from the derivative
+    # it loads. Without a placeholder here the model would never see the
+    # document at all: the edge into this agent carries apply_route's
+    # routing decision as its content, not the document.
     instruction=(
         "You extract corporate fields from a supplier document.\n\n"
-        "You will receive the document's checksum and its pages as text. "
+        "Document checksum: {document_checksum}\n\n"
+        "Document pages, each labeled with its zero-based index:\n"
+        "{document_pages}\n\n"
         "Extract every field you can support, and for each one return the "
         "verbatim span of page text the value came from.\n\n"
         "Rules:\n"
-        "  - Copy document_checksum exactly as given. Never alter it.\n"
+        "  - Copy document_checksum exactly as given above. Never alter it.\n"
         "  - Every value MUST appear inside the span you cite, and the span "
         "MUST appear verbatim on the page you cite. An independent validator "
         "checks both, and an unsupported value quarantines the case.\n"
