@@ -1,4 +1,4 @@
-"""Day-2 Frappe capability spike (gate #4 in gates-and-cut-rules).
+"""Day-2 Frappe capability spike — ERP capability gate.
 
 Proves, against the real Frappe Cloud site and BEFORE any plan purchase:
   1. API-token authentication works.
@@ -187,7 +187,7 @@ print(f"\n[spike] VERDICT: {verdict} failed={failed} partial={partial}", flush=T
 # The notify address is redacted: evidence.json is committed to a public repo.
 evidence = {
     "spike": "frappe_capability",
-    "gate": "day-2 Frappe capability spike (gates-and-cut-rules #4)",
+    "gate": "day-2 Frappe capability spike",
     "ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     "site": SITE,
     "results": {k: v.replace(NOTIFY_EMAIL, "<notify-email>") for k, v in results.items()},

@@ -14,3 +14,7 @@ wheels/
 
 # Local worktrees (superpowers SDD)
 .worktrees/
+
+# Superpowers process artifacts (specs/plans) — written from the private
+# planning layer, so they carry its vocabulary. Kept locally, never tracked.
+docs/superpowers/
