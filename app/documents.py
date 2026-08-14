@@ -44,8 +44,15 @@ def load_document(ref: str) -> RedactedDerivative:
     path = FIXTURE_ROOT / f"{name}.json"
     try:
         payload = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise DocumentUnavailable(f"cannot load {ref!r}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise DocumentUnavailable(f"{ref!r}: document must be a JSON object, not {type(payload).__name__}")
+
+    try:
         pages = payload["pages"]
-    except (OSError, ValueError, KeyError) as exc:
+    except KeyError as exc:
         raise DocumentUnavailable(f"cannot load {ref!r}: {exc}") from exc
 
     if not isinstance(pages, list) or not all(isinstance(p, str) for p in pages):
