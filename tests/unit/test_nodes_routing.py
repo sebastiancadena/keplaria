@@ -11,7 +11,7 @@ document, so a reviewer (and verify.py) can see why a case was blocked.
 from __future__ import annotations
 
 import app.nodes as nodes_module
-from app.nodes import apply_route, quarantine_case
+from app.nodes import apply_route, load_case_state, quarantine_case
 from app.state.commands import get_command
 from app.state.firestore import CASES
 
@@ -181,3 +181,37 @@ def test_quarantine_case_persists_a_malformed_screening_without_raising(
         {"id": None, "score": None, "match": None},
         {"id": ["unhashable"], "score": None, "match": None},
     ]
+
+
+def test_a_clock_event_routes_away_from_the_coordinator(db, case_id):
+    db.collection("cases").document(case_id).set(
+        {"case_id": case_id, "lifecycle": {"state": "active", "cycle": 1}}
+    )
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "renewal_due"}})
+
+    event = load_case_state(None, ctx)
+
+    assert event.actions.route == "clock"
+    assert event.actions.state_delta["case_state"]["lifecycle"]["cycle"] == 1
+
+
+def test_a_document_event_routes_to_the_coordinator_and_loads_the_derivative(db, case_id):
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                         "document_ref": "fixture:andes-verde-cert-2028"}})
+
+    event = load_case_state(None, ctx)
+
+    assert event.actions.route == "agentic"
+    assert "2028-01-01" in event.actions.state_delta["derivative"]["pages"][0]
+
+
+def test_an_unresolvable_document_reference_does_not_raise(db, case_id):
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                         "document_ref": "fixture:nope"}})
+
+    event = load_case_state(None, ctx)
+
+    assert event.actions.state_delta["derivative"] is None, (
+        "an unreadable document must reach the grounding gate as absent "
+        "evidence, not crash the graph"
+    )

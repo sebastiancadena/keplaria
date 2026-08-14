@@ -14,7 +14,8 @@ from google.adk.agents.context import Context
 from google.adk.events.event import Event
 from opentelemetry import trace
 
-from app.policy import PolicyError, validate_route
+from app.documents import DocumentUnavailable, load_document
+from app.policy import CLOCK_EVENTS, PolicyError, validate_route
 from app.risk import assess_case
 from app.schemas import CanonicalEvent, ScreeningResult
 from app.state.commands import DONE, claim_command
@@ -80,6 +81,57 @@ def _record_outcome(
     db.collection(CASES).document(case_id).set(
         {"phase": phase, "routing": routing, "screening": summary, "policy": policy},
         merge=True,
+    )
+
+
+def load_case_state(node_input, ctx: Context) -> Event:
+    """Reload durable case state, then classify the event.
+
+    This is what makes a wake-up months later meaningful: the graph decides
+    from the stored lifecycle and certificate blocks, not from whatever the
+    event happens to carry.
+
+    Routing here is the coordinator bypass. A clock-driven event engages no
+    agents, so sending it to an LlmAgent would spend a model call to be told
+    'no agents' and would put a delegation decision in the trace that was
+    never made.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+    event_type = case.get("event_type", "")
+
+    snap = get_client().collection(CASES).document(case_id).get()
+    case_state = (snap.to_dict() or {}) if snap.exists else {}
+
+    derivative = None
+    ref = case.get("document_ref")
+    if ref:
+        try:
+            derivative = load_document(ref).model_dump()
+        except DocumentUnavailable as exc:
+            # Absent evidence, not a crash: the grounding gate is the single
+            # place that decides what unusable evidence means, and it
+            # quarantines rather than proceeding.
+            derivative = None
+            error_msg = f"{type(exc).__name__}: {exc}"
+            with tracer.start_as_current_span("document_unavailable") as span:
+                span.set_attribute("keplaria.case_id", case_id)
+                span.set_attribute("keplaria.document_error", error_msg[:200])
+
+    route = "clock" if event_type in CLOCK_EVENTS else "agentic"
+
+    with tracer.start_as_current_span("load_case_state") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.event_class", route)
+        span.set_attribute(
+            "keplaria.lifecycle_state",
+            (case_state.get("lifecycle") or {}).get("state", "onboarding"),
+        )
+
+    return Event(
+        output={"event_class": route},
+        state={"case_state": case_state, "derivative": derivative},
+        route=route,
     )
 
 
