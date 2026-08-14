@@ -54,6 +54,17 @@ echo "== Agent Runtime deploy preconditions =="
 [ -f .gcloudignore ] && grep -q '^strategy$' .gcloudignore \
   && ok ".gcloudignore excludes the private strategy symlinks" \
   || bad ".gcloudignore missing/incomplete — a deploy would package strategy/ into the container"
+# app/risk.py's DEFAULT_POLICY_PATH resolves to this file at runtime — the
+# first runtime-required file outside app/. If .gcloudignore ever excludes
+# policy/, load_policy() fails closed on every case (POLICY_UNAVAILABLE ->
+# blocked): a silent, total onboarding outage.
+[ -f policy/supplier_risk.v1.json ] \
+  && python3 -c "import json; json.load(open('policy/supplier_risk.v1.json'))" >/dev/null 2>&1 \
+  && ok "policy fixture exists and parses (policy/supplier_risk.v1.json)" \
+  || bad "policy fixture missing or does not parse — every case would fail closed to POLICY_UNAVAILABLE/blocked"
+grep -qE '^policy/?$' .gcloudignore \
+  && bad ".gcloudignore excludes policy/ — the runtime-required fixture would not ship, every case fails closed" \
+  || ok "policy/ is not excluded from the deploy package"
 gcloud compute network-attachments describe keplaria-psc2 --region=us-central1 \
   --project=keplaria >/dev/null 2>&1 \
   && ok "network attachment keplaria-psc2" || bad "keplaria-psc2 missing (PSC-I → yente will fail)"

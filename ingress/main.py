@@ -201,6 +201,21 @@ def push(envelope: Any = Body(...)) -> dict:
         )
         raise HTTPException(status_code=503, detail="command execution failed") from exc
 
+    refused_bands = [r.get("band") for r in command_results if r.get("status") == "refused_by_policy"]
+    if refused_bands:
+        # The runner's guard is a silent no-op by design (see
+        # app/executor/runner.py): it never raises and never surfaces as
+        # `failed`, so without this line a wiring bug that refused every
+        # write forever would look identical to "no events arrived". This is
+        # observability only — the 200 ack below is unchanged, because a
+        # policy refusal is deterministic and retrying it is pointless.
+        logger.warning(
+            "command execution refused by policy for event %s case %s: bands=%s",
+            event.event_id,
+            event.case_id,
+            refused_bands,
+        )
+
     if any(r.get("status") == "failed" for r in command_results):
         logger.warning(
             "command execution reported a failure for event %s case %s: %s",

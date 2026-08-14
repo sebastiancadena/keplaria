@@ -132,3 +132,52 @@ def test_quarantine_case_claims_no_command_but_records_the_refusal(
     assert case["phase"] == "quarantined"
     assert case["routing"] == routing
     assert case["screening"] is None
+    assert case["policy"] is None
+
+
+def test_quarantine_case_persists_a_malformed_screening_without_raising(
+    db, case_id, monkeypatch
+):
+    """A screening dict that app.risk.assess already rejects as
+    SCREENING_MALFORMED (missing/wrong-typed id, score, or match on a
+    candidate; a non-dict candidate entry) still flows into
+    quarantine_case -> _record_outcome, because that is exactly the
+    'blocked' terminal a malformed screening routes to. _record_outcome used
+    to bracket-index c["id"]/c["score"]/c["match"], which raised
+    KeyError/TypeError for the very inputs assess() already tolerates — the
+    gate stopped raising, but the write recording why a case was quarantined
+    did not. This proves the persistence path is total too."""
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+    db.collection(CASES).document(case_id).set({"case_id": case_id, "case_version": 1})
+
+    routing = {
+        "proposed": [],
+        "route": [],
+        "reason": "screening malformed",
+        "refused": None,
+        "pending_implementation": [],
+    }
+    malformed_screening = {
+        "reachable": True,
+        "candidates": [{"score": 0.9}, "not-a-dict", {"id": ["unhashable"]}],
+        "flagged": ["y"],
+    }
+    ctx = _StubContext(
+        {
+            "case": _case(case_id, "new_supplier_packet"),
+            "routing": routing,
+            "screening": malformed_screening,
+        }
+    )
+
+    result = quarantine_case(None, ctx)  # must not raise
+
+    assert result.output["status"] == "quarantined"
+
+    case = db.collection(CASES).document(case_id).get().to_dict()
+    assert case["screening"]["candidate_count"] == 3
+    assert case["screening"]["candidates"] == [
+        {"id": None, "score": 0.9, "match": None},
+        {"id": None, "score": None, "match": None},
+        {"id": ["unhashable"], "score": None, "match": None},
+    ]

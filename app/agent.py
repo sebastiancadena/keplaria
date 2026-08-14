@@ -15,9 +15,11 @@
 """Keplaria workflow — the thin vertical.
 
 event → canonical parse → structured routing decision → validated branch →
-deterministic command queue. The coordinator proposes a route; deterministic
-policy code decides whether it is allowed, so no model output reaches a side
-effect unvalidated.
+sanctions screening → deterministic risk gate → command queue. The
+coordinator proposes a route; deterministic policy code decides whether it is
+allowed, and a second deterministic node decides whether the screened
+supplier may be onboarded at all. No model output reaches a side effect
+unvalidated, and a flagged supplier never reaches the command queue.
 
 The screening node reaches the self-hosted yente service on the private VM. It
 has no public address, so that call only succeeds when the serving workload has
@@ -36,6 +38,8 @@ from google.genai import types
 
 from app.nodes import (
     apply_route,
+    assess_risk,
+    park_case,
     parse_case,
     quarantine_case,
     queue_supplier,
@@ -77,19 +81,28 @@ root_agent = Workflow(
         (parse_case, coordinator),
         (coordinator, apply_route),
         # A routing-map chain element is this ADK version's syntax for a
-        # conditional edge; it expands to the same (from, to, route) pairs
-        # the design calls for: "screen" -> screen_supplier, "skip" ->
-        # queue_supplier, "blocked" -> quarantine_case (a refused proposal
-        # must never reach the command queue).
+        # conditional edge. "skip" goes to assess_risk rather than straight to
+        # queue_supplier so that EVERY path to the command queue carries a
+        # policy verdict — that invariant is what lets the executor refuse a
+        # case with no verdict instead of having to tolerate one.
         (
             apply_route,
             {
                 "screen": screen_supplier,
-                "skip": queue_supplier,
+                "skip": assess_risk,
                 "blocked": quarantine_case,
             },
         ),
-        (screen_supplier, queue_supplier),
+        (screen_supplier, assess_risk),
+        # The gate. Only "clear" reaches the command queue.
+        (
+            assess_risk,
+            {
+                "clear": queue_supplier,
+                "review": park_case,
+                "blocked": quarantine_case,
+            },
+        ),
     ],
 )
 

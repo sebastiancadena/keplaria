@@ -20,6 +20,7 @@ import pytest
 import app.executor.runner as runner_module
 from app.executor.runner import execute_pending_commands
 from app.state.commands import DONE, FAILED, claim_command, get_command, record_success
+from app.state.firestore import CASES
 
 pytestmark = [
     pytest.mark.live,
@@ -37,6 +38,10 @@ def _payload(name: str) -> dict:
 def test_pending_command_executes_and_reaches_done(db, case_id):
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
     claim_command(db, case_id, "create_supplier", _payload(supplier))
+    # The runner's policy guard refuses to drain any command whose case is
+    # not `clear` — seed a cleared verdict so this test exercises the path
+    # it was written for, not the refusal guard.
+    db.collection(CASES).document(case_id).set({"policy": {"band": "clear", "policy_version": 1}})
 
     results = execute_pending_commands(db, case_id)
 
@@ -84,6 +89,9 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     before any network I/O happens."""
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
     claim_command(db, case_id, "create_supplier", _payload(supplier))
+    # Same guard as above: without a `clear` verdict on the case, the runner
+    # refuses before the monkeypatched call below is ever reached.
+    db.collection(CASES).document(case_id).set({"policy": {"band": "clear", "policy_version": 1}})
 
     def _boom(client, name):
         raise KeyError("data")

@@ -16,6 +16,15 @@ one bonus attempt per delivery that happens to arrive — not an ongoing
 retry loop — and stays `failed` until some unrelated later event for the
 same case triggers another drain, or until a dedicated retry/DLQ path is
 built (not yet).
+
+This module also re-reads the gate's verdict (`cases/{case_id}.policy`) before
+draining and refuses any command whose case is not `clear`. That is a backstop,
+not the primary enforcement: the graph's assess_risk branch is what stops a
+flagged supplier, and in the happy path this guard never fires, because the
+review and blocked terminals claim no command. It exists for the anomalous
+paths — a duplicate-event redelivery draining a command queued under older
+state, or a graph-wiring bug — and it matters because this process runs under
+a different identity (the Cloud Run ingress) than the graph.
 """
 
 from __future__ import annotations
@@ -23,12 +32,24 @@ from __future__ import annotations
 import httpx
 
 from app.executor.frappe import FrappeError, create_supplier_if_absent, frappe_client
+from app.risk import CLEAR
 from app.state.commands import DONE, record_failure, record_success
 from app.state.firestore import CASES, OUTBOX
 
 # The only action this executor knows how to run today. A command with any
 # other action is left untouched rather than guessed at.
 _CREATE_SUPPLIER = "create_supplier"
+
+
+def _policy_band(db, case_id: str) -> tuple[str | None, int | None]:
+    """Read the gate's verdict off the case document.
+
+    Returns (None, None) when the case or its policy block is absent — which
+    every graph path now makes an anomaly, and which the caller refuses.
+    """
+    snap = db.collection(CASES).document(case_id).get()
+    policy = ((snap.to_dict() or {}) if snap.exists else {}).get("policy") or {}
+    return policy.get("band"), policy.get("policy_version")
 
 
 def execute_pending_commands(db, case_id: str) -> list[dict]:
@@ -58,6 +79,9 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     outbox_ref = db.collection(CASES).document(case_id).collection(OUTBOX)
     results: list[dict] = []
 
+    band, policy_version = _policy_band(db, case_id)
+    refused = band != CLEAR
+
     for snap in outbox_ref.stream():
         command = snap.to_dict() or {}
         action = command.get("action")
@@ -65,6 +89,21 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
         if command.get("status") == DONE:
             continue
         if action != _CREATE_SUPPLIER:
+            continue
+
+        if refused:
+            # Refusal-only: this guard can stop a write, never authorize one.
+            # Deliberately NOT record_failure — a refusal is not a failure, and
+            # the command must stay PENDING so that a later approval flipping
+            # the verdict to `clear` lets the next drain execute it normally.
+            results.append(
+                {
+                    "action": action,
+                    "status": "refused_by_policy",
+                    "band": band,
+                    "policy_version": policy_version,
+                }
+            )
             continue
 
         payload = command.get("payload") or {}

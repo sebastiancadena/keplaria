@@ -37,3 +37,20 @@ GEMINI.md
 agents-cli-manifest.yaml
 skills-lock.json
 .rumdl_cache
+
+# NOTE: `policy/` is deliberately NOT listed above and must NEVER be added to
+# this "not needed at runtime" block. app/risk.py's DEFAULT_POLICY_PATH
+# resolves to policy/supplier_risk.v1.json at runtime — it is the first
+# runtime-required file outside app/. If this directory is ever excluded
+# here, load_policy() fails on every case (fail-closed by design), which
+# means every case silently becomes POLICY_UNAVAILABLE -> blocked: a total,
+# silent onboarding outage that no test in this repo would catch, because
+# tests run against the checked-out tree, not the deployed container.
+
+# --- Local scratch: worktrees and SDD workspaces ---------------------------
+# .gcloudignore REPLACES .gitignore at deploy time, so these must be repeated
+# here. A worktree under .worktrees/ carries its own resolved strategy/.claude/
+# CLAUDE.md symlinks — packaging one would leak the private layer (or abort the
+# packager with "path is outside the project directory").
+.worktrees/
+.superpowers/

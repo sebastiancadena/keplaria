@@ -15,6 +15,7 @@ from google.adk.events.event import Event
 from opentelemetry import trace
 
 from app.policy import PolicyError, validate_route
+from app.risk import assess_case
 from app.schemas import CanonicalEvent, ScreeningResult
 from app.state.commands import DONE, claim_command
 from app.state.firestore import CASES, get_client
@@ -28,27 +29,47 @@ YENTE_CUTOFF = 0.0
 tracer = trace.get_tracer("keplaria.nodes")
 
 
-def _record_outcome(db, case_id: str, phase: str, routing: dict | None, screening: dict | None) -> None:
+def _record_outcome(
+    db,
+    case_id: str,
+    phase: str,
+    routing: dict | None,
+    screening: dict | None,
+    policy: dict | None = None,
+) -> None:
     """Persist a compact routing/screening summary onto the case doc.
 
     Session state is invisible outside the engine; this is what lets
     verify.py (and anyone else reading Firestore) substantiate the routing
     and screening decisions without reaching into the graph.
 
-    The persisted `screening` block is a record of what yente returned, not a
-    gate: nothing downstream reads `flagged` as a condition. See
-    `queue_supplier` for why, and for what is still missing.
+    The persisted `policy` block is the authoritative record of the gate's
+    decision. app.executor.runner re-reads it before draining a command, so
+    this is not merely a projection — it is read back for enforcement.
+
+    A malformed `screening` dict (one app.risk.assess already rejected as
+    SCREENING_MALFORMED) still flows in here from the quarantine_case /
+    park_case terminals — the gate refusing to raise does not mean the
+    thing it refused is well-formed. This function must persist a "why was
+    this case decided this way" record for THAT input too, so it reads every
+    candidate field with `.get()`, never `[]`, and never assumes `candidates`
+    is a list of dicts.
     """
     summary = None
     if screening:
-        candidates = screening.get("candidates", [])
+        raw_candidates = screening.get("candidates", [])
+        candidates = raw_candidates if isinstance(raw_candidates, list) else []
         summary = {
             "reachable": screening.get("reachable"),
             "endpoint": screening.get("endpoint"),
             "flagged": screening.get("flagged", []),
             "candidate_count": len(candidates),
             "candidates": [
-                {"id": c["id"], "score": c["score"], "match": c["match"]}
+                {
+                    "id": c.get("id") if isinstance(c, dict) else None,
+                    "score": c.get("score") if isinstance(c, dict) else None,
+                    "match": c.get("match") if isinstance(c, dict) else None,
+                }
                 for c in candidates[:3]
             ],
         }
@@ -57,7 +78,8 @@ def _record_outcome(db, case_id: str, phase: str, routing: dict | None, screenin
     # but integration tests that drive the graph directly without going
     # through the ingress adapter never create it — merge tolerates both.
     db.collection(CASES).document(case_id).set(
-        {"phase": phase, "routing": routing, "screening": summary}, merge=True
+        {"phase": phase, "routing": routing, "screening": summary, "policy": policy},
+        merge=True,
     )
 
 
@@ -140,12 +162,54 @@ def quarantine_case(node_input, ctx: Context) -> Event:
     with tracer.start_as_current_span("quarantine_case") as span:
         span.set_attribute("keplaria.case_id", case_id)
         span.set_attribute("keplaria.quarantined", True)
-        _record_outcome(get_client(), case_id, "quarantined", routing, ctx.state.get("screening"))
+        _record_outcome(
+            get_client(),
+            case_id,
+            "quarantined",
+            routing,
+            ctx.state.get("screening"),
+            ctx.state.get("policy"),
+        )
 
     return Event(
         output={
             "status": "quarantined",
             "case_id": case_id,
+            "routing": ctx.state.get("routing"),
+        }
+    )
+
+
+def park_case(node_input, ctx: Context) -> Event:
+    """Terminal node for the `review` band — a case parked for a human.
+
+    Zero writes: no command claim, no ERP call, exactly like quarantine_case.
+
+    The phase is `awaiting_approval`: a case parked pending a human decision.
+    This is NOT a live pause — RequestInput is not in this graph. A later
+    milestone replaces this node with a real pause on the same branch.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+    policy = ctx.state.get("policy")
+
+    with tracer.start_as_current_span("park_case") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.parked", True)
+        _record_outcome(
+            get_client(),
+            case_id,
+            "awaiting_approval",
+            ctx.state.get("routing"),
+            ctx.state.get("screening"),
+            policy,
+        )
+
+    return Event(
+        output={
+            "status": "awaiting_approval",
+            "case_id": case_id,
+            "policy": policy,
             "routing": ctx.state.get("routing"),
         }
     )
@@ -202,18 +266,42 @@ def screen_supplier(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"screening": payload})
 
 
+def assess_risk(node_input, ctx: Context) -> Event:
+    """The gate. Deterministic policy decides whether the ERP command may be queued.
+
+    Routes on the band, never on model output. Reached from BOTH the screened
+    branch and the skip branch, so no path to queue_supplier bypasses a
+    verdict — which is what lets the executor treat a missing verdict as an
+    anomaly to refuse rather than a state it must tolerate.
+
+    Only factor IDs reach the span. The values that triggered them go to
+    Firestore via _record_outcome: the data handling contract keeps
+    entity-identifying values out of telemetry.
+    """
+    case = ctx.state.get("case", {})
+    screening = ctx.state.get("screening")
+
+    with tracer.start_as_current_span("assess_risk") as span:
+        verdict = assess_case(screening=screening, case=case)
+        span.set_attribute("keplaria.case_id", case.get("case_id", ""))
+        span.set_attribute("keplaria.policy_version", verdict.policy_version)
+        span.set_attribute("keplaria.risk_score", verdict.score)
+        span.set_attribute("keplaria.risk_band", verdict.band)
+        span.set_attribute(
+            "keplaria.factors_fired", [f.id for f in verdict.factors_fired]
+        )
+
+    payload = verdict.model_dump()
+    return Event(output=payload, state={"policy": payload}, route=verdict.band)
+
+
 def queue_supplier(node_input, ctx: Context) -> Event:
     """Claim the create_supplier command and stop. Never calls the ERP.
 
-    IMPORTANT — screening does not gate this write. `ctx.state["screening"]`
-    (including `flagged`, the yente match outcome) is recorded and advisory
-    only in this slice: it is attached to the output and persisted onto the
-    case doc via `_record_outcome`, but nothing here reads it as a condition.
-    A screening hit does NOT prevent the create_supplier command from being
-    claimed and, downstream, executed against the ERP. Gating on screening
-    results is deterministic policy/risk work that has not been built yet —
-    this node unconditionally queues the command regardless of what
-    screen_supplier found.
+    Reached only via the assess_risk gate's `clear` branch, so by the time
+    this node runs the case already carries a policy verdict that permits an
+    ERP command. A flagged or near-match supplier terminates at
+    quarantine_case or park_case instead and never arrives here.
 
     The Agent Runtime engine's PSC-I network attachment routes egress through
     keplaria-vpc, whose Cloud NAT is ENDPOINT_TYPE_VM only — it does not cover
@@ -243,7 +331,14 @@ def queue_supplier(node_input, ctx: Context) -> Event:
 
         if not claim.acquired and claim.status == DONE:
             span.set_attribute("keplaria.command_replayed", True)
-            _record_outcome(db, case_id, "executed", ctx.state.get("routing"), ctx.state.get("screening"))
+            _record_outcome(
+                db,
+                case_id,
+                "executed",
+                ctx.state.get("routing"),
+                ctx.state.get("screening"),
+                ctx.state.get("policy"),
+            )
             return Event(
                 output={
                     "status": "already_executed",
@@ -255,7 +350,14 @@ def queue_supplier(node_input, ctx: Context) -> Event:
             )
 
         span.set_attribute("keplaria.command_queued", True)
-        _record_outcome(db, case_id, "queued", ctx.state.get("routing"), ctx.state.get("screening"))
+        _record_outcome(
+            db,
+            case_id,
+            "queued",
+            ctx.state.get("routing"),
+            ctx.state.get("screening"),
+            ctx.state.get("policy"),
+        )
 
     return Event(
         output={

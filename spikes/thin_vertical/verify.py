@@ -27,10 +27,17 @@ SUPPLIER is deliberately a name that does NOT match any sanctioned entity in
 fixtures/watchlist/entities.ftm.json. Screening still executes and still
 proves yente reachability over the private network; it just returns no
 match, which is the honest picture of a legitimate supplier being onboarded.
-Screening is recorded but advisory-only in this slice — see
-app.nodes.queue_supplier — so this script must never be pointed at a
+Screening was advisory when this spike ran; the risk gate that supersedes it
+lands in spikes/policy_gate. This script is preserved as the day-3 artifact
+and is not updated to the new behaviour. It must never be pointed at a
 fixture entity: the resulting evidence.json would otherwise read as "a
-sanctioned entity was onboarded and called success."
+sanctioned entity was onboarded and called success." Operationally: with the
+gate now in place, if the screening service is unreachable the case parks as
+`awaiting_approval` and no command is ever claimed, so `wait_for_command`
+below times out and this script reads FAIL for a reason unrelated to what it
+tests — the screening service must be confirmed reachable before re-running
+this script, or a FAIL here says nothing about the thin-vertical path it was
+written to prove.
 
 Note: evidence.json also carries a top-level `trace_id` and a `traces` block
 that this script does NOT write — they are merged in by hand after a run

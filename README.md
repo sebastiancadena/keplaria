@@ -28,8 +28,9 @@ topic keplaria-events
   -> Firestore inbox transaction (claims event_id, creates/advances the
      case, bumps case_version)
   -> Agent Runtime graph: parse -> LLM coordinator routing proposal ->
-     deterministic policy validation (app/policy.py) -> yente screening
-     over PSC-I -> queue ERP command
+     deterministic route validation (app/policy.py) -> yente screening
+     over PSC-I -> deterministic risk gate (app/risk.py) -> queue ERP
+     command, or park/quarantine the case
   -> ingress drains the command outbox and performs the ERP write
 ```
 
@@ -40,16 +41,27 @@ itself cannot reach Frappe Cloud. The deterministic executor that performs
 ERP writes therefore lives in the ingress process. This is a genuinely
 separate component from the agent graph, by design, not a workaround.
 
-**Fail-closed routing.** The LLM coordinator only proposes a route; a
-deterministic policy layer (`app/policy.py`) decides whether it is
-permitted. A refused proposal routes to a `quarantine_case` terminal node
-that performs no Firestore command claim and no ERP write. This gate is
-about *routing* — which nodes run — not about sanctions screening: a
-supplier that yente flags as a match still reaches `queue_supplier` and its
-create_supplier command still gets queued and executed. The screening
-result is recorded (`cases/{case_id}.screening`) but not currently
-evaluated by anything; a deterministic policy/risk node that blocks or
-holds a flagged case is scoped, later work, not yet built.
+**Two deterministic gates, both fail-closed.** The LLM coordinator only
+proposes a route; `app/policy.py` decides whether it is permitted, and a
+refused proposal routes to a `quarantine_case` terminal that performs no
+command claim and no ERP write. Screening results then pass through a second,
+independent gate: `app/risk.py` scores the case against a versioned policy
+fixture (`policy/supplier_risk.v1.json`) and returns one of three bands.
+`clear` queues the ERP command; `review` parks the case as
+`awaiting_approval`; `blocked` quarantines it. A supplier yente flags as a
+match scores at or above the block threshold and never reaches the command
+queue. `app/executor/runner.py`, run from the ingress, re-reads that
+persisted verdict before draining any command and refuses to drain one whose
+case is not `clear` — a backstop at a different identity boundary (the
+Cloud Run ingress runs under a different identity than the Agent Runtime
+graph), explicitly **not** a second independent check: the graph's
+`assess_risk` branch is what actually stops a flagged supplier.
+
+Two honest limits. The `review` band is a parked case, not a live pause —
+`RequestInput` is not in this graph, and a later milestone reinstates a real
+pause on this same branch. And the score is computed from screening results
+only: the Evidence agent is still a stub, so nothing here is
+evidence-grounded yet.
 
 **Idempotency.** Every side effect is a Firestore command with a
 deterministic ID (`{case_id}:{action}`). A command already `DONE` is never

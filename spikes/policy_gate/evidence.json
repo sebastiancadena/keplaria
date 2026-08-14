@@ -1,0 +1,52 @@
+{
+  "gate": "policy_risk_node",
+  "policy_id": "supplier_risk",
+  "policy_version": 1,
+  "thresholds": {
+    "review": 0.2,
+    "block": 0.6
+  },
+  "result": "PASS",
+  "passed": "4/4",
+  "checks": [
+    {
+      "name": "sanctioned_entity_is_blocked",
+      "expected_band": "blocked",
+      "actual_band": "blocked",
+      "score": 0.95,
+      "factors_fired": [
+        "SANCTIONS_MATCH",
+        "SUBTHRESHOLD_CANDIDATE"
+      ],
+      "passed": true
+    },
+    {
+      "name": "decoy_near_match_is_parked_for_review",
+      "expected_band": "review",
+      "actual_band": "review",
+      "score": 0.25,
+      "factors_fired": [
+        "SUBTHRESHOLD_CANDIDATE"
+      ],
+      "passed": true
+    },
+    {
+      "name": "unreachable_screening_is_parked_not_cleared",
+      "expected_band": "review",
+      "actual_band": "review",
+      "score": 0.3,
+      "factors_fired": [
+        "SCREENING_UNAVAILABLE"
+      ],
+      "passed": true
+    },
+    {
+      "name": "clean_supplier_is_cleared",
+      "expected_band": "clear",
+      "actual_band": "clear",
+      "score": 0.0,
+      "factors_fired": [],
+      "passed": true
+    }
+  ]
+}
