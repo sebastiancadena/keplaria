@@ -25,9 +25,33 @@ command -v wrangler >/dev/null && { wrangler whoami >/dev/null 2>&1 \
 command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 \
   && ok "gh authenticated" || meh "gh not authenticated"; }
 
+echo "== judge-visibility (private planning layer must not leak) =="
+# The leak vector is our own writing: specs, plans and subagent briefs drafted
+# from strategy/ carry risk IDs, plan-step labels and private filenames into
+# code and commit messages when copied verbatim. Caught in app/risk.py and in a
+# commit message on 2026-08-14. This grep is the automated backstop.
+LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|Ground Control|\bR[1-9][0-9]?\b'
+leak_files=$(git grep -lEi "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' 2>/dev/null)
+[ -z "$leak_files" ] \
+  && ok "no private planning vocabulary in the tracked tree" \
+  || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
+# Commit messages are covered by the same rule and were the harder miss.
+leak_msgs=$(git log --format='%h %s%n%b' -n 40 | grep -nEi "$LEAK_RE" | head -3)
+[ -z "$leak_msgs" ] \
+  && ok "last 40 commit messages carry no private vocabulary" \
+  || meh "private vocabulary in a recent commit message — squash before pushing: $(echo "$leak_msgs" | head -1)"
+
 echo "== project =="
 [ -d .venv ] && uv lock --check >/dev/null 2>&1 \
   && ok "uv.lock consistent with pyproject" || meh ".venv/lock drift (run: uv sync)"
+# uv run pytest is a SUBSET (-m 'not live'). Report both halves so a test that
+# silently landed in a live-marked file is visible rather than invisible.
+if [ -d .venv ]; then
+  sel=$(uv run pytest --collect-only -q 2>/dev/null | grep -oE '[0-9]+/[0-9]+ tests collected' | head -1)
+  live=$(uv run pytest -m live --collect-only -q 2>/dev/null | grep -oE '^[0-9]+/[0-9]+ tests collected|[0-9]+ tests collected' | head -1)
+  [ -n "$sel" ] && ok "default suite selection: $sel (live-only: ${live:-unknown})" \
+    || meh "could not determine test selection split"
+fi
 
 echo "== cloud infra (read-only) =="
 state=$(gcloud functions describe billing-killswitch --region=us-central1 --gen2 \
