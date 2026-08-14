@@ -119,6 +119,57 @@ def test_park_case_persists_phase_and_verdict(db, case_id):
     assert stored["policy"]["band"] == "review"
 
 
+def test_a_clock_event_does_not_rescore_a_blocked_case():
+    ctx = _StubContext({
+        "case": {"case_id": "C1", "event_type": "evidence_overdue"},
+        "case_state": {"policy": {"band": "blocked", "score": 0.7,
+                                  "policy_id": "supplier_risk", "policy_version": 1,
+                                  "reasons": ["SANCTIONS_MATCH"]}},
+    })
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "blocked", (
+        "the clock advancing must never launder a blocked supplier into clear"
+    )
+    assert event.actions.state_delta["policy"]["band"] == "blocked"
+
+
+def test_a_clock_event_on_a_case_with_no_stored_verdict_is_blocked():
+    ctx = _StubContext({"case": {"case_id": "C1", "event_type": "renewal_due"},
+                "case_state": {}})
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "blocked"
+    assert event.actions.state_delta["policy"]["reasons"] == ["NO_STORED_VERDICT"]
+
+
+def test_a_clock_event_carries_a_clear_verdict_forward():
+    ctx = _StubContext({
+        "case": {"case_id": "C1", "event_type": "renewal_due"},
+        "case_state": {"policy": {"band": "clear", "score": 0.0,
+                                  "policy_id": "supplier_risk", "policy_version": 1}},
+    })
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "clear"
+
+
+def test_a_fresh_screening_still_scores_normally():
+    ctx = _StubContext({
+        "case": {"case_id": "C1", "event_type": "new_supplier_packet"},
+        "case_state": {},
+        "screening": {"reachable": True, "candidates": [], "flagged": []},
+    })
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "clear"
+    assert event.actions.state_delta["policy"]["score"] == 0.0
+
+
 def test_queue_supplier_persists_a_clear_verdict_alongside_the_claim(db, case_id, monkeypatch):
     """This is the branch's central invariant, made hermetic: no path reaches
     the command queue without a persisted `clear` verdict. app.executor.runner

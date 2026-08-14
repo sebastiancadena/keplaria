@@ -13,10 +13,11 @@ import httpx
 from google.adk.agents.context import Context
 from google.adk.events.event import Event
 from opentelemetry import trace
+from pydantic import ValidationError
 
 from app.documents import DocumentUnavailable, load_document
 from app.policy import CLOCK_EVENTS, PolicyError, validate_route
-from app.risk import assess_case
+from app.risk import BLOCKED, RiskVerdict, assess_case
 from app.schemas import CanonicalEvent, ScreeningResult
 from app.state.commands import DONE, claim_command
 from app.state.firestore import CASES, get_client
@@ -327,26 +328,59 @@ def screen_supplier(node_input, ctx: Context) -> Event:
 
 
 def assess_risk(node_input, ctx: Context) -> Event:
-    """The gate. Deterministic policy decides whether the ERP command may be queued.
+    """The gate. Deterministic policy decides whether commands may be queued.
 
-    Routes on the band, never on model output. Reached from BOTH the screened
-    branch and the skip branch, so no path to queue_supplier bypasses a
-    verdict — which is what lets the executor treat a missing verdict as an
-    anomaly to refuse rather than a state it must tolerate.
+    Two modes. An event that performed its own screening is scored fresh. An
+    event that brought no screening of its own — every clock-driven event —
+    carries the stored verdict forward instead.
 
-    Only factor IDs reach the span. The values that triggered them go to
-    Firestore via _record_outcome: the data handling contract keeps
-    entity-identifying values out of telemetry.
+    Carry-forward is not an optimization. Re-scoring a clock event from
+    `screening=None` fires no factors, scores zero, and lands `clear`: the
+    passage of time alone would launder a blocked supplier, and the
+    executor's backstop reads exactly this stored band. A stored band
+    therefore carries forward unchanged, and a case with no stored verdict at
+    all is an anomaly that carries `blocked`.
+
+    Only factor IDs reach the span; the values that triggered them go to
+    Firestore via _record_outcome.
     """
     case = ctx.state.get("case", {})
     screening = ctx.state.get("screening")
+    case_state = ctx.state.get("case_state") or {}
+    is_clock = case.get("event_type", "") in CLOCK_EVENTS
 
     with tracer.start_as_current_span("assess_risk") as span:
-        verdict = assess_case(screening=screening, case=case)
+        if is_clock:
+            stored = case_state.get("policy")
+            stored = stored if isinstance(stored, dict) else {}
+            carried = True
+            if stored.get("band"):
+                try:
+                    verdict = RiskVerdict(**stored)
+                except ValidationError:
+                    # The stored block came out of a schemaless Firestore
+                    # document. A gate that raises here is worse than one that
+                    # refuses: the platform allows a single concurrent query,
+                    # so an exception becomes retry pressure instead of a
+                    # decision. Fail closed and say why.
+                    verdict = RiskVerdict(
+                        policy_id="carry_forward", policy_version=0, score=1.0,
+                        band=BLOCKED, reasons=["STORED_VERDICT_MALFORMED"],
+                    )
+            else:
+                verdict = RiskVerdict(
+                    policy_id="carry_forward", policy_version=0, score=1.0,
+                    band=BLOCKED, reasons=["NO_STORED_VERDICT"],
+                )
+        else:
+            verdict = assess_case(screening=screening, case=case)
+            carried = False
+
         span.set_attribute("keplaria.case_id", case.get("case_id", ""))
         span.set_attribute("keplaria.policy_version", verdict.policy_version)
         span.set_attribute("keplaria.risk_score", verdict.score)
         span.set_attribute("keplaria.risk_band", verdict.band)
+        span.set_attribute("keplaria.verdict_carried_forward", carried)
         span.set_attribute(
             "keplaria.factors_fired", [f.id for f in verdict.factors_fired]
         )
