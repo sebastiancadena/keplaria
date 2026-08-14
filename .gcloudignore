@@ -54,3 +54,4 @@ skills-lock.json
 # packager with "path is outside the project directory").
 .worktrees/
 .superpowers/
+.playwright-mcp/
