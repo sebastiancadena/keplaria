@@ -25,6 +25,18 @@ command -v wrangler >/dev/null && { wrangler whoami >/dev/null 2>&1 \
 command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 \
   && ok "gh authenticated" || meh "gh not authenticated"; }
 
+echo "== ERP maintenance tooling =="
+[ -x scripts/erp.py ] \
+  && ok "scripts/erp.py present (suppliers | cases | audit | purge --yes)" \
+  || meh "scripts/erp.py missing or not executable — ERP cleanup falls back to ad-hoc one-offs"
+# The pre-recording question this answers: is a watchlist entity on record?
+# An exact string search does NOT answer it — the ERP once held
+# 'Comercializadora Andes Verde SAS' while the watchlist carried the same
+# entity as 'Comercializadora Andes Verde S.A.S.', and a grep called it clean.
+[ -f fixtures/watchlist/entities.ftm.json ] \
+  && ok "watchlist fixture present (scripts/erp.py audit can run)" \
+  || meh "watchlist fixture missing — 'erp.py audit' cannot check for sanctioned records"
+
 echo "== judge-visibility (private planning layer must not leak) =="
 # The leak vector is our own writing: specs, plans and subagent briefs drafted
 # from strategy/ carry risk IDs, plan-step labels and private filenames into
