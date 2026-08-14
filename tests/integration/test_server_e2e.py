@@ -145,6 +145,7 @@ def _canonical_event() -> dict:
     }
 
 
+@pytest.mark.live
 @pytest.mark.skipif(
     not os.environ.get("FRAPPE_API_KEY"),
     reason="FRAPPE_* credentials not in the environment",
@@ -201,6 +202,7 @@ def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
     assert outputs[-1]["case_id"] == event["case_id"]
 
 
+@pytest.mark.live
 @pytest.mark.skipif(
     not os.environ.get("FRAPPE_API_KEY"),
     reason="FRAPPE_* credentials not in the environment",
@@ -275,29 +277,9 @@ def test_collect_feedback(server_fixture: subprocess.Popen[str]) -> None:
     assert response.status_code == 200
 
 
-@pytest.fixture(scope="session", autouse=True)
-def cleanup_agent_runtime_sessions() -> None:
-    """Cleanup agent engine sessions created during tests."""
-    yield  # Run tests first
-
-    # Cleanup after tests complete
-    from vertexai import agent_engines
-
-    try:
-        # Use same environment variable as server, default to project name
-        default_agent_name = "keplaria"
-        agent_name = os.environ.get("AGENT_ENGINE_SESSION_NAME", default_agent_name)
-
-        # Find and delete agent engines with this name
-        existing_agents = list(agent_engines.list(filter=f"display_name={agent_name}"))
-
-        for agent_runtime in existing_agents:
-            try:
-                agent_engines.delete(resource_name=agent_runtime.name)
-                logger.info(f"Cleaned up agent engine: {agent_runtime.name}")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to cleanup agent engine {agent_runtime.name}: {e}"
-                )
-    except Exception as e:
-        logger.warning(f"Failed to cleanup agent engine sessions: {e}")
+# The scaffold shipped an autouse session teardown here that listed every agent
+# engine named "keplaria" and tried to delete it. These tests run with
+# USE_IN_MEMORY_SESSION=true and never create an engine, so the only thing that
+# filter could ever match is the production engine doctor.sh guards. Removed —
+# there is nothing of ours to clean up. Do not reintroduce engine deletion in
+# test teardown.

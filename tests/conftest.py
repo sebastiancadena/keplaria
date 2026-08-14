@@ -18,6 +18,13 @@ from app.state.firestore import get_client
 
 TEST_DATABASE = os.environ.get("KEPLARIA_TEST_DATABASE", "keplaria-test")
 
+# App code (graph nodes, executor) resolves its own client from
+# FIRESTORE_DATABASE at call time, and `--env-file .env` hands it the live
+# "(default)" value. Under pytest that must always be the test database; the
+# emulator case keeps "(default)" because the emulator holds no real data.
+if not os.environ.get("FIRESTORE_EMULATOR_HOST"):
+    os.environ["FIRESTORE_DATABASE"] = TEST_DATABASE
+
 
 @pytest.fixture(scope="session")
 def db():

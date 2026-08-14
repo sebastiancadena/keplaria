@@ -22,3 +22,10 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# Live tests (real Gemini calls, real Frappe Cloud writes) are opt-in:
+# `uv run --env-file .env pytest -m live`. A plain `pytest` run stays hermetic
+# apart from the keplaria-test Firestore database (see tests/conftest.py).
+addopts = "-m 'not live'"
+markers = [
+    "live: hits live external systems (Gemini, Frappe Cloud); deselected by default, opt in with -m live",
+]

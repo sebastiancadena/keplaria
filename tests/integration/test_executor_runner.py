@@ -1,9 +1,11 @@
 """execute_pending_commands is what actually writes to the ERP now that the
 graph only ever queues the command (see app.nodes.queue_supplier). Its
 idempotency guarantee — a DONE command is never re-driven — is the whole
-point of moving execution out of the graph without weakening the exactly-once
-contract, so it has to be proven against the real Frappe Cloud site, not a
-mock.
+point of moving execution out of the graph without weakening the
+no-duplicate-effect contract (at-least-once delivery made safe by the
+DONE-skip plus the ERP's deterministic-ID uniqueness, not transactional
+exactly-once), so it has to be proven against the real Frappe Cloud site, not
+a mock.
 
 Run with:
     FIRESTORE_EMULATOR_HOST=localhost:8451 GOOGLE_CLOUD_PROJECT=keplaria \
@@ -19,10 +21,13 @@ import app.executor.runner as runner_module
 from app.executor.runner import execute_pending_commands
 from app.state.commands import DONE, FAILED, claim_command, get_command, record_success
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("FRAPPE_API_KEY"),
-    reason="FRAPPE_* credentials not in the environment",
-)
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(
+        not os.environ.get("FRAPPE_API_KEY"),
+        reason="FRAPPE_* credentials not in the environment",
+    ),
+]
 
 
 def _payload(name: str) -> dict:

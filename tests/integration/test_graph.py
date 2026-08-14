@@ -31,14 +31,18 @@ from app.agent import app
 from app.state.commands import DONE, PENDING, get_command, record_success
 from app.state.firestore import get_client
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("FRAPPE_API_KEY"),
-    reason="FRAPPE_* credentials not in the environment",
-)
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(
+        not os.environ.get("FRAPPE_API_KEY"),
+        reason="FRAPPE_* credentials not in the environment",
+    ),
+]
 
 # These write to whichever database FIRESTORE_DATABASE selects, because the graph
 # nodes resolve their own client. Case IDs are TEST- prefixed and unique per run.
-# Export FIRESTORE_DATABASE=keplaria-test to keep them out of the live database.
+# tests/conftest.py forces FIRESTORE_DATABASE=keplaria-test, so a plain run can
+# never land in the live "(default)" database.
 
 
 async def _run(event: dict) -> list:

@@ -10,10 +10,13 @@ import pytest
 
 from app.executor.frappe import create_supplier_if_absent, frappe_client
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("FRAPPE_API_KEY"),
-    reason="FRAPPE_* credentials not in the environment",
-)
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(
+        not os.environ.get("FRAPPE_API_KEY"),
+        reason="FRAPPE_* credentials not in the environment",
+    ),
+]
 
 
 @pytest.fixture(scope="module")

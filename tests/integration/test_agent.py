@@ -24,10 +24,13 @@ from google.genai import types
 
 from app.agent import root_agent
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("FRAPPE_API_KEY"),
-    reason="FRAPPE_* credentials not in the environment",
-)
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(
+        not os.environ.get("FRAPPE_API_KEY"),
+        reason="FRAPPE_* credentials not in the environment",
+    ),
+]
 
 
 def test_agent_stream() -> None:
