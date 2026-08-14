@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from app.executor.frappe import (
+    FrappeError,
     attach_evidence,
     clear_supplier_hold,
     create_supplier_if_absent,
@@ -89,6 +90,29 @@ def supplier(client):
         )
 
 
+@pytest.fixture
+def supplier_without_email(client):
+    """A fresh test Supplier that deliberately has no email_id.
+
+    create_supplier_if_absent never sets email_id, so this is simply the
+    bare-create path -- no extra API call needed to leave it unset. Same
+    best-effort delete-on-teardown as the `supplier` fixture.
+    """
+    name = f"TEST Supplier {uuid.uuid4().hex[:8]}"
+    create_supplier_if_absent(client, name)
+
+    yield name
+
+    quoted = urllib.parse.quote(name, safe="")
+    delete_response = client.delete(f"/api/resource/Supplier/{quoted}")
+    if delete_response.status_code not in (200, 202):
+        print(
+            f"\nWARN: could not clean up test supplier {name!r}: HTTP "
+            f"{delete_response.status_code} {delete_response.text[:300]} "
+            "-- leaving it for scripts/erp.py purge --test-suppliers --yes"
+        )
+
+
 def test_create_returns_the_deterministic_external_id(client):
     name = f"TEST Supplier {uuid.uuid4().hex[:8]}"
 
@@ -134,6 +158,16 @@ def test_a_renewal_message_is_queued_for_delivery(client, supplier):
 
     assert result["external_id"], "the Communication name is the external ID"
     assert result["created"] is True
+
+
+def test_a_renewal_message_without_email_id_is_rejected(client, supplier_without_email):
+    with pytest.raises(FrappeError, match="no email_id"):
+        send_supplier_message(
+            client,
+            supplier_without_email,
+            "Certificate renewal required",
+            "Your certificate expires on 2027-01-01.",
+        )
 
 
 def test_attaching_evidence_twice_is_reported_as_not_created(client, supplier):

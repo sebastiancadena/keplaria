@@ -132,7 +132,12 @@ def send_supplier_message(
         raise FrappeError(
             f"supplier lookup failed: HTTP {supplier.status_code} {supplier.text[:300]}"
         )
-    recipient = (supplier.json()["data"] or {}).get("email_id")
+    try:
+        recipient = (supplier.json()["data"] or {}).get("email_id")
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise FrappeError(
+            f"supplier lookup returned an unexpected body: {exc}"
+        ) from exc
     if not recipient:
         raise FrappeError(f"supplier {supplier_name!r} has no email_id to write to")
 
@@ -154,7 +159,11 @@ def send_supplier_message(
         raise FrappeError(
             f"message failed: HTTP {response.status_code} {response.text[:300]}"
         )
-    return {"external_id": response.json()["data"]["name"], "created": True}
+    try:
+        external_id = response.json()["data"]["name"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise FrappeError(f"message send returned an unexpected body: {exc}") from exc
+    return {"external_id": external_id, "created": True}
 
 
 def attach_evidence(
@@ -200,8 +209,18 @@ def attach_evidence(
             "limit_page_length": 1,
         },
     )
-    if existing.status_code < 400 and existing.json().get("data"):
-        return {"external_id": existing.json()["data"][0]["name"], "created": False}
+    if existing.status_code >= 400:
+        raise FrappeError(
+            f"existence check failed: HTTP {existing.status_code} {existing.text[:300]}"
+        )
+    try:
+        existing_rows = existing.json()["data"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise FrappeError(
+            f"existence check returned an unexpected body: {exc}"
+        ) from exc
+    if existing_rows:
+        return {"external_id": existing_rows[0]["name"], "created": False}
 
     response = client.post(
         "/api/method/upload_file",
@@ -217,4 +236,8 @@ def attach_evidence(
         raise FrappeError(
             f"attach failed: HTTP {response.status_code} {response.text[:300]}"
         )
-    return {"external_id": response.json()["message"]["name"], "created": True}
+    try:
+        external_id = response.json()["message"]["name"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise FrappeError(f"upload returned an unexpected body: {exc}") from exc
+    return {"external_id": external_id, "created": True}
