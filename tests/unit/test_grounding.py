@@ -52,9 +52,21 @@ def test_a_schema_valid_but_unsupported_expiry_is_rejected():
     assert verdict.field == "certificate_expiry"
 
 
-def test_an_unparseable_expiry_is_rejected():
-    # A span that looks like it might contain a date (matches YYYY-MM-DD pattern)
-    # but is not a valid date (month 13 does not exist).
+def test_a_non_iso_value_in_span_is_not_a_date():
+    # Original case: span contains the value but it's not a date at all.
+    # Returns VALUE_NOT_A_DATE because span has no ISO dates.
+    verdict = validate(
+        _result(field={"value": "next March", "span": "Expiry: next March"}),
+        RedactedDerivative(checksum="abc123", pages=["Expiry: next March"]),
+    )
+
+    assert verdict.grounded is False
+    assert verdict.reason == "VALUE_NOT_A_DATE"
+
+
+def test_an_iso_format_but_invalid_date_is_rejected():
+    # Span contains text matching YYYY-MM-DD pattern, but it's not a valid date
+    # (month 13, day 45 do not exist). Extracted date doesn't pass fromisoformat.
     verdict = validate(
         _result(field={"value": "2027-13-45", "span": "Expiry: 2027-13-45"}),
         RedactedDerivative(checksum="abc123", pages=["Expiry: 2027-13-45"]),
@@ -82,9 +94,36 @@ def test_a_span_with_two_dates_is_rejected_as_ambiguous():
 
 
 def test_a_span_with_one_date_but_wrong_value_is_rejected():
-    # The span has exactly one date, but it doesn't match the claimed value.
+    # The span has exactly one date, but value doesn't match it, and value
+    # is not in span at all. Fails at the value-not-in-span check.
     verdict = validate(
         _result(field={"value": "2030-01-01", "span": "Expiry: 2027-01-01"}),
+        RedactedDerivative(checksum="abc123", pages=["Expiry: 2027-01-01"]),
+    )
+    assert verdict.grounded is False
+    assert verdict.reason == "VALUE_NOT_IN_SPAN"
+    assert verdict.field == "certificate_expiry"
+
+
+def test_a_span_with_repeated_identical_date_passes():
+    # Certificates often restate their expiry date. Repeated identical dates
+    # should not trigger AMBIGUOUS_SPAN — only distinct dates do.
+    verdict = validate(
+        _result(field={"span": "Valid from 2027-01-01, confirmed 2027-01-01"}),
+        RedactedDerivative(
+            checksum="abc123",
+            pages=["Valid from 2027-01-01, confirmed 2027-01-01"],
+        ),
+    )
+    assert verdict.grounded is True
+
+
+def test_a_value_that_is_a_substring_but_not_the_date_is_rejected():
+    # Value appears in the span (substring match) but is not the actual date
+    # the span contains. E.g., value="027-01-01" in "Expiry: 2027-01-01".
+    # This tests the dates_in_span[0] != value branch.
+    verdict = validate(
+        _result(field={"value": "027-01-01", "span": "Expiry: 2027-01-01"}),
         RedactedDerivative(checksum="abc123", pages=["Expiry: 2027-01-01"]),
     )
     assert verdict.grounded is False

@@ -7,6 +7,17 @@ page of the exact document we handed over.
 
 Total — never raises. A malformed result is ungrounded, not an exception,
 because this runs on the path to a side effect and must fail closed.
+
+Reason codes emitted by validate():
+- MALFORMED_RESULT: result structure is invalid
+- CHECKSUM_MISMATCH: document checksum does not match derivative
+- PAGE_OUT_OF_RANGE: page index out of bounds
+- SPAN_NOT_FOUND: span does not appear in page
+- VALUE_NOT_IN_SPAN: value does not appear in span (or for DATE_FIELDS, value
+  does not match the extracted date, or no ISO date appears in span)
+- CONFIDENCE_OUT_OF_RANGE: confidence outside [0, 1]
+- VALUE_NOT_A_DATE: value is in span but is not a valid ISO date
+- AMBIGUOUS_SPAN: span contains multiple distinct dates (DATE_FIELDS only)
 """
 
 from __future__ import annotations
@@ -37,8 +48,12 @@ def _fail(reason: str, field: str = "") -> GroundingVerdict:
 
 
 def _extract_iso_dates(text: str) -> list[str]:
-    """Extract all ISO 8601 date strings (YYYY-MM-DD) from text."""
-    return re.findall(r'\d{4}-\d{2}-\d{2}', text)
+    """Extract unique ISO 8601 date strings (YYYY-MM-DD) from text.
+
+    Returns a deduplicated list. Repeated identical dates count as one, since
+    certificates often restate their expiry date in multiple places.
+    """
+    return list(dict.fromkeys(re.findall(r'\d{4}-\d{2}-\d{2}', text)))
 
 
 def validate(result: dict, derivative: RedactedDerivative) -> GroundingVerdict:
@@ -83,13 +98,16 @@ def validate(result: dict, derivative: RedactedDerivative) -> GroundingVerdict:
             # The span is real but does not say what the value claims.
             return _fail("VALUE_NOT_IN_SPAN", name)
         if name in DATE_FIELDS:
-            # For date fields, extract all ISO dates from the span.
-            # Exactly one must exist and must equal the claimed value.
+            # For date fields, extract all distinct ISO dates from the span.
+            # The span must contain exactly one distinct date, equal to value.
             dates_in_span = _extract_iso_dates(span)
             if len(dates_in_span) == 0:
-                return _fail("VALUE_NOT_IN_SPAN", name)
+                # Value is in span but contains no ISO dates.
+                return _fail("VALUE_NOT_A_DATE", name)
             if len(dates_in_span) > 1:
+                # Multiple distinct dates in span — ambiguous which is the value.
                 return _fail("AMBIGUOUS_SPAN", name)
+            # Exactly one date in span — it must match the claimed value.
             if dates_in_span[0] != value:
                 return _fail("VALUE_NOT_IN_SPAN", name)
             # Verify the value is a valid ISO date.
