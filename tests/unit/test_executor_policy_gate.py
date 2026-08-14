@@ -125,6 +125,40 @@ def test_evidence_is_attached_before_the_hold_is_released(db, case_id, monkeypat
     )
 
 
+def test_attach_evidence_uses_the_commands_cycle_not_the_payloads(
+    db, case_id, monkeypatch
+):
+    """The ledger (record_success/record_failure) and the ERP-side
+    idempotency filename (`{supplier}-cert-c{cycle}.pdf`) must agree on
+    which cycle a command belongs to. attach_evidence must be called with
+    the command's own top-level `cycle` — the same value used for
+    record_success — never a `cycle` that happens to also live inside the
+    payload dict, because nothing upstream enforces the two stay equal."""
+    from app.executor.runner import execute_pending_commands
+
+    seen_cycles = []
+    monkeypatch.setattr("app.executor.runner.frappe_client", _fake_client)
+    monkeypatch.setattr(
+        "app.executor.runner.attach_evidence",
+        lambda client, supplier_name, cycle, content: seen_cycles.append(cycle)
+        or {"external_id": "F1", "created": True},
+    )
+    db.collection("cases").document(case_id).set({"policy": {"band": "clear"}})
+    # Top-level cycle is 5; the payload's own "cycle" field disagrees (99).
+    claim_command(
+        db, case_id, "attach_evidence", 5,
+        {"supplier_name": "Andes", "cycle": 99},
+    )
+
+    execute_pending_commands(db, case_id)
+
+    assert seen_cycles == [5], (
+        "attach_evidence must receive the command's ledger cycle, not the "
+        "payload's, or the ERP attachment filename can diverge from the "
+        "cycle Firestore recorded as done"
+    )
+
+
 def test_an_unknown_action_is_left_untouched(db, case_id, monkeypatch):
     from app.executor.runner import execute_pending_commands
 

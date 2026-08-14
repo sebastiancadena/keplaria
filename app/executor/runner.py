@@ -97,8 +97,19 @@ def _command_cycle(command: dict) -> int:
         return 1
 
 
-def _run(action: str, client, payload: dict) -> dict:
-    """Dispatch one claimed command to the matching Frappe call."""
+def _run(action: str, client, payload: dict, cycle: int) -> dict:
+    """Dispatch one claimed command to the matching Frappe call.
+
+    `cycle` is the command's authoritative cycle — the same value already
+    computed once per command in execute_pending_commands and used for
+    record_success/record_failure — not re-derived from `payload`. Those
+    two can drift (nothing enforces `payload["cycle"] == command["cycle"]`
+    upstream), and attach_evidence uses this value to build the ERP-side
+    idempotency filename (`{supplier}-cert-c{cycle}.pdf`); if this function
+    read a different cycle than the ledger recorded, the command could reach
+    `done` under one cycle while the attachment lands under another, and a
+    later drain would silently attach a duplicate.
+    """
     supplier = payload.get("supplier_name", "")
     if action == CREATE_SUPPLIER:
         return create_supplier_if_absent(client, supplier)
@@ -108,9 +119,7 @@ def _run(action: str, client, payload: dict) -> dict:
         # that merely starts with "%PDF-1.4" without being a well-formed
         # stream. See its docstring in app/executor/frappe.py for why this
         # is a stand-in rather than the supplier's real certificate.
-        return attach_evidence(
-            client, supplier, _command_cycle(payload), PLACEHOLDER_CERTIFICATE_PDF,
-        )
+        return attach_evidence(client, supplier, cycle, PLACEHOLDER_CERTIFICATE_PDF)
     if action == REQUEST_RENEWAL:
         return send_supplier_message(
             client, supplier, "Certificate renewal required",
@@ -210,7 +219,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
 
         try:
             with frappe_client() as client:
-                result = _run(action, client, payload)
+                result = _run(action, client, payload, cycle)
         except (FrappeError, httpx.HTTPError) as exc:
             error = f"{type(exc).__name__}: {exc}"
             record_failure(db, case_id, action, cycle, error)
