@@ -11,6 +11,7 @@ because this runs on the path to a side effect and must fail closed.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from pydantic import BaseModel
@@ -35,6 +36,11 @@ def _fail(reason: str, field: str = "") -> GroundingVerdict:
     return GroundingVerdict(grounded=False, reason=reason, field=field)
 
 
+def _extract_iso_dates(text: str) -> list[str]:
+    """Extract all ISO 8601 date strings (YYYY-MM-DD) from text."""
+    return re.findall(r'\d{4}-\d{2}-\d{2}', text)
+
+
 def validate(result: dict, derivative: RedactedDerivative) -> GroundingVerdict:
     """Check every field against the derivative. First failure wins."""
     if not isinstance(result, dict):
@@ -53,7 +59,9 @@ def validate(result: dict, derivative: RedactedDerivative) -> GroundingVerdict:
         if not isinstance(entry, dict):
             return _fail("MALFORMED_RESULT")
 
-        name = entry.get("name") or ""
+        name = entry.get("name")
+        if not isinstance(name, str):
+            name = ""
         span = entry.get("span")
         value = entry.get("value")
         page = entry.get("page")
@@ -75,6 +83,16 @@ def validate(result: dict, derivative: RedactedDerivative) -> GroundingVerdict:
             # The span is real but does not say what the value claims.
             return _fail("VALUE_NOT_IN_SPAN", name)
         if name in DATE_FIELDS:
+            # For date fields, extract all ISO dates from the span.
+            # Exactly one must exist and must equal the claimed value.
+            dates_in_span = _extract_iso_dates(span)
+            if len(dates_in_span) == 0:
+                return _fail("VALUE_NOT_IN_SPAN", name)
+            if len(dates_in_span) > 1:
+                return _fail("AMBIGUOUS_SPAN", name)
+            if dates_in_span[0] != value:
+                return _fail("VALUE_NOT_IN_SPAN", name)
+            # Verify the value is a valid ISO date.
             try:
                 date.fromisoformat(value)
             except ValueError:
