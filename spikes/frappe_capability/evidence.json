@@ -1,0 +1,14 @@
+{
+  "spike": "frappe_capability",
+  "gate": "day-2 Frappe capability spike (gates-and-cut-rules #4)",
+  "ran_at": "2026-08-14T14:04:16+00:00",
+  "site": "https://andina-foods.v.frappe.cloud",
+  "results": {
+    "api_token_auth": "PASS: authenticated as <notify-email>",
+    "deterministic_ids": "PASS: name == supplier_name ('SPIKE Deterministic Supplier'); duplicate rejected with HTTP 409",
+    "supplier_hold_release": "PASS: on_hold set with hold_type=All, then released, both verified",
+    "outbound_email": "PASS: email Sent to <notify-email> (queue 8f9nkpu1tu)",
+    "rbac_native_403": "PASS: bot token authenticates but Supplier access \u2192 native 403"
+  },
+  "verdict": "PASS"
+}

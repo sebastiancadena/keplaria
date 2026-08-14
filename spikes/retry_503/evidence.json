@@ -1,0 +1,18 @@
+{
+  "spike": "retry_503",
+  "gate": "day-2 controlled-503 retry spike",
+  "ran_at": "2026-08-14T14:01:21+00:00",
+  "criteria": {
+    "completed_after_retry": true,
+    "exactly_two_attempts": true,
+    "exactly_one_downstream_write": true
+  },
+  "fetch_attempts": 2,
+  "downstream_writes": 1,
+  "final_output": {
+    "status": "written",
+    "doc": "redacted-derivative",
+    "attempts": 2
+  },
+  "verdict": "PASS"
+}

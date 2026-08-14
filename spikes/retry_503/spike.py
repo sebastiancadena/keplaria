@@ -9,7 +9,10 @@ Run: uv run python spikes/retry_503/spike.py  (exits 0 on PASS)
 """
 
 import asyncio
+import json
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
 from google.adk import Event, Workflow
 from google.adk.apps import App
@@ -85,6 +88,22 @@ async def main() -> int:
     print(f"[spike] attempts={ATTEMPTS['fetch']} writes={LEDGER['writes']}")
     verdict = "PASS" if all(criteria.values()) else "FAIL"
     print(f"[spike] VERDICT: {verdict} {criteria}")
+
+    # Gate evidence goes in the repo, never stdout-only (see CLAUDE.md
+    # Maintenance).
+    evidence = {
+        "spike": "retry_503",
+        "gate": "day-2 controlled-503 retry spike",
+        "ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "criteria": criteria,
+        "fetch_attempts": ATTEMPTS["fetch"],
+        "downstream_writes": LEDGER["writes"],
+        "final_output": final_output,
+        "verdict": verdict,
+    }
+    evidence_path = Path(__file__).parent / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
+    print(f"[spike] evidence written to {evidence_path}")
     return 0 if verdict == "PASS" else 1
 
 

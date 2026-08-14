@@ -16,6 +16,8 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
@@ -178,9 +180,20 @@ run_check("rbac_native_403", check_rbac_403)
 
 failed = [k for k, v in results.items() if v.startswith("FAIL")]
 partial = [k for k, v in results.items() if v.startswith("PARTIAL")]
-print(
-    f"\n[spike] VERDICT: {'FAIL' if failed else ('PARTIAL' if partial else 'PASS')}"
-    f" failed={failed} partial={partial}",
-    flush=True,
-)
+verdict = "FAIL" if failed else ("PARTIAL" if partial else "PASS")
+print(f"\n[spike] VERDICT: {verdict} failed={failed} partial={partial}", flush=True)
+
+# Gate evidence goes in the repo, never stdout-only (see CLAUDE.md Maintenance).
+# The notify address is redacted: evidence.json is committed to a public repo.
+evidence = {
+    "spike": "frappe_capability",
+    "gate": "day-2 Frappe capability spike (gates-and-cut-rules #4)",
+    "ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "site": SITE,
+    "results": {k: v.replace(NOTIFY_EMAIL, "<notify-email>") for k, v in results.items()},
+    "verdict": verdict,
+}
+evidence_path = Path(__file__).parent / "evidence.json"
+evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
+print(f"[spike] evidence written to {evidence_path}", flush=True)
 sys.exit(1 if failed else 0)
