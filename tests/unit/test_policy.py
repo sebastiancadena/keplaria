@@ -50,4 +50,25 @@ def test_allowlist_covers_every_supported_event_type():
         "new_supplier_packet",
         "certificate_received",
         "evidence_overdue",
+        "renewal_due",
     }
+
+
+def test_clock_events_engage_no_agents():
+    from app.policy import CLOCK_EVENTS
+    assert ALLOWED_ROUTES["renewal_due"] == set()
+    assert ALLOWED_ROUTES["evidence_overdue"] == set()
+    assert validate_route("renewal_due", []) == []
+
+
+def test_clock_events_are_classified_as_such():
+    from app.policy import CLOCK_EVENTS
+    assert CLOCK_EVENTS == frozenset({"renewal_due", "evidence_overdue"})
+    assert "new_supplier_packet" not in CLOCK_EVENTS
+    assert "certificate_received" not in CLOCK_EVENTS
+
+
+def test_a_clock_event_may_not_engage_an_agent():
+    from app.policy import CLOCK_EVENTS
+    with pytest.raises(PolicyError):
+        validate_route("renewal_due", ["compliance"])

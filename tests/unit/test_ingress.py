@@ -13,6 +13,8 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+from app.schemas import CanonicalEvent
+
 
 @pytest.fixture
 def client(monkeypatch, db):
@@ -120,3 +122,24 @@ def test_engine_failure_is_retried_not_stranded(client, case_id, monkeypatch):
     assert second.json()["status"] == "claimed"
     assert second.json()["case_version"] == 1, "a retry must not bump the version again"
     assert len(attempts) == 2, "the redelivered event must reach the engine again"
+
+
+def test_the_event_carries_an_effective_date_and_document_reference():
+    event = CanonicalEvent(
+        event_id="E1", case_id="C1", event_type="certificate_received",
+        supplier="Andes", effective_date="2027-01-20",
+        document_ref="fixture:andes-verde-cert-2028",
+    )
+
+    assert event.effective_date == "2027-01-20"
+    assert event.document_ref == "fixture:andes-verde-cert-2028"
+
+
+def test_both_new_fields_are_optional():
+    event = CanonicalEvent(
+        event_id="E1", case_id="C1", event_type="new_supplier_packet",
+        supplier="Andes",
+    )
+
+    assert event.effective_date is None
+    assert event.document_ref is None

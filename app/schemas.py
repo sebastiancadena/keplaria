@@ -20,6 +20,32 @@ class CanonicalEvent(BaseModel):
     amount: float | None = None
     # When set, the event is only valid against this exact stored case version.
     expected_case_version: int | None = None
+    # The demo clock. Station-keeping decisions are a pure function of this
+    # date, never of wall-clock time, so a simulated year runs in seconds.
+    effective_date: str | None = None
+    # Immutable payload reference; resolved by app.documents.load_document.
+    document_ref: str | None = None
+
+
+class EvidenceField(BaseModel):
+    """One extracted value and the span that supports it."""
+
+    name: str = Field(description="Field name, e.g. 'certificate_expiry'.")
+    value: str = Field(description="The extracted value.")
+    page: int = Field(description="Zero-based page index the value came from.")
+    span: str = Field(
+        description="The verbatim text from that page containing the value."
+    )
+    confidence: float = Field(description="Extraction confidence, 0.0 to 1.0.")
+
+
+class EvidenceResult(BaseModel):
+    """The Evidence agent's structured output. Checked by app.grounding."""
+
+    document_checksum: str = Field(
+        description="The checksum of the document supplied, copied exactly."
+    )
+    fields: list[EvidenceField] = Field(description="Every field extracted.")
 
 
 class RoutingDecision(BaseModel):

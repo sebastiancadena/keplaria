@@ -14,7 +14,14 @@ ALLOWED_ROUTES: dict[str, set[str]] = {
     "new_supplier_packet": {"evidence", "compliance"},
     "certificate_received": {"evidence"},
     "evidence_overdue": set(),
+    "renewal_due": set(),
 }
+
+# Events driven by the clock rather than by a document or an entity change.
+# They engage no agents, so they must not reach the coordinator at all —
+# spending a model call to be told "no agents" is waste, and it would make
+# the trace imply a delegation decision that never happened.
+CLOCK_EVENTS = frozenset({"renewal_due", "evidence_overdue"})
 
 
 class PolicyError(ValueError):
