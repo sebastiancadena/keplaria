@@ -10,10 +10,34 @@ document, so a reviewer (and verify.py) can see why a case was blocked.
 
 from __future__ import annotations
 
+import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
+
 import app.nodes as nodes_module
 from app.nodes import apply_route, load_case_state, quarantine_case
 from app.state.commands import get_command
 from app.state.firestore import CASES
+
+
+@pytest.fixture(scope="module")
+def span_exporter():
+    """Capture finished spans so a test can assert on span attributes.
+
+    `keplaria.nodes`'s module-level `tracer` is an OTel ProxyTracer bound at
+    import time; it delegates lazily to whatever real TracerProvider is
+    installed later via `set_tracer_provider`, which is exactly what this
+    fixture installs — no monkeypatch of `app.nodes.tracer` needed.
+    """
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+    return exporter
 
 
 class _StubContext:
@@ -215,3 +239,24 @@ def test_an_unresolvable_document_reference_does_not_raise(db, case_id):
         "an unreadable document must reach the grounding gate as absent "
         "evidence, not crash the graph"
     )
+
+
+def test_document_unavailable_span_carries_no_entity_identifying_value(
+    case_id, span_exporter
+):
+    """A document_ref deterministically names the entity it belongs to (a
+    supplier's certificate fixture), so DocumentUnavailable's message — which
+    embeds the raw ref — must never reach a span. The span attribute must be
+    exactly the exception type name, not merely 'present' or 'non-empty',
+    otherwise a regression that puts str(exc) back on the span would still
+    pass this test."""
+    span_exporter.clear()
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                         "document_ref": "fixture:nope"}})
+
+    load_case_state(None, ctx)
+
+    spans = {s.name: s for s in span_exporter.get_finished_spans()}
+    error_attr = spans["document_unavailable"].attributes["keplaria.document_error"]
+
+    assert error_attr == "DocumentUnavailable"

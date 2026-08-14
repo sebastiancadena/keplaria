@@ -112,11 +112,19 @@ def load_case_state(node_input, ctx: Context) -> Event:
             # Absent evidence, not a crash: the grounding gate is the single
             # place that decides what unusable evidence means, and it
             # quarantines rather than proceeding.
+            #
+            # The span carries only the exception type name, never str(exc)
+            # or the ref itself: DocumentUnavailable's messages embed the raw
+            # document_ref, and in this system a document_ref deterministically
+            # names the entity it belongs to (e.g. a supplier's certificate
+            # fixture) — so it is entity-identifying data, which this
+            # project's telemetry contract keeps off spans. IDs, codes, and
+            # counts only; entity-identifying values go to Firestore, never
+            # to a span.
             derivative = None
-            error_msg = f"{type(exc).__name__}: {exc}"
             with tracer.start_as_current_span("document_unavailable") as span:
                 span.set_attribute("keplaria.case_id", case_id)
-                span.set_attribute("keplaria.document_error", error_msg[:200])
+                span.set_attribute("keplaria.document_error", type(exc).__name__)
 
     route = "clock" if event_type in CLOCK_EVENTS else "agentic"
 
