@@ -157,6 +157,46 @@ def test_a_clock_event_carries_a_clear_verdict_forward():
     assert event.actions.route == "clear"
 
 
+def test_a_clock_event_carries_a_review_verdict_forward():
+    """review is the band nothing else pins: it's the one that diverts a case
+    to human sign-off, so a silent downgrade to clear here would remove the
+    human from the loop, not merely misprice risk. Reconstruction via
+    RiskVerdict(**stored) is band-agnostic today, but that is a fact about
+    the current structure — this test is what notices if a later "clarify
+    the carry-forward branch into explicit per-band handling" change ever
+    drops review through the rescoring path instead."""
+    ctx = _StubContext({
+        "case": {"case_id": "C1", "event_type": "evidence_overdue"},
+        "case_state": {"policy": {"band": "review", "score": 0.4,
+                                  "policy_id": "supplier_risk", "policy_version": 1,
+                                  "reasons": ["SCREENING_UNAVAILABLE"]}},
+    })
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "review", (
+        "a stored review verdict must survive a clock event neither raised "
+        "to blocked nor lowered to clear"
+    )
+    assert event.actions.state_delta["policy"]["band"] == "review"
+
+
+def test_a_clock_event_with_a_malformed_stored_verdict_fails_closed():
+    """band is truthy so this reaches RiskVerdict(**stored) rather than the
+    NO_STORED_VERDICT branch; policy_id/policy_version/score are absent, which
+    RiskVerdict requires, so construction raises ValidationError and trips
+    the except clause under test."""
+    ctx = _StubContext({
+        "case": {"case_id": "C1", "event_type": "renewal_due"},
+        "case_state": {"policy": {"band": "blocked"}},
+    })
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "blocked"
+    assert event.actions.state_delta["policy"]["reasons"] == ["STORED_VERDICT_MALFORMED"]
+
+
 def test_a_fresh_screening_still_scores_normally():
     ctx = _StubContext({
         "case": {"case_id": "C1", "event_type": "new_supplier_packet"},
