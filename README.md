@@ -250,7 +250,7 @@ gitignored — never commit keys.
 ```dotenv
 GOOGLE_GENAI_USE_ENTERPRISE=true
 GOOGLE_CLOUD_PROJECT=keplaria
-GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_CLOUD_LOCATION=global
 ```
 
 `GOOGLE_GENAI_USE_ENTERPRISE` routes the SDK to Gemini Enterprise Agent Platform
@@ -261,9 +261,12 @@ is for the Gemini Developer API instead.
 
 **Region is `us-central1`** — the full GCP region name (there is no bare
 `central1`; regions always carry the geography prefix). Use it consistently for
-local runs, `agents-cli deploy --region`, and any infrastructure.
-`GOOGLE_CLOUD_LOCATION` has no SDK default, so it must be set explicitly rather
-than relied upon.
+`agents-cli deploy --region` and any infrastructure. **The one exception is
+`GOOGLE_CLOUD_LOCATION`, which stays `global`** — it selects the model-serving
+endpoint, not a resource region, and `gemini-3.6-flash` 404s at `us-central1`
+(see Operational constraints above; `AGENT_ENGINE_LOCATION=us-central1` is the
+separate variable for the Agent Engine endpoint). `GOOGLE_CLOUD_LOCATION` has
+no SDK default, so it must be set explicitly rather than relied upon.
 
 ## `agents-cli`
 
