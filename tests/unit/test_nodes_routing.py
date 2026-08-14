@@ -55,23 +55,27 @@ def _case(case_id: str, event_type: str) -> dict:
     return {"case_id": case_id, "event_type": event_type}
 
 
-def test_valid_proposal_with_compliance_screens():
+def test_valid_proposal_with_evidence_and_compliance_reaches_evidence_first():
+    """Evidence must run — and be validated — before compliance ever sees a
+    field it extracted, so any route containing 'evidence' goes to the
+    evidence agent regardless of what else is requested. validate_evidence
+    is what routes on to 'screen' afterward."""
     ctx = _StubContext({"case": _case("CASE-1", "new_supplier_packet")})
     node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
 
     result = apply_route(node_input, ctx)
 
-    assert result.actions.route == "screen"
+    assert result.actions.route == "evidence"
     assert result.output["refused"] is None
 
 
-def test_valid_proposal_without_compliance_skips():
+def test_valid_proposal_with_evidence_only_reaches_evidence():
     ctx = _StubContext({"case": _case("CASE-2", "certificate_received")})
     node_input = {"route": ["evidence"], "reason": "cert received"}
 
     result = apply_route(node_input, ctx)
 
-    assert result.actions.route == "skip"
+    assert result.actions.route == "evidence"
     assert result.output["refused"] is None
 
 
@@ -137,7 +141,6 @@ def test_quarantine_case_claims_no_command_but_records_the_refusal(
         "route": [],
         "reason": "hallucinated agent",
         "refused": "unknown agent: 'finance_bot'",
-        "pending_implementation": [],
     }
     ctx = _StubContext(
         {
@@ -179,7 +182,6 @@ def test_quarantine_case_persists_a_malformed_screening_without_raising(
         "route": [],
         "reason": "screening malformed",
         "refused": None,
-        "pending_implementation": [],
     }
     malformed_screening = {
         "reachable": True,

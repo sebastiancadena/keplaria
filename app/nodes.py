@@ -16,6 +16,7 @@ from opentelemetry import trace
 from pydantic import ValidationError
 
 from app.documents import DocumentUnavailable, load_document
+from app.grounding import RedactedDerivative, validate as grounding_validate
 from app.policy import CLOCK_EVENTS, PolicyError, validate_route
 from app.risk import BLOCKED, RiskVerdict, assess_case
 from app.schemas import CanonicalEvent, ScreeningResult
@@ -169,9 +170,6 @@ def apply_route(node_input, ctx: Context) -> Event:
     checking `refused is not None` here is sufficient to distinguish
     "genuinely nothing to do" from "the proposal was rejected" without
     duplicating the ALLOWED_ROUTES policy table in this module.
-
-    The evidence agent is not built yet, so a permitted 'evidence' selection is
-    recorded and skipped rather than silently dropped.
     """
     case = ctx.state.get("case", {})
     event_type = case.get("event_type", "")
@@ -193,11 +191,12 @@ def apply_route(node_input, ctx: Context) -> Event:
         "route": route,
         "reason": reason,
         "refused": refused,
-        "pending_implementation": [a for a in route if a == "evidence"],
     }
 
     if refused is not None:
         next_route = "blocked"
+    elif "evidence" in route:
+        next_route = "evidence"
     elif "compliance" in route:
         next_route = "screen"
     else:
@@ -206,6 +205,70 @@ def apply_route(node_input, ctx: Context) -> Event:
     return Event(
         output=decision,
         state={"routing": decision},
+        route=next_route,
+    )
+
+
+MAX_EVIDENCE_ATTEMPTS = 2
+
+
+def validate_evidence(node_input, ctx: Context) -> Event:
+    """Independently check the Evidence agent's output against the document.
+
+    A schema-valid answer is not a grounded one. Every value must resolve to
+    a verbatim span on a declared page of the exact document supplied, or the
+    case quarantines with zero writes.
+
+    The retry is bounded and explicit: one re-ask, then quarantine. The
+    back-edge to the agent is what makes the second attempt a genuinely fresh
+    extraction rather than a re-validation of the same output, and the
+    attempt counter in state is what keeps it from looping.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+    routing = ctx.state.get("routing") or {}
+    attempts = int(ctx.state.get("evidence_attempts") or 0) + 1
+
+    raw = node_input
+    if hasattr(raw, "model_dump"):
+        raw = raw.model_dump()
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            raw = {}
+
+    derivative_state = ctx.state.get("derivative")
+    with tracer.start_as_current_span("validate_evidence") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.evidence_attempt", attempts)
+
+        if not derivative_state:
+            span.set_attribute("keplaria.grounding_reason", "NO_DOCUMENT")
+            return Event(
+                output={"grounded": False, "reason": "NO_DOCUMENT"},
+                state={"evidence_attempts": attempts},
+                route="ungrounded",
+            )
+
+        derivative = RedactedDerivative(**derivative_state)
+        verdict = grounding_validate(raw if isinstance(raw, dict) else {}, derivative)
+        span.set_attribute("keplaria.grounded", verdict.grounded)
+        span.set_attribute("keplaria.grounding_reason", verdict.reason)
+
+        if not verdict.grounded:
+            route = "retry" if attempts < MAX_EVIDENCE_ATTEMPTS else "ungrounded"
+            return Event(
+                output={"grounded": False, "reason": verdict.reason,
+                        "field": verdict.field, "attempt": attempts},
+                state={"evidence_attempts": attempts},
+                route=route,
+            )
+
+    next_route = "screen" if "compliance" in (routing.get("route") or []) else "skip"
+    return Event(
+        output={"grounded": True, "attempt": attempts},
+        state={"evidence": raw, "evidence_attempts": attempts},
         route=next_route,
     )
 

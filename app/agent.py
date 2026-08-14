@@ -39,13 +39,15 @@ from google.genai import types
 from app.nodes import (
     apply_route,
     assess_risk,
+    load_case_state,
     park_case,
     parse_case,
     quarantine_case,
     queue_supplier,
     screen_supplier,
+    validate_evidence,
 )
-from app.schemas import RoutingDecision
+from app.schemas import EvidenceResult, RoutingDecision
 
 coordinator = LlmAgent(
     name="mission_coordinator",
@@ -74,11 +76,38 @@ coordinator = LlmAgent(
     disallow_transfer_to_peers=True,
 )
 
+evidence_agent = LlmAgent(
+    name="evidence_agent",
+    model="gemini-3.6-flash",
+    instruction=(
+        "You extract corporate fields from a supplier document.\n\n"
+        "You will receive the document's checksum and its pages as text. "
+        "Extract every field you can support, and for each one return the "
+        "verbatim span of page text the value came from.\n\n"
+        "Rules:\n"
+        "  - Copy document_checksum exactly as given. Never alter it.\n"
+        "  - Every value MUST appear inside the span you cite, and the span "
+        "MUST appear verbatim on the page you cite. An independent validator "
+        "checks both, and an unsupported value quarantines the case.\n"
+        "  - Extract 'certificate_expiry' as an ISO date (YYYY-MM-DD).\n"
+        "  - If a field is not in the document, omit it. Never guess."
+    ),
+    output_schema=EvidenceResult,
+    output_key="evidence_result",
+    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True,
+)
+
 root_agent = Workflow(
     name="keplaria_workflow",
     edges=[
         ("START", parse_case),
-        (parse_case, coordinator),
+        (parse_case, load_case_state),
+        # The coordinator bypass: clock-driven events engage no agents, so
+        # they never reach an LlmAgent. They still pass through assess_risk,
+        # which keeps the "every write path carries a verdict" invariant.
+        (load_case_state, {"agentic": coordinator, "clock": assess_risk}),
         (coordinator, apply_route),
         # A routing-map chain element is this ADK version's syntax for a
         # conditional edge. "skip" goes to assess_risk rather than straight to
@@ -88,9 +117,24 @@ root_agent = Workflow(
         (
             apply_route,
             {
+                "evidence": evidence_agent,
                 "screen": screen_supplier,
                 "skip": assess_risk,
                 "blocked": quarantine_case,
+            },
+        ),
+        (evidence_agent, validate_evidence),
+        # The back-edge is the bounded retry: one fresh extraction, then
+        # quarantine. Verified against ADK 2.5.0 — Workflow performs no cycle
+        # validation and ctx.state persists across the loop, so the attempt
+        # counter in validate_evidence is what bounds it.
+        (
+            validate_evidence,
+            {
+                "retry": evidence_agent,
+                "screen": screen_supplier,
+                "skip": assess_risk,
+                "ungrounded": quarantine_case,
             },
         ),
         (screen_supplier, assess_risk),
@@ -98,6 +142,9 @@ root_agent = Workflow(
         (
             assess_risk,
             {
+                # queue_supplier is replaced by commit_commands in Task 10.
+                # It stays here for now so this task's commit is green on its
+                # own — do not import a name that does not exist yet.
                 "clear": queue_supplier,
                 "review": park_case,
                 "blocked": quarantine_case,

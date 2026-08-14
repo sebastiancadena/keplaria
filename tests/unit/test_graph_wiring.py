@@ -12,8 +12,16 @@ external state. This is pure structural introspection and belongs in the default
 suite, not in live-marked tests.
 """
 
-from app.agent import root_agent
-from app.nodes import assess_risk, park_case, queue_supplier, quarantine_case, screen_supplier
+from app.agent import evidence_agent, root_agent
+from app.nodes import (
+    MAX_EVIDENCE_ATTEMPTS,
+    assess_risk,
+    park_case,
+    queue_supplier,
+    quarantine_case,
+    screen_supplier,
+    validate_evidence,
+)
 
 
 def test_flagged_supplier_never_reaches_the_command_queue():
@@ -37,7 +45,100 @@ def test_flagged_supplier_never_reaches_the_command_queue():
         "blocked": quarantine_case,
     }
     assert edges["apply_route"] == {
-        "skip": assess_risk,
+        "evidence": evidence_agent,
         "screen": screen_supplier,
+        "skip": assess_risk,
         "blocked": quarantine_case,
     }
+
+
+class _StubContext:
+    """validate_evidence only reads ctx.state — a dict wrapper is enough.
+
+    Same shape as the stub in tests/unit/test_nodes_risk.py; this file has
+    none of its own yet.
+    """
+
+    def __init__(self, state: dict):
+        self.state = state
+
+
+def test_the_evidence_agent_holds_no_operational_tools():
+    assert not getattr(evidence_agent, "tools", []), (
+        "Evidence may call neither the screening service nor the ERP"
+    )
+    assert evidence_agent.disallow_transfer_to_parent is True
+    assert evidence_agent.disallow_transfer_to_peers is True
+
+
+def _routing_maps(workflow):
+    """Every conditional edge in the graph, as {source: {route: target}}."""
+    return {edge[0]: edge[1] for edge in workflow.edges if isinstance(edge[1], dict)}
+
+
+def test_a_clock_event_never_reaches_an_llm_agent():
+    from google.adk.agents import LlmAgent
+    from app.nodes import load_case_state
+
+    clock_target = _routing_maps(root_agent)[load_case_state]["clock"]
+
+    assert not isinstance(clock_target, LlmAgent), (
+        "a clock event engages no agents; routing one to an LlmAgent spends a "
+        "model call to be told 'no agents' and puts a delegation decision in "
+        "the trace that was never made"
+    )
+
+
+def test_ungrounded_evidence_retries_once_then_quarantines():
+    derivative = {"checksum": "abc123", "pages": ["Expiry: 2027-01-01"]}
+    hallucinated = {"document_checksum": "abc123",
+                    "fields": [{"name": "certificate_expiry", "value": "2030-01-01",
+                                "page": 0, "span": "Expiry: 2027-01-01",
+                                "confidence": 0.9}]}
+
+    ctx = _StubContext({"case": {"case_id": "C1", "event_type": "certificate_received"},
+                "derivative": derivative, "routing": {"route": ["evidence"]}})
+
+    first = validate_evidence(hallucinated, ctx)
+    assert first.actions.route == "retry"
+    ctx.state.update(first.actions.state_delta)
+
+    second = validate_evidence(hallucinated, ctx)
+    assert second.actions.route == "ungrounded", (
+        f"the retry is bounded at {MAX_EVIDENCE_ATTEMPTS} attempts"
+    )
+
+
+def test_grounded_evidence_continues_to_screening_when_compliance_is_routed():
+    derivative = {"checksum": "abc123", "pages": ["Expiry: 2027-01-01"]}
+    good = {"document_checksum": "abc123",
+            "fields": [{"name": "certificate_expiry", "value": "2027-01-01",
+                        "page": 0, "span": "Expiry: 2027-01-01", "confidence": 0.9}]}
+
+    ctx = _StubContext({"case": {"case_id": "C1", "event_type": "new_supplier_packet"},
+                "derivative": derivative,
+                "routing": {"route": ["evidence", "compliance"]}})
+
+    event = validate_evidence(good, ctx)
+
+    assert event.actions.route == "screen"
+    assert event.actions.state_delta["evidence"]["fields"][0]["value"] == "2027-01-01"
+
+
+def test_grounded_evidence_skips_screening_when_compliance_is_not_routed():
+    derivative = {"checksum": "abc123", "pages": ["Expiry: 2027-01-01"]}
+    good = {"document_checksum": "abc123",
+            "fields": [{"name": "certificate_expiry", "value": "2027-01-01",
+                        "page": 0, "span": "Expiry: 2027-01-01", "confidence": 0.9}]}
+
+    ctx = _StubContext({"case": {"case_id": "C1", "event_type": "certificate_received"},
+                "derivative": derivative, "routing": {"route": ["evidence"]}})
+
+    assert validate_evidence(good, ctx).actions.route == "skip"
+
+
+def test_absent_evidence_quarantines_immediately():
+    ctx = _StubContext({"case": {"case_id": "C1", "event_type": "certificate_received"},
+                "derivative": None, "routing": {"route": ["evidence"]}})
+
+    assert validate_evidence({}, ctx).actions.route == "ungrounded"
