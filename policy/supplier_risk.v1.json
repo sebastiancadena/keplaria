@@ -2,6 +2,7 @@
   "policy_id": "supplier_risk",
   "policy_version": 1,
   "thresholds": { "review": 0.20, "block": 0.60 },
+  "lifecycle": { "renewal_window_days": 35, "overdue_grace_days": 0 },
   "factors": [
     {
       "id": "SANCTIONS_MATCH",
