@@ -11,6 +11,18 @@ which is entirely pytest.mark.live and deselected by default.
 
 from __future__ import annotations
 
+import contextlib
+
+from app.state.commands import claim_command
+
+
+@contextlib.contextmanager
+def _fake_client():
+    """Stands in for frappe_client(). Never used — every action function that
+    would touch it is monkeypatched in these tests — but the runner opens it
+    as a context manager, so it must be one."""
+    yield object()
+
 
 def test_executor_refuses_a_case_whose_verdict_is_not_clear(db, case_id):
     """Backstop at the authorization boundary: a command queued under older
@@ -50,3 +62,74 @@ def test_executor_refuses_a_case_with_no_verdict_at_all(db, case_id):
     assert results[0]["status"] == "refused_by_policy"
     assert results[0]["band"] is None
     assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
+
+
+def test_a_hold_executes_even_when_the_case_is_blocked(db, case_id, monkeypatch):
+    from app.executor.runner import execute_pending_commands
+
+    calls = []
+    monkeypatch.setattr(
+        "app.executor.runner.set_supplier_hold",
+        lambda client, supplier_name, hold_type="All": calls.append(supplier_name)
+        or {"external_id": supplier_name, "created": True},
+    )
+    monkeypatch.setattr("app.executor.runner.frappe_client", _fake_client)
+    db.collection("cases").document(case_id).set({"policy": {"band": "blocked"}})
+    claim_command(db, case_id, "apply_hold", 1, {"supplier_name": "Andes"})
+
+    results = execute_pending_commands(db, case_id)
+
+    assert calls == ["Andes"], (
+        "a hold is restrictive; refusing it because the case is blocked would "
+        "invert the gate's purpose"
+    )
+    assert results[0]["status"] == "done"
+
+
+def test_a_hold_release_is_refused_when_the_case_is_blocked(db, case_id, monkeypatch):
+    from app.executor.runner import execute_pending_commands
+
+    monkeypatch.setattr("app.executor.runner.frappe_client", _fake_client)
+    db.collection("cases").document(case_id).set({"policy": {"band": "blocked"}})
+    claim_command(db, case_id, "clear_hold", 2, {"supplier_name": "Andes"})
+
+    results = execute_pending_commands(db, case_id)
+
+    assert results[0]["status"] == "refused_by_policy", (
+        "releasing a hold grants something, so it stays gated"
+    )
+
+
+def test_evidence_is_attached_before_the_hold_is_released(db, case_id, monkeypatch):
+    from app.executor.runner import execute_pending_commands
+
+    order = []
+    monkeypatch.setattr("app.executor.runner.frappe_client", _fake_client)
+    monkeypatch.setattr(
+        "app.executor.runner.attach_evidence",
+        lambda *a, **k: order.append("attach") or {"external_id": "F1", "created": True},
+    )
+    monkeypatch.setattr(
+        "app.executor.runner.clear_supplier_hold",
+        lambda *a, **k: order.append("clear") or {"external_id": "S1", "created": True},
+    )
+    db.collection("cases").document(case_id).set({"policy": {"band": "clear"}})
+    claim_command(db, case_id, "clear_hold", 2, {"supplier_name": "Andes"})
+    claim_command(db, case_id, "attach_evidence", 2, {"supplier_name": "Andes",
+                                                      "cycle": 2})
+
+    execute_pending_commands(db, case_id)
+
+    assert order == ["attach", "clear"], (
+        "the ERP must never show a released supplier whose evidence has not landed"
+    )
+
+
+def test_an_unknown_action_is_left_untouched(db, case_id, monkeypatch):
+    from app.executor.runner import execute_pending_commands
+
+    monkeypatch.setattr("app.executor.runner.frappe_client", _fake_client)
+    db.collection("cases").document(case_id).set({"policy": {"band": "clear"}})
+    claim_command(db, case_id, "launch_rocket", 1, {})
+
+    assert execute_pending_commands(db, case_id) == []

@@ -17,6 +17,33 @@ class FrappeError(RuntimeError):
     """An ERP call failed in a way the caller must handle."""
 
 
+# A syntactically-valid minimal PDF (header, three tiny objects, xref table,
+# startxref, trailer). Live-system finding: Frappe's File.before_insert runs
+# a server-side PDF content scan (pypdf) on anything with file_type == "PDF",
+# and it raises an unhandled 500 -- not a graceful validation error -- on a
+# stream that merely starts with "%PDF-1.4" but isn't well-formed. This is
+# the smallest content observed to pass that scan on the live site.
+#
+# It is a STAND-IN, not the supplier's real certificate: the document
+# pipeline that would extract and supply the actual certificate bytes is
+# deliberately out of scope for this slice. The executor attaches this
+# placeholder so `attach_evidence` has something well-formed to upload;
+# swapping in real certificate bytes is future work, not a bug here.
+PLACEHOLDER_CERTIFICATE_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 3 3]>>endobj\n"
+    b"xref\n0 4\n"
+    b"0000000000 65535 f \n"
+    b"0000000009 00000 n \n"
+    b"0000000052 00000 n \n"
+    b"0000000101 00000 n \n"
+    b"trailer<</Size 4/Root 1 0 R>>\n"
+    b"startxref\n160\n%%EOF"
+)
+
+
 def frappe_client() -> httpx.Client:
     """Authenticated client for the configured Frappe site."""
     site = os.environ["FRAPPE_SITE"].rstrip("/")

@@ -18,27 +18,110 @@ same case triggers another drain, or until a dedicated retry/DLQ path is
 built (not yet).
 
 This module also re-reads the gate's verdict (`cases/{case_id}.policy`) before
-draining and refuses any command whose case is not `clear`. That is a backstop,
-not the primary enforcement: the graph's assess_risk branch is what stops a
-flagged supplier, and in the happy path this guard never fires, because the
-review and blocked terminals claim no command. It exists for the anomalous
-paths — a duplicate-event redelivery draining a command queued under older
-state, or a graph-wiring bug — and it matters because this process runs under
-a different identity (the Cloud Run ingress) than the graph.
+draining and refuses any not-yet-executed PERMISSIVE command whose case is not
+`clear`. That is a backstop, not the primary enforcement: the graph's
+assess_risk branch is what stops a flagged supplier, and in the happy path
+this guard never fires, because the review and blocked terminals claim no
+command. It exists for the anomalous paths — a duplicate-event redelivery
+draining a command queued under older state, or a graph-wiring bug — and it
+matters because this process runs under a different identity (the Cloud Run
+ingress) than the graph.
+
+The gate is deliberately one-directional. It exists to stop the system
+GRANTING something — creating a supplier, attaching evidence, releasing a
+hold, asking for a renewal — never to stop it WITHHOLDING something. A hold
+(`apply_hold`) is restrictive: it always executes, regardless of the case's
+policy band, because refusing to hold a risky supplier for scoring badly is
+exactly backwards. `app.lifecycle.RESTRICTIVE` is the single source of truth
+for which actions bypass the gate; every other known action is permissive and
+stays gated on a `clear` verdict.
 """
 
 from __future__ import annotations
 
 import httpx
 
-from app.executor.frappe import FrappeError, create_supplier_if_absent, frappe_client
+from app.executor.frappe import (
+    PLACEHOLDER_CERTIFICATE_PDF,
+    FrappeError,
+    attach_evidence,
+    clear_supplier_hold,
+    create_supplier_if_absent,
+    frappe_client,
+    send_supplier_message,
+    set_supplier_hold,
+)
+from app.lifecycle import (
+    APPLY_HOLD,
+    ATTACH_EVIDENCE,
+    CLEAR_HOLD,
+    CREATE_SUPPLIER,
+    REQUEST_RENEWAL,
+    RESTRICTIVE,
+)
 from app.risk import CLEAR
 from app.state.commands import DONE, record_failure, record_success
 from app.state.firestore import CASES, OUTBOX
 
-# The only action this executor knows how to run today. A command with any
-# other action is left untouched rather than guessed at.
-_CREATE_SUPPLIER = "create_supplier"
+# Drain order, not merely a lookup: attach_evidence must land before
+# clear_hold, so the ERP never shows a released supplier whose evidence is
+# still missing. outbox_ref.stream() guarantees no ordering of its own.
+#
+# Built from app.lifecycle's constants rather than re-spelled as literals:
+# these are the same five names the decision function emits, and two
+# spellings of one action-name set is exactly the drift the constants
+# prevent.
+_DRAIN_ORDER = (
+    CREATE_SUPPLIER,
+    ATTACH_EVIDENCE,
+    REQUEST_RENEWAL,
+    APPLY_HOLD,
+    CLEAR_HOLD,
+)
+
+
+def _command_cycle(command: dict) -> int:
+    """The command's cycle, defaulting to 1 for missing or unparseable values.
+
+    Deliberately distinguishes absent from zero rather than using `or 1`: a
+    command written before cycles existed has no `cycle` field and is
+    genuinely cycle 1, but a stored `0` is data this function has no
+    business silently rewriting.
+    """
+    raw = command.get("cycle")
+    if raw is None:
+        return 1
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _run(action: str, client, payload: dict) -> dict:
+    """Dispatch one claimed command to the matching Frappe call."""
+    supplier = payload.get("supplier_name", "")
+    if action == CREATE_SUPPLIER:
+        return create_supplier_if_absent(client, supplier)
+    if action == ATTACH_EVIDENCE:
+        # PLACEHOLDER_CERTIFICATE_PDF, not an ad-hoc byte literal: the live
+        # ERP runs a server-side pypdf content scan and rejects anything
+        # that merely starts with "%PDF-1.4" without being a well-formed
+        # stream. See its docstring in app/executor/frappe.py for why this
+        # is a stand-in rather than the supplier's real certificate.
+        return attach_evidence(
+            client, supplier, _command_cycle(payload), PLACEHOLDER_CERTIFICATE_PDF,
+        )
+    if action == REQUEST_RENEWAL:
+        return send_supplier_message(
+            client, supplier, "Certificate renewal required",
+            f"Your certificate expires on {payload.get('expiry_date', 'the stated date')}. "
+            "Please submit a renewed certificate.",
+        )
+    if action == APPLY_HOLD:
+        return set_supplier_hold(client, supplier, payload.get("hold_type", "All"))
+    if action == CLEAR_HOLD:
+        return clear_supplier_hold(client, supplier)
+    raise FrappeError(f"no handler for action {action!r}")
 
 
 def _policy_band(db, case_id: str) -> tuple[str | None, int | None]:
@@ -82,21 +165,37 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     band, policy_version = _policy_band(db, case_id)
     refused = band != CLEAR
 
+    commands = []
     for snap in outbox_ref.stream():
         command = snap.to_dict() or {}
-        action = command.get("action")
-        cycle = int(command.get("cycle") or 1)
-
         if command.get("status") == DONE:
             continue
-        if action != _CREATE_SUPPLIER:
+        if command.get("action") not in _DRAIN_ORDER:
+            # An action this executor does not know is left untouched
+            # rather than guessed at or marked failed.
             continue
+        commands.append(command)
 
-        if refused:
-            # Refusal-only: this guard can stop a write, never authorize one.
-            # Deliberately NOT record_failure — a refusal is not a failure, and
-            # the command must stay PENDING so that a later approval flipping
-            # the verdict to `clear` lets the next drain execute it normally.
+    # Deterministic drain order, not stream() order: see _DRAIN_ORDER above.
+    commands.sort(key=lambda c: _DRAIN_ORDER.index(c["action"]))
+
+    for command in commands:
+        action = command["action"]
+        # Total coercion, not int() directly: `cycle` is read out of a
+        # schemaless Firestore document, and a command that cannot be
+        # parsed must not take the whole drain down with it. Cycle 1 is the
+        # safe reading — it is what every pre-lifecycle command carries.
+        cycle = _command_cycle(command)
+
+        if refused and action not in RESTRICTIVE:
+            # Refusal-only: this guard can stop a write, never authorize
+            # one. RESTRICTIVE actions (a hold) bypass it entirely — the
+            # gate exists to stop the system granting something, and
+            # refusing to hold a risky supplier would invert that.
+            # Deliberately NOT record_failure — a refusal is not a
+            # failure, and the command must stay PENDING so that a later
+            # approval flipping the verdict to `clear` lets the next drain
+            # execute it normally.
             results.append(
                 {
                     "action": action,
@@ -108,11 +207,10 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
             continue
 
         payload = command.get("payload") or {}
-        supplier = payload.get("supplier_name", "")
 
         try:
             with frappe_client() as client:
-                result = create_supplier_if_absent(client, supplier)
+                result = _run(action, client, payload)
         except (FrappeError, httpx.HTTPError) as exc:
             error = f"{type(exc).__name__}: {exc}"
             record_failure(db, case_id, action, cycle, error)
@@ -120,12 +218,12 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
             continue
         except Exception as exc:
             # Not FrappeError/httpx.HTTPError — e.g. a malformed Frappe
-            # response raising KeyError/TypeError out of
-            # create_supplier_if_absent. Still a failed command, not a crash
-            # this module should let propagate silently: leaving it PENDING
-            # with no record_failure would make the failure invisible in the
-            # case document and the evidence until some later drain happens
-            # to hit a caught type. Record it the same way, then continue
+            # response raising KeyError/TypeError out of an action
+            # function. Still a failed command, not a crash this module
+            # should let propagate silently: leaving it PENDING with no
+            # record_failure would make the failure invisible in the case
+            # document and the evidence until some later drain happens to
+            # hit a caught type. Record it the same way, then continue
             # draining the rest of the outbox rather than aborting on the
             # first unexpected error.
             error = f"{type(exc).__name__}: {exc}"[:300]

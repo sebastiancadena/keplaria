@@ -18,6 +18,7 @@ from app.executor.frappe import (
     send_supplier_message,
     set_supplier_hold,
 )
+from app.executor.frappe import PLACEHOLDER_CERTIFICATE_PDF as _MINIMAL_VALID_PDF
 
 pytestmark = [
     pytest.mark.live,
@@ -26,27 +27,6 @@ pytestmark = [
         reason="FRAPPE_* credentials not in the environment",
     ),
 ]
-
-# A syntactically-valid minimal PDF (header, three tiny objects, xref table,
-# startxref, trailer). Live-system finding: Frappe's File.before_insert runs
-# a server-side PDF content scan (pypdf) on anything with file_type == "PDF",
-# and it raises an unhandled 500 -- not a graceful validation error -- on a
-# stream that merely starts with "%PDF-1.4" but isn't well-formed, such as
-# the plain-text fixture bytes the task brief specified. This constant is the
-# smallest content observed to pass that scan on the live site.
-_MINIMAL_VALID_PDF = (
-    b"%PDF-1.4\n"
-    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
-    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
-    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 3 3]>>endobj\n"
-    b"xref\n0 4\n"
-    b"0000000000 65535 f \n"
-    b"0000000009 00000 n \n"
-    b"0000000052 00000 n \n"
-    b"0000000101 00000 n \n"
-    b"trailer<</Size 4/Root 1 0 R>>\n"
-    b"startxref\n160\n%%EOF"
-)
 
 
 @pytest.fixture(scope="module")
