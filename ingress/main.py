@@ -115,7 +115,9 @@ def push(envelope: Any = Body(...)) -> dict:
             # engine (it is never invoked here), so it is a free chance to
             # retry any outbox command still not DONE. A case whose commands
             # are all DONE drains to a no-op, so this never disturbs the
-            # exactly-once guarantee this branch exists to preserve.
+            # no-duplicate-effect guarantee this branch exists to preserve
+            # (idempotent execution over at-least-once delivery — not
+            # transactional exactly-once; see app/executor/runner.py).
             #
             # This is a bounded, one-shot attempt, not a standing guarantee:
             # errors are logged, not raised, and this exact message is always

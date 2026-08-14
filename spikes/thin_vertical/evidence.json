@@ -67,7 +67,7 @@
   },
   "criteria": {
     "case_at_version_1": true,
-    "duplicate_produced_no_second_write": true,
+    "duplicate_not_reprocessed": true,
     "erp_supplier_created": true,
     "ingress_requires_authentication": true,
     "routing_decision_persisted": true,
@@ -76,7 +76,8 @@
   "duplicate_replay": {
     "attempts": 1,
     "case_version_after": 1,
-    "message_id": "21004787563435806"
+    "message_id": "21004787563435806",
+    "note": "attempts counts graph claim_command acquisitions, not ERP call attempts (the executor does not increment it); together with case_version this proves the duplicate was not reprocessed, while the absent second ERP write rests on the executor's DONE-skip and the ERP's deterministic-ID uniqueness (criterion renamed 2026-08-14 from duplicate_produced_no_second_write; measured values unchanged from the 2026-08-13 run)"
   },
   "event_id": "evt-81b55d58dd",
   "passed": true,

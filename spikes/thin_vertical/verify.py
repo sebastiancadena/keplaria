@@ -1,8 +1,16 @@
 """Thin vertical: end-to-end proof against deployed infrastructure.
 
 Publishes one canonical event to the topic, waits for the case to reach a
-terminal command, then republishes the SAME event and asserts the ERP was
-written exactly once. Writes evidence into this directory — never a scratchpad.
+terminal command, then republishes the SAME event and asserts the duplicate
+was NOT reprocessed: the command still shows a single graph claim
+(`attempts == 1` — that field counts claim_command acquisitions, not ERP call
+attempts; the executor never increments it) and `case_version` has not moved.
+No second ERP write follows from that plus two other mechanisms this script
+relies on but does not measure directly: the executor skips DONE commands, and
+the ERP rejects duplicate deterministic IDs. Claim this evidence as a
+no-reprocessing proof with idempotent execution, not as a counted guarantee of
+exactly one external POST. Writes evidence into this directory — never a
+scratchpad.
 
 Authentication is proven with two anonymous witnesses rather than `/healthz`:
 that route returns 404 both anonymously and with a valid identity token
@@ -162,11 +170,18 @@ def main() -> int:
         "message_id": replay_id,
         "attempts": (replayed or {}).get("attempts"),
         "case_version_after": case_after.get("case_version"),
+        "note": (
+            "attempts counts graph claim_command acquisitions, not ERP call"
+            " attempts (the executor does not increment it); together with"
+            " case_version this proves the duplicate was not reprocessed,"
+            " while the absent second ERP write rests on the executor's"
+            " DONE-skip and the ERP's deterministic-ID uniqueness"
+        ),
     }
-    exactly_once = (replayed or {}).get("attempts") == 1 and case_after.get(
+    not_reprocessed = (replayed or {}).get("attempts") == 1 and case_after.get(
         "case_version"
     ) == 1
-    evidence["criteria"]["duplicate_produced_no_second_write"] = exactly_once
+    evidence["criteria"]["duplicate_not_reprocessed"] = not_reprocessed
     log(f"after replay: attempts={(replayed or {}).get('attempts')} "
         f"case_version={case_after.get('case_version')}")
 
