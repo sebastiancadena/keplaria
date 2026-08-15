@@ -1,8 +1,8 @@
 {
-  "captured_at": "2026-08-15T00:03:02.808653+00:00",
-  "case_id": "DEMO-1d817bc0",
-  "supplier": "Distribuidora Textiles Occidente SAS",
-  "result": "FAIL",
+  "captured_at": "2026-08-15T00:37:09.098852+00:00",
+  "case_id": "DEMO-4bfa08bb",
+  "supplier": "Talleres Cerro Dorado SAS",
+  "result": "PASS",
   "steps": [
     {
       "step": 1,
@@ -14,40 +14,41 @@
       },
       "phase": "committed",
       "routing": {
+        "reason": "Both evidence and compliance agents are engaged to extract fields and screen the entity as this incoming event requires full verification.",
+        "proposed": [
+          "evidence",
+          "compliance"
+        ],
         "refused": null,
-        "evidence_skipped_no_document": false,
-        "reason": "Both evidence and compliance agents are required to extract document fields and screen the entity for this supplier case.",
         "route": [
           "evidence",
           "compliance"
         ],
-        "proposed": [
-          "evidence",
-          "compliance"
-        ]
+        "dropped": [],
+        "evidence_skipped_no_document": false
       },
       "lifecycle": {
-        "last_reason": "ONBOARDED",
-        "last_effective_date": "2026-01-05",
         "state": "active",
+        "last_effective_date": "2026-01-05",
+        "last_reason": "ONBOARDED",
         "cycle": 1
       },
       "certificate": {
-        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
-        "expiry_date": "2027-01-01",
         "extracted_at": "2026-01-05",
-        "evidence_version": 1
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "evidence_version": 1,
+        "expiry_date": "2027-01-01"
       },
       "commands": {
-        "DEMO-1d817bc0:attach_evidence:c1": {
+        "DEMO-4bfa08bb:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "3b30ce0937"
+          "external_id": "ada5e53b81"
         },
-        "DEMO-1d817bc0:create_supplier:c1": {
+        "DEMO-4bfa08bb:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         }
       }
     },
@@ -68,21 +69,21 @@
         "cycle": 1
       },
       "certificate": {
-        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
-        "expiry_date": "2027-01-01",
         "extracted_at": "2026-01-05",
-        "evidence_version": 1
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "evidence_version": 1,
+        "expiry_date": "2027-01-01"
       },
       "commands": {
-        "DEMO-1d817bc0:attach_evidence:c1": {
+        "DEMO-4bfa08bb:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "3b30ce0937"
+          "external_id": "ada5e53b81"
         },
-        "DEMO-1d817bc0:create_supplier:c1": {
+        "DEMO-4bfa08bb:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         }
       }
     },
@@ -96,32 +97,32 @@
       "phase": "committed",
       "routing": null,
       "lifecycle": {
-        "last_reason": "RENEWAL_REQUESTED",
-        "last_effective_date": "2026-12-01",
         "state": "renewal_requested",
+        "last_effective_date": "2026-12-01",
+        "last_reason": "RENEWAL_REQUESTED",
         "cycle": 1
       },
       "certificate": {
-        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
-        "expiry_date": "2027-01-01",
         "extracted_at": "2026-01-05",
-        "evidence_version": 1
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "evidence_version": 1,
+        "expiry_date": "2027-01-01"
       },
       "commands": {
-        "DEMO-1d817bc0:attach_evidence:c1": {
+        "DEMO-4bfa08bb:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "3b30ce0937"
+          "external_id": "ada5e53b81"
         },
-        "DEMO-1d817bc0:create_supplier:c1": {
+        "DEMO-4bfa08bb:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-1d817bc0:request_renewal:c1": {
-          "status": "failed",
+        "DEMO-4bfa08bb:request_renewal:c1": {
+          "status": "done",
           "cycle": 1,
-          "external_id": null
+          "external_id": "53do62icfi"
         }
       }
     },
@@ -135,37 +136,37 @@
       "phase": "committed",
       "routing": null,
       "lifecycle": {
-        "last_reason": "HELD_OVERDUE",
-        "last_effective_date": "2027-01-15",
         "state": "held",
+        "last_effective_date": "2027-01-15",
+        "last_reason": "HELD_OVERDUE",
         "cycle": 1
       },
       "certificate": {
-        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
-        "expiry_date": "2027-01-01",
         "extracted_at": "2026-01-05",
-        "evidence_version": 1
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "evidence_version": 1,
+        "expiry_date": "2027-01-01"
       },
       "commands": {
-        "DEMO-1d817bc0:apply_hold:c1": {
+        "DEMO-4bfa08bb:apply_hold:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-1d817bc0:attach_evidence:c1": {
+        "DEMO-4bfa08bb:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "3b30ce0937"
+          "external_id": "ada5e53b81"
         },
-        "DEMO-1d817bc0:create_supplier:c1": {
+        "DEMO-4bfa08bb:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-1d817bc0:request_renewal:c1": {
-          "status": "failed",
+        "DEMO-4bfa08bb:request_renewal:c1": {
+          "status": "done",
           "cycle": 1,
-          "external_id": null
+          "external_id": "53do62icfi"
         }
       }
     },
@@ -177,52 +178,66 @@
         "state": "active",
         "cycle": 2
       },
-      "phase": "quarantined",
+      "phase": "committed",
       "routing": {
-        "refused": "agent 'compliance' is not permitted for event type 'certificate_received'",
-        "evidence_skipped_no_document": false,
-        "reason": "Both evidence and compliance agents are engaged as the event requires full entity extraction and screening.",
-        "route": [],
+        "reason": "Both evidence and compliance agents are engaged because the supplier case requires document extraction and sanctions screening.",
         "proposed": [
           "evidence",
           "compliance"
-        ]
+        ],
+        "refused": null,
+        "route": [
+          "evidence"
+        ],
+        "dropped": [
+          "compliance"
+        ],
+        "evidence_skipped_no_document": false
       },
       "lifecycle": {
-        "last_reason": "HELD_OVERDUE",
-        "last_effective_date": "2027-01-15",
-        "state": "held",
-        "cycle": 1
+        "state": "active",
+        "last_effective_date": "2027-01-20",
+        "last_reason": "RENEWED",
+        "cycle": 2
       },
       "certificate": {
-        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
-        "expiry_date": "2027-01-01",
-        "extracted_at": "2026-01-05",
-        "evidence_version": 1
+        "extracted_at": "2027-01-20",
+        "document_checksum": "807c25e06e397a8818fd8620715ccb07c0408c13b17b851e8f9849b0a53c256f",
+        "evidence_version": 2,
+        "expiry_date": "2028-01-01"
       },
       "commands": {
-        "DEMO-1d817bc0:apply_hold:c1": {
+        "DEMO-4bfa08bb:apply_hold:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-1d817bc0:attach_evidence:c1": {
+        "DEMO-4bfa08bb:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "3b30ce0937"
+          "external_id": "ada5e53b81"
         },
-        "DEMO-1d817bc0:create_supplier:c1": {
+        "DEMO-4bfa08bb:attach_evidence:c2": {
+          "status": "done",
+          "cycle": 2,
+          "external_id": "08aa99f18c"
+        },
+        "DEMO-4bfa08bb:clear_hold:c2": {
+          "status": "done",
+          "cycle": 2,
+          "external_id": "Talleres Cerro Dorado SAS"
+        },
+        "DEMO-4bfa08bb:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "Distribuidora Textiles Occidente SAS"
+          "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-1d817bc0:request_renewal:c1": {
-          "status": "failed",
+        "DEMO-4bfa08bb:request_renewal:c1": {
+          "status": "done",
           "cycle": 1,
-          "external_id": null
+          "external_id": "53do62icfi"
         }
       }
     }
-  ],
-  "failure": "step 5: state was 'held', wanted 'active'"
+  ]
 }

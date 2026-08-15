@@ -46,9 +46,22 @@ a confirmed live yente match (`syn-co-001` in
 threshold. Run this harness against that name and step 1 quarantines
 instead of reaching `active` — correct screening behaviour, not a bug, but
 not what a closed-loop lifecycle demo is trying to show. `SUPPLIER` here is
-`"Distribuidora Textiles Occidente SAS"`: no token overlap with any
-watchlist entity or alias, following the same precedent
-`spikes/thin_vertical/verify.py` set for its own supplier name.
+`"Talleres Cerro Dorado SAS"`: no token overlap with any watchlist entity or
+alias, following the same precedent `spikes/thin_vertical/verify.py` set for
+its own supplier name.
+
+The name has changed twice, both times for reasons worth knowing before
+picking a third: an earlier value, `"Distribuidora Textiles Occidente
+SAS"`, is also clean against the watchlist and is not itself the reason it
+was replaced — it was replaced because `create_supplier_if_absent` "does
+not update an existing record" on a duplicate create (see
+`app/executor/frappe.py`), so the ERP Supplier record that earlier runs
+left behind — created before a fix below existed — kept reporting
+`request_renewal` as `failed` forever afterward, since a found-existing
+record's `email_id` is never reconciled on a later run. Re-running against
+a name this harness has used before is safe (see "Re-running"); picking a
+new one is only needed to prove a fix that changes what a *fresh* create
+does, the way validating the email_id fix below required one.
 
 ## Run
 
@@ -70,45 +83,60 @@ gets written — with `result: "FAIL"` and a `failure` field — covering every
 step that ran before the failing one, so a partial run is never lost the
 way an uncaught traceback would lose it.
 
-## Known blockers (steps 1-4 pass; step 5 does not, as of 2026-08-14)
+## History: three defects this harness found and that are now fixed
 
-The evidence currently committed in this directory is a `FAIL` at step 5,
-reproduced across six live runs. Two independent, pre-existing defects were
-found this way — both outside this harness's own code, both something a
-prior spike never exercised because none of them drove a full closed-loop
-sequence against the deployed graph before this one:
+The first two committed evidence runs (2026-08-14) were `FAIL` at step 5,
+reproduced across six live attempts. All three root causes below are now
+fixed, deployed, and reflected in the currently-committed `PASS`
+`evidence.json` — kept here because the fixes live in `app/`, not in this
+directory, and a future change to any of them should re-read this history
+first.
 
-1. **The coordinator over-routes `certificate_received`.** `app/agent.py`'s
-   `mission_coordinator` prompt already says, explicitly, "certificate_received:
+1. **The coordinator over-routed `certificate_received`.** `app/agent.py`'s
+   `mission_coordinator` prompt said, explicitly, "certificate_received:
    ... Engage evidence only; do not re-screen unless entity fields changed" —
-   and still proposes `[evidence, compliance]` for that event type on every
+   and still proposed `[evidence, compliance]` for that event type on every
    observed live run (six for six, at `temperature=0`, including after a
    rewritten, more emphatic instruction that did not change the outcome).
-   `app/policy.py`'s `ALLOWED_ROUTES` correctly rejects `compliance` for
-   `certificate_received` and quarantines the case — the deterministic gate
-   is doing exactly its job here, which is also why this fails safe rather
-   than onboarding anything incorrectly. But it means step 5 (a
-   `certificate_received` renewal) never reaches `app/lifecycle.py`'s
-   `certificate_received` branch, so the case never leaves `held`.
-2. **A Supplier is created with no `email_id`**, so `request_renewal`
-   (step 3's `send_supplier_message`) fails every time with `"supplier ...
-   has no email_id to write to"` — by design
-   (`app/executor/frappe.py send_supplier_message`: "a Supplier with no
-   email_id is an error, not a silently skipped send"), but nothing upstream
-   of that call (`app/executor/frappe.py create_supplier_if_absent`'s
-   payload) ever sets one. This means step 3's expected renewal
-   Communication never appears in ERPNext regardless of the routing defect
-   above — confirmed independently by reading the Supplier record directly
-   (`email_id: ""`) and its outbox command (`status: "failed"`).
+   **Fix (user's decision, not a prompt change):** `app/policy.py`'s
+   `validate_route` now drops a known-but-disallowed agent from the route
+   instead of refusing the whole proposal — the guarantee it holds is still
+   absolute (no agent runs unless policy permits it), it just no longer
+   quarantines a legitimate business event over the coordinator's
+   over-caution. `app/nodes.py`'s `apply_route` records what got dropped in
+   a `dropped` field on the persisted routing decision, so the audit trail
+   still shows the coordinator proposed `compliance` and policy removed it
+   — see `evidence.json` step 5's `routing.dropped`.
+2. **A Supplier was created with no `email_id`**, so `request_renewal`
+   failed every time with `"supplier ... has no email_id to write to"` — by
+   design (`app/executor/frappe.py send_supplier_message`: "a Supplier with
+   no email_id is an error, not a silently skipped send"), but nothing
+   upstream ever set one. **Fix:** `app/lifecycle.py`'s `CREATE_SUPPLIER`
+   command payload now carries a synthetic, deterministic, RFC
+   2606-reserved `@example.com` address (`_synthetic_email`, slugified from
+   the supplier name), and `create_supplier_if_absent` sets it on the
+   record when given one. Opt-in, not a new default inside
+   `create_supplier_if_absent` itself, so a caller that wants the bare
+   no-email path (e.g. `tests/integration/test_frappe_executor.py`'s
+   `supplier_without_email` fixture) still gets it.
+3. **A `certificate_received` event with no fresh screening scored `clear`
+   instead of carrying the stored verdict forward** — a design defect, not
+   an implementation slip: `assess_risk`'s carry-forward branch conditioned
+   on "is this a clock event," which happened to coincide with "no
+   screening" for every event type that existed when it was written, but
+   stopped coinciding the moment `certificate_received` (agentic, not a
+   clock event, but also never populating `screening` — its permitted route
+   is `{evidence}` only) could reach the gate. Re-scoring that fresh from
+   `screening=None` fires no factors, scores 0.0, and lands `clear` —
+   laundering a previously blocked supplier via a mailed-in certificate.
+   **Fix:** the condition is now `screening is None`, not event-type
+   membership in `CLOCK_EVENTS`, covering every event that can reach the
+   gate with nothing of its own to score, present or future.
 
-Neither was fixed as part of writing this harness: the first needs a
-coordinator-behaviour decision (stronger prompting did not work; an actual
-fix likely means restructuring the routing away from a free-text LLM
-proposal, or accepting and living with the deterministic refusal), and the
-second needs a decision about where a supplier's email address should come
-from (nothing in `CanonicalEvent` or the certificate fixtures carries one
-today). Both are documented in the committed `evidence.json`'s step 5
-`routing` and `commands` blocks, not just here.
+The fix for #2 also means the `SUPPLIER` name changed a second time (see
+above) — a duplicate `create_supplier` call never reconciles `email_id`
+onto an already-existing record, so validating the fix needed a name this
+harness had never used before.
 
 ## Re-running
 
@@ -129,10 +157,12 @@ afterwards (below).
 ## Cleanup
 
 The harness creates one live ERPNext Supplier record plus its case document
-and outbox in Firestore. To remove them after a demo or a re-run:
+and outbox in Firestore. To remove them after a demo or a re-run (substitute
+whatever `SUPPLIER` was set to at the time — see "Why the supplier name
+differs" above for why that has changed more than once):
 
 ```bash
-uv run --env-file .env python scripts/erp.py purge --supplier "Distribuidora Textiles Occidente SAS" --yes
+uv run --env-file .env python scripts/erp.py purge --supplier "Talleres Cerro Dorado SAS" --yes
 ```
 
 This is a human-triggered action by design — `scripts/erp.py` never deletes

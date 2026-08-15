@@ -103,7 +103,18 @@ CASE_ID = f"DEMO-{uuid.uuid4().hex[:8]}"
 # watchlist entity or alias, so screening executes for real (proving yente
 # reachability) and returns clear, letting the sequence exercise the
 # lifecycle transitions it is actually testing.
-SUPPLIER = "Distribuidora Textiles Occidente SAS"
+#
+# Changed again from "Distribuidora Textiles Occidente SAS" (still clean
+# against the watchlist, kept as-is above for the record) after
+# create_supplier_if_absent's own documented contract bit this harness: it
+# "does not update an existing record" on a duplicate create, so the ERP
+# Supplier record that earlier runs left behind (created before
+# app.lifecycle threaded a synthetic email_id through CREATE_SUPPLIER's
+# payload) would keep reporting request_renewal as `failed` forever, even
+# after the fix, because create_supplier_if_absent only reconciles email_id
+# on a fresh create, not a found-existing one. A brand-new name is what
+# actually exercises the fix instead of re-observing a pre-fix artifact.
+SUPPLIER = "Talleres Cerro Dorado SAS"
 
 SEQUENCE = [
     ("new_supplier_packet", "2026-01-05", "fixture:andes-verde-cert-2027",
@@ -134,14 +145,21 @@ def _write_evidence(steps: list, result: str, failure: str | None) -> Path:
 def main() -> None:
     """Run the sequence, writing evidence.json whether it passes or not.
 
-    A step's assertion failure is caught here rather than left to crash the
-    process uncaught: this repo's own rule is that gate evidence belongs in
-    the repo, and an uncaught exception on step 3 of 5 leaves no
-    evidence.json at all — the four steps that DID happen become invisible,
-    indistinguishable from the harness never having run. `steps` therefore
-    always gets written, with `result: "FAIL"` and a `failure` field naming
-    exactly what diverged, so a partial run is still evidence of what
-    happened rather than nothing.
+    A step's failure is caught here rather than left to crash the process
+    uncaught: this repo's own rule is that gate evidence belongs in the
+    repo, and an uncaught exception on step 3 of 5 leaves no evidence.json
+    at all — worse, it leaves whatever evidence.json a PRIOR run wrote
+    sitting there uncorrected, silently describing a run that isn't this
+    one. `except Exception`, not just `AssertionError`: a step's own
+    assertion is not the only way this can fail mid-sequence — a publish
+    timeout, a transient gRPC error from wait_for_settle's polling, or
+    anything else raised between steps must not skip _write_evidence either,
+    or exactly the scenario this module's docstring warns about (evidence
+    that cannot be re-read later is not evidence) happens by omission rather
+    than by writing to a scratchpad. `steps` therefore always gets written,
+    with `result: "FAIL"` and a `failure` field naming exactly what broke,
+    so a partial run is still evidence of what happened rather than nothing
+    — and never stale evidence of a previous run.
     """
     db = get_client()
     steps: list = []
@@ -181,9 +199,10 @@ def main() -> None:
             for key, value in expected.items():
                 actual = lifecycle.get("last_reason") if key == "reason" else lifecycle.get(key)
                 assert actual == value, f"step {index}: {key} was {actual!r}, wanted {value!r}"
-    except AssertionError as exc:
-        path = _write_evidence(steps, "FAIL", str(exc))
-        print(f"FAIL — {exc}; {len(steps)} step(s) recorded, evidence at {path}")
+    except Exception as exc:
+        failure = f"{type(exc).__name__}: {exc}"
+        path = _write_evidence(steps, "FAIL", failure)
+        print(f"FAIL — {failure}; {len(steps)} step(s) recorded, evidence at {path}")
         raise
 
     path = _write_evidence(steps, "PASS", None)
