@@ -29,7 +29,7 @@ from google.genai import types
 
 from app.agent import app
 from app.state.commands import get_command
-from app.state.firestore import get_client
+from app.state.firestore import CASES, get_client
 
 pytestmark = [
     pytest.mark.live,
@@ -103,8 +103,23 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
 
 @pytest.mark.asyncio
 async def test_certificate_received_skips_screening():
-    """Two event types must take visibly different paths through the graph."""
+    """Two event types must take visibly different paths through the graph.
+
+    certificate_received never populates `screening` (its permitted route is
+    {evidence} only), so assess_risk carries the case's stored verdict
+    forward rather than scoring fresh — correct, since scoring fresh from
+    screening=None would launder a blocked supplier via a mailed-in
+    certificate, but it means a case with no prior verdict at all fails
+    closed to `blocked`. Seed a `clear` verdict directly so this test keeps
+    isolating the property it's named for (no compliance engagement) from
+    that separate, already-covered-elsewhere carry-forward behavior.
+    """
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
+    get_client().collection(CASES).document(case_id).set({
+        "case_id": case_id,
+        "policy": {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                   "band": "clear", "factors_fired": [], "reasons": []},
+    })
 
     outputs = await _run(_event(case_id, "certificate_received"))
 

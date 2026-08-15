@@ -194,13 +194,20 @@ def parse_case(node_input, ctx: Context) -> Event:
 def apply_route(node_input, ctx: Context) -> Event:
     """Validate the coordinator's proposal and pick the executable branch.
 
-    Any PolicyError blocks the case rather than skipping it: a refused
-    proposal must never reach queue_supplier. validate_route already
-    encodes the one legitimate empty route (an event type that requires no
-    agents, e.g. evidence_overdue) as a normal return rather than a raise, so
-    checking `refused is not None` here is sufficient to distinguish
-    "genuinely nothing to do" from "the proposal was rejected" without
-    duplicating the ALLOWED_ROUTES policy table in this module.
+    A remaining PolicyError still blocks the case rather than skipping it: a
+    refused proposal must never reach queue_supplier. But validate_route no
+    longer raises just because the coordinator over-proposed — a known agent
+    the event type doesn't permit (e.g. `compliance` on `certificate_received`)
+    is silently dropped from the route it returns, not refused. `refused`
+    here is therefore reserved for what validate_route still does raise on:
+    an unknown agent name, or a genuinely empty proposal on an event type
+    that requires one. `dropped` records the narrowing separately, so the
+    persisted case still shows exactly what the coordinator asked for versus
+    what policy actually ran — an audit trail the earlier all-or-nothing
+    refusal didn't need, because a refusal already carried `proposed` and an
+    empty `route` was self-explanatory. A narrowed route needs the diff
+    spelled out or a reviewer can't tell "coordinator proposed exactly this"
+    from "coordinator proposed more and policy trimmed it."
 
     Evidence only has a document to extract from when the event actually
     carries a `document_ref`. A packet with no document is not a failure —
@@ -221,17 +228,19 @@ def apply_route(node_input, ctx: Context) -> Event:
     try:
         route = validate_route(event_type, proposed)
         refused = None
+        dropped = [agent for agent in dict.fromkeys(proposed) if agent not in route]
     except PolicyError as exc:
         # A rejected proposal is a policy outcome the trace must show, and it
         # must never fall through to a side effect — quarantine_case is the
         # only node this can reach next.
-        route, refused = [], str(exc)
+        route, refused, dropped = [], str(exc), []
 
     evidence_skipped_no_document = "evidence" in route and not has_document
 
     decision = {
         "proposed": proposed,
         "route": route,
+        "dropped": dropped,
         "reason": reason,
         "refused": refused,
         "evidence_skipped_no_document": evidence_skipped_no_document,
@@ -438,15 +447,29 @@ def assess_risk(node_input, ctx: Context) -> Event:
     """The gate. Deterministic policy decides whether commands may be queued.
 
     Two modes. An event that performed its own screening is scored fresh. An
-    event that brought no screening of its own — every clock-driven event —
-    carries the stored verdict forward instead.
+    event that brought no screening of its own carries the stored verdict
+    forward instead.
 
-    Carry-forward is not an optimization. Re-scoring a clock event from
-    `screening=None` fires no factors, scores zero, and lands `clear`: the
-    passage of time alone would launder a blocked supplier, and the
-    executor's backstop reads exactly this stored band. A stored band
-    therefore carries forward unchanged, and a case with no stored verdict at
-    all is an anomaly that carries `blocked`.
+    Carry-forward is not an optimization. Re-scoring from `screening=None`
+    fires no factors, scores zero, and lands `clear`: the passage of time
+    alone would launder a blocked supplier, and the executor's backstop
+    reads exactly this stored band. A stored band therefore carries forward
+    unchanged, and a case with no stored verdict at all is an anomaly that
+    carries `blocked`.
+
+    The condition is `screening is None`, not "is this a clock event" — an
+    earlier version of this gate conditioned on event type, which happened
+    to coincide with "no screening" for every clock event but silently
+    stopped coinciding the moment an agentic event could also reach this
+    node with no fresh screening of its own: certificate_received's route is
+    `{evidence}` only (see app/policy.py's ALLOWED_ROUTES), so it never
+    engages compliance and never populates `screening`. Scoring that fresh
+    from `screening=None` would land `clear` regardless of what the last
+    real screening found — laundering a previously blocked supplier via a
+    mailed-in certificate, which is exactly the outcome carry-forward exists
+    to prevent. Conditioning on the actual absence of screening, rather than
+    on event type as a proxy for it, covers every event that can reach this
+    node with nothing of its own to score, present or future.
 
     Only factor IDs reach the span; the values that triggered them go to
     Firestore via _record_outcome.
@@ -454,10 +477,10 @@ def assess_risk(node_input, ctx: Context) -> Event:
     case = ctx.state.get("case", {})
     screening = ctx.state.get("screening")
     case_state = ctx.state.get("case_state") or {}
-    is_clock = case.get("event_type", "") in CLOCK_EVENTS
+    carry_forward = screening is None
 
     with tracer.start_as_current_span("assess_risk") as span:
-        if is_clock:
+        if carry_forward:
             stored = case_state.get("policy")
             stored = stored if isinstance(stored, dict) else {}
             carried = True

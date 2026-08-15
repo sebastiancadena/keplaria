@@ -75,14 +75,52 @@ def test_unreachable_screening_routes_review(case_id):
     assert result.actions.route == "review"
 
 
-def test_absent_screening_routes_clear(case_id):
-    """The skip branch still passes the gate, and still gets a verdict."""
-    ctx = _StubContext({"case": _case(case_id)})
+def test_new_supplier_packet_always_carries_real_screening(case_id):
+    """Replaces a prior test of this name that fed assess_risk a
+    new_supplier_packet with NO screening and asserted `clear` — that no
+    longer matches production and, worse, no longer matches what this gate
+    is supposed to do: `new_supplier_packet`'s permitted route is
+    {evidence, compliance} on both the with-document and no-document paths
+    (see app/policy.py's ALLOWED_ROUTES and app/nodes.py's apply_route), so
+    it always reaches screen_supplier and always has a fresh `screening`
+    dict by the time it reaches this gate. See
+    test_certificate_received_with_no_screening_carries_forward_instead_of_clear
+    below for the scenario the old version of this test was actually
+    guarding against without saying so — an agentic event reaching this gate
+    with no screening of its own — which is now handled correctly."""
+    ctx = _StubContext({
+        "case": _case(case_id),
+        "screening": _screening(candidates=[{"id": "x", "score": 0.1, "match": False}]),
+    })
 
     result = assess_risk(None, ctx)
 
     assert result.actions.route == "clear"
     assert result.output["policy_version"] == 1
+
+
+def test_certificate_received_with_no_screening_carries_forward_instead_of_clear():
+    """The exact defect this fixes. certificate_received's permitted route
+    is {evidence} only, so it never populates `screening` — re-scoring it
+    fresh from `screening=None` fires no factors, scores 0.0, and lands
+    `clear`, laundering a previously blocked supplier via a mailed-in
+    certificate. Carrying forward must trigger on `screening is None`, not
+    on "is this a clock event" (certificate_received is not a clock event —
+    see CLOCK_EVENTS — so the old event-type check let this exact case
+    through)."""
+    ctx = _StubContext({
+        "case": {"case_id": "C1", "event_type": "certificate_received"},
+        "case_state": {"policy": {"band": "blocked", "score": 0.95,
+                                  "policy_id": "supplier_risk", "policy_version": 1,
+                                  "reasons": ["SANCTIONS_MATCH"]}},
+    })
+
+    event = assess_risk(None, ctx)
+
+    assert event.actions.route == "blocked", (
+        "a renewal certificate must never launder a blocked supplier into clear"
+    )
+    assert event.actions.state_delta["policy"]["band"] == "blocked"
 
 
 # The verdict is published to graph state via `Event(state={"policy": ...})`,
