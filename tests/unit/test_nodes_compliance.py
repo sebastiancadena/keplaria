@@ -76,6 +76,19 @@ def _yente_payload(candidates):
     return {"responses": {"q": {"results": candidates}}}
 
 
+# Expected (band, reason_code) for each recommendation in ALLOWED_RECOMMENDATIONS
+# when it reaches assess_risk against a freshly-scored `clear` verdict. This is
+# the exhaustiveness tripwire's source of truth: a recommendation term added to
+# ALLOWED_RECOMMENDATIONS without a matching entry here (and a matching branch
+# in assess_risk) fails test_recommendation_map_covers_every_allowed_term below
+# instead of silently falling through the escalation guard one way or another.
+RECOMMENDATION_OUTCOMES = {
+    "note_clear": ("clear", None),
+    "escalate_review": ("review", "COMPLIANCE_ESCALATION"),
+    "corroborate_block": ("review", "COMPLIANCE_BLOCK_CORROBORATION"),
+}
+
+
 def test_compliance_assessment_parses_a_complete_payload():
     parsed = ComplianceAssessment(
         assessments=[
@@ -186,6 +199,69 @@ def test_invalid_assessment_tightens_clear_to_review(case_id):
     assert "COMPLIANCE_ASSESSMENT_INVALID" in result.output["reasons"]
 
 
+def test_corroborate_block_tightens_clear_to_review(case_id):
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": _screening_state(),  # low scores, no match -> clear
+            "compliance": _compliance(recommendation="corroborate_block"),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "review"
+    assert "COMPLIANCE_BLOCK_CORROBORATION" in result.output["reasons"]
+
+
+def test_recommendation_map_covers_every_allowed_term():
+    """Binds RECOMMENDATION_OUTCOMES to ALLOWED_RECOMMENDATIONS so the two
+    can never drift apart silently. Add a term to ALLOWED_RECOMMENDATIONS
+    without adding a matching entry here (and a matching branch in
+    assess_risk's escalation guard) and this fails immediately, instead of
+    the new term falling through the gate unhandled."""
+    mapped = set(RECOMMENDATION_OUTCOMES)
+    allowed = set(nodes_module.ALLOWED_RECOMMENDATIONS)
+    assert mapped == allowed, (
+        f"RECOMMENDATION_OUTCOMES {mapped} and ALLOWED_RECOMMENDATIONS "
+        f"{allowed} disagree — every recommendation the vocabulary check "
+        "accepts needs a known gate outcome"
+    )
+
+
+@pytest.mark.parametrize("recommendation", sorted(RECOMMENDATION_OUTCOMES))
+def test_assess_risk_handles_every_allowed_recommendation(case_id, recommendation):
+    """Runs every member of ALLOWED_RECOMMENDATIONS through assess_risk from
+    a freshly-scored clear verdict and checks it lands the mapped band and
+    reason code — the exhaustiveness check above only guards the key set,
+    this checks the gate actually does what the map says it does."""
+    expected_band, expected_reason = RECOMMENDATION_OUTCOMES[recommendation]
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": _screening_state(),  # low scores, no match -> clear
+            "compliance": _compliance(recommendation=recommendation),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == expected_band, (
+        f"{recommendation} was expected to land band {expected_band!r} but "
+        f"got {result.actions.route!r}"
+    )
+    if expected_reason is None:
+        assert result.output["reasons"] == [], (
+            f"{recommendation} is not supposed to tighten a clear verdict, "
+            f"but reasons came back as {result.output['reasons']!r}"
+        )
+    else:
+        assert expected_reason in result.output["reasons"], (
+            f"{recommendation} was expected to append {expected_reason!r} "
+            f"but reasons came back as {result.output['reasons']!r}"
+        )
+
+
 def test_note_clear_leaves_clear_untouched(case_id):
     ctx = _StubContext(
         {
@@ -206,16 +282,17 @@ def test_note_clear_leaves_clear_untouched(case_id):
     [
         _compliance(recommendation="note_clear"),
         _compliance(recommendation="escalate_review"),
+        _compliance(recommendation="corroborate_block"),
         _compliance(valid=False),
     ],
-    ids=["note_clear", "escalate_review", "invalid_record"],
+    ids=["note_clear", "escalate_review", "corroborate_block", "invalid_record"],
 )
 def test_blocked_is_never_downgraded_by_the_agent(case_id, compliance):
     """The escalation is one-way: it may only tighten a fresh clear verdict.
     A blocked verdict must survive every shape the agent's output can take —
-    a clean recommendation, an escalating one, and an invalid record — since
-    a guard as narrow as `if verdict.band != BLOCKED` would still pass a
-    single-case version of this test but fail two of these three."""
+    a clean recommendation, both escalating ones, and an invalid record —
+    since a guard as narrow as `if verdict.band != BLOCKED` would still pass
+    a single-case version of this test but fail three of these four."""
     screening = _screening_state()
     screening["candidates"][0].update({"score": 1.0, "match": True})
     screening["flagged"] = [screening["candidates"][0]["id"]]

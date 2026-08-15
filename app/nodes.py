@@ -651,6 +651,11 @@ def assess_risk(node_input, ctx: Context) -> Event:
         # The compliance record can only tighten a fresh clear verdict to
         # review, never loosen review/blocked and never touch a carried-
         # forward verdict — it has an opinion, not veto power over the gate.
+        # corroborate_block gets its own branch even though the intended
+        # path (a match: true candidate) already blocks on the deterministic
+        # score alone: a low-scoring, no-match candidate can still read as a
+        # near-exact name to the model, and that contradiction needs its own
+        # reason code rather than silently riding through as clear.
         if not carried and verdict.band == CLEAR:
             compliance = ctx.state.get("compliance")
             if isinstance(compliance, dict):
@@ -666,6 +671,13 @@ def assess_risk(node_input, ctx: Context) -> Event:
                         update={
                             "band": REVIEW,
                             "reasons": [*verdict.reasons, "COMPLIANCE_ESCALATION"],
+                        }
+                    )
+                elif compliance.get("recommendation") == "corroborate_block":
+                    verdict = verdict.model_copy(
+                        update={
+                            "band": REVIEW,
+                            "reasons": [*verdict.reasons, "COMPLIANCE_BLOCK_CORROBORATION"],
                         }
                     )
 
