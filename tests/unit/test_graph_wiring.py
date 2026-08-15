@@ -14,9 +14,10 @@ suite, not in live-marked tests.
 
 import pytest
 
-from app.agent import evidence_agent, root_agent
+from app.agent import compliance_agent, evidence_agent, root_agent
 from app.nodes import (
     MAX_EVIDENCE_ATTEMPTS,
+    apply_compliance,
     assess_risk,
     commit_commands,
     park_case,
@@ -37,10 +38,15 @@ def test_flagged_supplier_never_reaches_the_write_terminal():
     for edge in root_agent.edges:
         source = edge[0]
         target = edge[1]
-        name = getattr(source, "__name__", str(source))
+        name = getattr(source, "__name__", None) or getattr(source, "name", str(source))
         edges[name] = target
 
-    assert edges["screen_supplier"] is assess_risk, "screening must feed the gate"
+    assert edges["screen_supplier"] == {
+        "interpret": compliance_agent,
+        "score": assess_risk,
+    }, "screening must feed the gate, via the interpreter when candidates exist"
+    assert edges["compliance_agent"] is apply_compliance
+    assert edges["apply_compliance"] is assess_risk
     assert edges["assess_risk"] == {
         "clear": commit_commands,
         "review": park_case,

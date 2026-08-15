@@ -43,7 +43,13 @@ all. A flagged or otherwise non-clear case never reaches the command queue.
 
 The screening node reaches the self-hosted yente service on the private VM. It
 has no public address, so that call only succeeds when the serving workload has
-private VPC connectivity — on Agent Runtime, a PSC-I network attachment.
+private VPC connectivity — on Agent Runtime, a PSC-I network attachment. When
+screening returns candidates, the tool-less Compliance agent interprets them
+against policy, and apply_compliance — a deterministic check, not a model
+call — independently confirms every candidate id it references actually came
+from the screen before the assessment is allowed to reach the gate. An
+unreachable service or a screen with no candidates has nothing to interpret,
+so it skips the agent and feeds the gate directly.
 
 The graph never calls the ERP itself: commit_commands only claims the
 commands `app.lifecycle.decide` names (see app/nodes.py's docstring for why —
@@ -57,6 +63,7 @@ from google.adk.workflow import Workflow
 from google.genai import types
 
 from app.nodes import (
+    apply_compliance,
     apply_route,
     assess_risk,
     commit_commands,
@@ -67,7 +74,7 @@ from app.nodes import (
     screen_supplier,
     validate_evidence,
 )
-from app.schemas import EvidenceResult, RoutingDecision
+from app.schemas import ComplianceAssessment, EvidenceResult, RoutingDecision
 
 coordinator = LlmAgent(
     name="mission_coordinator",
@@ -129,6 +136,40 @@ evidence_agent = LlmAgent(
     disallow_transfer_to_peers=True,
 )
 
+compliance_agent = LlmAgent(
+    name="compliance_agent",
+    model="gemini-3.6-flash",
+    # {screening_supplier_name} and {screening_candidates} are the same kind
+    # of state-template placeholder as evidence_agent's above: screen_supplier
+    # publishes both as flat, top-level session-state keys precisely so a
+    # plain-string instruction here can resolve them. This agent carries no
+    # tools, so those two keys are the only way the screening result reaches
+    # it at all.
+    instruction=(
+        "You interpret sanctions-screening candidates for a supplier under a "
+        "compliance policy.\n\n"
+        "Supplier being screened: {screening_supplier_name}\n\n"
+        "Candidates returned by the screening service:\n"
+        "{screening_candidates}\n\n"
+        "For every candidate, return its candidate_id copied exactly as given, "
+        "whether it plausibly refers to the same entity as the supplier "
+        "(consider name similarity and topics), and one sentence of reasoning.\n\n"
+        "Recommendation rules:\n"
+        "  - Any candidate with match: true -> 'corroborate_block'.\n"
+        "  - No confirmed match, but at least one candidate that plausibly "
+        "concerns this supplier -> 'escalate_review'.\n"
+        "  - Every candidate clearly unrelated -> 'note_clear'.\n\n"
+        "Never invent candidate ids. Never state that the supplier is cleared "
+        "or approved: the final decision belongs to a deterministic policy "
+        "gate; your output is an interpretation for the audit record."
+    ),
+    output_schema=ComplianceAssessment,
+    output_key="compliance_assessment",
+    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True,
+)
+
 root_agent = Workflow(
     name="keplaria_workflow",
     edges=[
@@ -167,7 +208,12 @@ root_agent = Workflow(
                 "ungrounded": quarantine_case,
             },
         ),
-        (screen_supplier, assess_risk),
+        (
+            screen_supplier,
+            {"interpret": compliance_agent, "score": assess_risk},
+        ),
+        (compliance_agent, apply_compliance),
+        (apply_compliance, assess_risk),
         # The gate. Only "clear" reaches the write terminal.
         (
             assess_risk,
