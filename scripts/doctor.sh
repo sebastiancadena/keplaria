@@ -94,9 +94,9 @@ echo "== Agent Runtime deploy preconditions =="
 # first runtime-required file outside app/. If .gcloudignore ever excludes
 # policy/, load_policy() fails closed on every case (POLICY_UNAVAILABLE ->
 # blocked): a silent, total onboarding outage.
-[ -f policy/supplier_risk.v1.json ] \
-  && python3 -c "import json; json.load(open('policy/supplier_risk.v1.json'))" >/dev/null 2>&1 \
-  && ok "policy fixture exists and parses (policy/supplier_risk.v1.json)" \
+[ -f policy/supplier_risk.v2.json ] \
+  && python3 -c "import json; json.load(open('policy/supplier_risk.v2.json'))" >/dev/null 2>&1 \
+  && ok "policy fixture exists and parses (policy/supplier_risk.v2.json)" \
   || bad "policy fixture missing or does not parse — every case would fail closed to POLICY_UNAVAILABLE/blocked"
 grep -qE '^policy/?$' .gcloudignore \
   && bad ".gcloudignore excludes policy/ — the runtime-required fixture would not ship, every case fails closed" \

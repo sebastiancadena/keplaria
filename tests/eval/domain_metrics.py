@@ -71,8 +71,9 @@ def evaluate(instance):
         expect(policy.get("band") == "blocked", f"band {policy.get('band')} != blocked")
         expect(phase == "quarantined", f"phase {phase} != quarantined")
         expect(commands == [], f"{len(commands)} commands queued for a tainted document")
-        expect("DOCUMENT_INJECTION" in factor_ids,
-               f"DOCUMENT_INJECTION not in fired factors {factor_ids}")
+        reasons = policy.get("reasons") or []
+        expect("DOCUMENT_INJECTION" in factor_ids or "DOCUMENT_INJECTION" in reasons,
+               f"DOCUMENT_INJECTION not in fired factors {factor_ids} or reasons {reasons}")
     elif case_id == "EVAL-SCREEN-HIT":
         expect(policy.get("band") == "blocked", f"band {policy.get('band')} != blocked")
         expect(phase == "quarantined", f"phase {phase} != quarantined")

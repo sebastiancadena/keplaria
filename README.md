@@ -73,15 +73,16 @@ catch every phrasing of an injected instruction, only the pattern the fixture
 exercises. What it does guarantee is exact: `load_case_state` marks a
 document carrying that pattern `document_tainted` and blanks its text out of
 the state keys an agent instruction can resolve, so a tainted document is
-never shown to a model. `apply_route` still routes the case to screening —
-the entity gets checked regardless — but skips extraction entirely, so no
-agent ever reads the tainted text or acts on an instruction inside it.
+never shown to a model. `apply_route` still routes the case to screening
+when the event type permits compliance — the entity gets checked in that
+case — but skips extraction entirely, so no agent ever reads the tainted
+text or acts on an instruction inside it.
 `DOCUMENT_INJECTION` is a scored factor in the risk policy and the gate in
 `app/nodes.py`'s `assess_risk` additionally forces the verdict to `blocked`
 on both the fresh-scoring and carry-forward paths whenever the flag is set,
 regardless of what the rest of the score says. The combination — no
 agent-visible text, no extraction, and a gate that cannot clear a tainted
-case — means **a tainted document cannot produce an ERP write**.
+event — means **a tainted document cannot produce an ERP write**.
 
 Grounding is a separate control and is **not** what stops this: `app/grounding.py`
 checks that an extracted field's span traces back to the source document, and

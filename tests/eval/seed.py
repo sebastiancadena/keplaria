@@ -69,7 +69,7 @@ def main() -> None:
             },
             "policy": {
                 "policy_id": "supplier_risk",
-                "policy_version": 1,
+                "policy_version": 2,
                 "score": 0.0,
                 "band": "clear",
                 "factors_fired": [],

@@ -152,8 +152,17 @@ def scan(pages) -> InjectionVerdict:
     """Scan page text for machine-directed instructions. Total — never raises.
 
     A page taints only when a directive and a machine-reader signal are found
-    in the same sentence. `Finding.pattern_id` is `"{directive}+{signal}"`,
-    naming both halves of the conjunction that fired.
+    in the same sentence. `Finding.pattern_id` is `"{directive}+{signal}"`:
+    the directive is whichever directive pattern matched that sentence, but
+    the signal half is always the first hit in `SIGNALS` iteration order —
+    not necessarily the signal that best justifies the match when more than
+    one signal pattern fires in the same sentence.
+
+    `MALFORMED_PAGES` below is unreachable from the production path: by the
+    time `scan` can be called from `load_case_state`, app/documents.py:58 has
+    already rejected any document whose pages are not `list[str]`. It exists
+    as a totality guarantee for this function's own contract as a seam, not
+    because a caller is known to trigger it.
     """
     if not isinstance(pages, list) or not all(isinstance(p, str) for p in pages):
         return InjectionVerdict(tainted=True, findings=[Finding(pattern_id="MALFORMED_PAGES")])

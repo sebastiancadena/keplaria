@@ -361,12 +361,17 @@ def apply_route(node_input, ctx: Context) -> Event:
     A tainted document (load_case_state's `document_tainted`) is treated the
     same way: evidence has nothing it may safely extract from, since
     document_pages/document_checksum were already blanked at load time. The
-    case still reaches compliance screening rather than a terminal, because
-    an injected certificate is itself a fraud signal and the screening
-    record is most worth having for exactly that case. This is deliberately
-    not routed to "blocked" — that branch is reserved for a refused
-    coordinator proposal, and taint is a fact about the document, not a
-    routing failure.
+    case reaches compliance screening when the event type permits it — e.g.
+    a `new_supplier_packet` where compliance is proposed alongside evidence —
+    because an injected certificate is itself a fraud signal and the
+    screening record is most worth having for exactly that case; but an
+    event type whose permitted route is evidence-only (e.g.
+    `certificate_received`) never reaches screening at all, tainted or not.
+    This is deliberately not routed to "blocked" — that branch is reserved
+    for a refused coordinator proposal, and taint is a fact about the
+    document, not a routing failure. Either way the case still converges on
+    assess_risk (via "screen" when compliance is proposed, or "skip"
+    otherwise), which is what actually blocks a tainted case.
     """
     case = ctx.state.get("case", {})
     event_type = case.get("event_type", "")
@@ -813,6 +818,18 @@ def assess_risk(node_input, ctx: Context) -> Event:
         # exactly what carry-forward exists to prevent in the other
         # direction. One-directional, like every other guard here: it can
         # only tighten, so it cannot launder anything.
+        #
+        # Because this guard is `verdict.band != BLOCKED`, the taint marker
+        # lands in a different place — or nowhere — depending on which path
+        # produced `verdict`: `factors_fired` on fresh scoring; `reasons`
+        # (appended here) on a carry-forward over a stored verdict that
+        # wasn't already blocked; and neither field when the stored verdict
+        # was already BLOCKED, or was missing/malformed (NO_STORED_VERDICT /
+        # STORED_VERDICT_MALFORMED already forced BLOCKED above, so this
+        # block never runs for them). A consumer that only reads the verdict
+        # must check both `factors_fired` and `reasons` to detect taint; the
+        # persisted `injection` block (see _record_outcome) is the reliable,
+        # path-independent record and should be preferred for audit.
         if ctx.state.get("document_tainted") and verdict.band != BLOCKED:
             verdict = verdict.model_copy(
                 update={
