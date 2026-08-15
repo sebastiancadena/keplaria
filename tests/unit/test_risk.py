@@ -158,6 +158,60 @@ def test_unregistered_condition_kind_is_rejected_at_load(tmp_path):
         load_policy(bad)
 
 
+def test_a_case_flag_factor_with_an_empty_flag_name_is_rejected_at_load(tmp_path):
+    """An empty flag name loads a factor that can never fire.
+
+    `case.get("")` is `None` for every case, so such a factor is dead weight
+    that reads as active policy — the worst kind of silent gap in a file whose
+    whole job is to be the auditable record of what the gate enforces. The
+    module's stated principle is that validation lives in load_policy so that
+    decision time cannot encounter a factor it has to reason about, and a
+    never-firing factor belongs on that list.
+    """
+    bad = tmp_path / "bad.json"
+    bad.write_text(
+        json.dumps(
+            {
+                "policy_id": "p",
+                "policy_version": 1,
+                "thresholds": {"review": 0.2, "block": 0.6},
+                "lifecycle": {"renewal_window_days": 35, "overdue_grace_days": 0},
+                "factors": [
+                    {"id": "X", "weight": 0.5, "when": {"kind": "case_flag", "flag": ""}}
+                ],
+            }
+        )
+    )
+
+    with pytest.raises(PolicyLoadError, match="flag"):
+        load_policy(bad)
+
+
+def test_a_case_flag_factor_with_a_real_flag_name_still_loads(tmp_path):
+    """The negative control: tightening the check must not reject the shipped
+    shape, which is what `policy/supplier_risk.v2.json` actually carries."""
+    good = tmp_path / "good.json"
+    good.write_text(
+        json.dumps(
+            {
+                "policy_id": "p",
+                "policy_version": 1,
+                "thresholds": {"review": 0.2, "block": 0.6},
+                "lifecycle": {"renewal_window_days": 35, "overdue_grace_days": 0},
+                "factors": [
+                    {
+                        "id": "X",
+                        "weight": 0.5,
+                        "when": {"kind": "case_flag", "flag": "document_tainted"},
+                    }
+                ],
+            }
+        )
+    )
+
+    assert load_policy(good).factors[0].when["flag"] == "document_tainted"
+
+
 def test_thresholds_out_of_order_are_rejected_at_load(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text(

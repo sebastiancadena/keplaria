@@ -163,8 +163,18 @@ def load_policy(path: Path | None = None) -> Policy:
         for param in _REQUIRED_PARAMS.get(kind, ()):
             if not isinstance(factor.when.get(param), (int, float)):
                 raise PolicyLoadError(f"factor {factor.id}: {kind} needs a numeric {param!r}")
-        if kind == "case_flag" and not isinstance(factor.when.get("flag"), str):
-            raise PolicyLoadError(f"factor {factor.id}: case_flag needs a string 'flag'")
+        if kind == "case_flag" and not (
+            isinstance(factor.when.get("flag"), str) and factor.when["flag"]
+        ):
+            # Non-empty, not merely a string: `case.get("")` is None for every
+            # case, so an empty name loads a factor that can never fire while
+            # reading as active policy. A dead factor in the file that is
+            # supposed to be the auditable record of what the gate enforces is
+            # exactly the kind of thing this function exists to catch before
+            # decision time can encounter it.
+            raise PolicyLoadError(
+                f"factor {factor.id}: case_flag needs a non-empty string 'flag'"
+            )
 
     return policy
 

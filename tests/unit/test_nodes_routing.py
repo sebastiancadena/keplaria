@@ -5,7 +5,8 @@ rejects, and reach 'screen'/'skip' only for accepted proposals — including the
 legitimately empty route for an event type that requires no agents at all.
 quarantine_case, the 'blocked' terminal, must never claim the create_supplier
 command or call the ERP — but it does record the refusal onto the case
-document, so a reviewer (and verify.py) can see why a case was blocked.
+document, so a reviewer (and spikes/thin_vertical/verify.py) can see why a
+case was blocked.
 """
 
 from __future__ import annotations

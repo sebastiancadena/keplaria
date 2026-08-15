@@ -47,8 +47,9 @@ def _record_outcome(
     """Persist a compact routing/screening summary onto the case doc.
 
     Session state is invisible outside the engine; this is what lets
-    verify.py (and anyone else reading Firestore) substantiate the routing
-    and screening decisions without reaching into the graph.
+    spikes/thin_vertical/verify.py (and anyone else reading Firestore)
+    substantiate the routing and screening decisions without reaching into
+    the graph.
 
     The persisted `policy` block is the authoritative record of the gate's
     decision. app.executor.runner re-reads it before draining a command, so
@@ -81,13 +82,15 @@ def _record_outcome(
     handed, a stored copy of the payload itself.
 
     `injection` distinguishes "never scanned" from "scanned and clean":
-    `None` means no derivative ever existed to scan (a clock event, or one
-    with no document_ref) and this function writes no `injection` key at
-    all, same absence discipline as routing/screening/policy/compliance
-    above. An empty list means a document WAS scanned and came back clean,
-    and that positive fact is worth recording — `{"tainted": False,
-    "finding_count": 0, "findings": []}` — because it says the gate ran,
-    not that it never applied.
+    `None` means no derivative ever existed to scan — a clock event, one
+    with no document_ref, or one whose document_ref could not be loaded at
+    all (load_document raising DocumentUnavailable leaves `derivative` None
+    too, and an unreadable document genuinely was never scanned) — and this
+    function writes no `injection` key at all, same absence discipline as
+    routing/screening/policy/compliance above. An empty list means a document
+    WAS scanned and came back clean, and that positive fact is worth
+    recording — `{"tainted": False, "finding_count": 0, "findings": []}` —
+    because it says the gate ran, not that it never applied.
     """
     summary = None
     if screening:
