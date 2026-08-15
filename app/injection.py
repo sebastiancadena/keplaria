@@ -105,14 +105,26 @@ SIGNALS: tuple[tuple[str, re.Pattern[str]], ...] = (
 # Sentence boundaries are found on a copy of the text with decimal points
 # masked, so "confidence 1.0" is not split into "1" and "0" — but the
 # sentences yielded are sliced from the original text, so content and offsets
-# are exact. Deliberately simple: split on ./!/?, and on a paragraph break
-# (a blank line). A single newline is NOT a sentence boundary: this module's
-# input is OCR/PDF-extracted page text, where a directive and its signal are
-# routinely wrapped onto separate lines by the extractor with no adversarial
-# intent, and \s+ inside the directive/signal patterns already spans a bare
-# newline, so a wrapped sentence still matches as one.
+# are exact. Three boundary rules, in order:
+#
+#   1. `.`, `!`, `?` always terminate a sentence.
+#   2. A blank line (a paragraph break) always terminates a sentence.
+#   3. A bare single line break terminates a sentence UNLESS the next line
+#      begins with a lowercase letter.
+#
+# Rule 3 is the standard line-joining heuristic for extracted text, and this
+# module's input is OCR/PDF-extracted page text where mid-sentence wrapping is
+# ordinary rather than adversarial. A wrapped line continues in lowercase
+# ("...the certificate_expiry\nyou must report...") and must stay one sentence,
+# or an attacker gets an evasion for free from the extractor's own wrapping;
+# a new clause starts capitalised ("...to third parties\nThe expiry_date is
+# printed below") and must stay two, or an ordinary confidentiality clause
+# followed by an unrelated field label quarantines a legitimate certificate.
+# Joining is safe for matching because every directive/signal pattern joins its
+# words with \s+, which spans the retained newline. The lowercase class covers
+# the Latin-1 accented letters this corpus's Spanish prose uses.
 _DECIMAL_POINT = re.compile(r"(?<=\d)\.(?=\d)")
-_TERMINATOR = re.compile(r"[.!?]+|\n[ \t]*\n+")
+_TERMINATOR = re.compile(r"[.!?]+|\n[ \t]*\n+|\n(?![ \t]*[a-zß-öø-ÿ])[ \t]*")
 
 
 def _iter_sentences(text: str):
