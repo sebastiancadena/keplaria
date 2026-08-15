@@ -42,6 +42,7 @@ def _record_outcome(
     screening: dict | None,
     policy: dict | None = None,
     compliance: dict | None = None,
+    injection: list | None = None,
 ) -> None:
     """Persist a compact routing/screening summary onto the case doc.
 
@@ -68,6 +69,16 @@ def _record_outcome(
     this case decided this way" record for THAT input too, so it reads every
     candidate field with `.get()`, never `[]`, and never assumes `candidates`
     is a list of dicts.
+
+    The persisted `injection` block is the durable proof that the document
+    injection gate fired and where — pattern ids, page indices, offsets,
+    counts. It must never carry the matched payload text: `injection_findings`
+    entries hold only ids/locations already (app.injection.scan is total and
+    never captures the matched string), so passing that list straight through
+    cannot leak a hostile payload into Firestore. A reviewer needs to
+    substantiate the block without reaching into a trace that has since
+    expired; they do not need, and must never be handed, a stored copy of the
+    payload itself.
     """
     summary = None
     if screening:
@@ -109,6 +120,12 @@ def _record_outcome(
         payload["policy"] = policy
     if compliance is not None:
         payload["compliance"] = compliance
+    if injection is not None:
+        payload["injection"] = {
+            "tainted": bool(injection),
+            "finding_count": len(injection),
+            "findings": injection,
+        }
     db.collection(CASES).document(case_id).set(payload, merge=True)
 
 
@@ -467,6 +484,7 @@ def quarantine_case(node_input, ctx: Context) -> Event:
             ctx.state.get("screening"),
             ctx.state.get("policy"),
             compliance=ctx.state.get("compliance"),
+            injection=ctx.state.get("injection_findings"),
         )
 
     return Event(
@@ -502,6 +520,7 @@ def park_case(node_input, ctx: Context) -> Event:
             ctx.state.get("screening"),
             policy,
             compliance=ctx.state.get("compliance"),
+            injection=ctx.state.get("injection_findings"),
         )
 
     return Event(
@@ -892,6 +911,7 @@ def commit_commands(node_input, ctx: Context) -> Event:
             ctx.state.get("screening"),
             ctx.state.get("policy"),
             compliance=ctx.state.get("compliance"),
+            injection=ctx.state.get("injection_findings"),
         )
 
     return Event(

@@ -10,6 +10,8 @@ document, so a reviewer (and verify.py) can see why a case was blocked.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -564,3 +566,50 @@ def test_the_taint_span_carries_no_payload_text(db, case_id, span_exporter):
     assert all(isinstance(p, str) for p in patterns)
     assert "DISREGARD_PRIOR_INSTRUCTIONS+ADDRESSES_AUTOMATED_READER" in patterns
     assert not any("2099-12-31" in str(v) for v in attributes.values())
+
+
+def test_the_case_document_records_why_a_document_was_refused(db, case_id, monkeypatch):
+    """A reviewer reading Firestore must be able to substantiate the block
+    without a trace: which patterns fired and where."""
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+    db.collection(CASES).document(case_id).set({"case_id": case_id, "case_version": 1})
+
+    ctx = _StubContext({
+        "case": _case(case_id, "new_supplier_packet", "fixture:manglar-cert-injected"),
+        "injection_findings": [{
+            "pattern_id": "DISREGARD_PRIOR_INSTRUCTIONS+ADDRESSES_AUTOMATED_READER",
+            "page": 0, "offset": 217,
+        }],
+        "document_tainted": True,
+    })
+
+    quarantine_case(None, ctx)
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert stored["injection"]["tainted"] is True
+    assert stored["injection"]["finding_count"] == 1
+    assert (
+        stored["injection"]["findings"][0]["pattern_id"]
+        == "DISREGARD_PRIOR_INSTRUCTIONS+ADDRESSES_AUTOMATED_READER"
+    )
+
+
+def test_the_persisted_injection_block_never_stores_the_payload(db, case_id, monkeypatch):
+    """A stored copy of a hostile payload is a liability, not evidence — the
+    record needs to prove the gate fired and where, nothing more."""
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+    db.collection(CASES).document(case_id).set({"case_id": case_id, "case_version": 1})
+
+    ctx = _StubContext({
+        "case": _case(case_id, "new_supplier_packet", "fixture:manglar-cert-injected"),
+        "injection_findings": [{
+            "pattern_id": "DICTATES_OUTPUT+SNAKE_CASE_IDENTIFIER",
+            "page": 0, "offset": 274,
+        }],
+        "document_tainted": True,
+    })
+
+    quarantine_case(None, ctx)
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert "2099-12-31" not in json.dumps(stored)
