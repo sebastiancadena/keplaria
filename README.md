@@ -64,6 +64,34 @@ pause on this same branch. And the score is computed from screening results
 only: the Evidence agent is still a stub, so nothing here is
 evidence-grounded yet.
 
+**Document injection gate.** `app/injection.py` scans a document's redacted
+text for a sentence that pairs a machine-directed instruction (imperative
+phrasing aimed at the reader-as-agent) with a machine-reader signal, before
+any agent sees that text. This is a **heuristic over a representative
+fixture, not a general prompt-injection defence** — it does not claim to
+catch every phrasing of an injected instruction, only the pattern the fixture
+exercises. What it does guarantee is exact: `load_case_state` marks a
+document carrying that pattern `document_tainted` and blanks its text out of
+the state keys an agent instruction can resolve, so a tainted document is
+never shown to a model. `apply_route` still routes the case to screening —
+the entity gets checked regardless — but skips extraction entirely, so no
+agent ever reads the tainted text or acts on an instruction inside it.
+`DOCUMENT_INJECTION` is a scored factor in the risk policy and the gate in
+`app/nodes.py`'s `assess_risk` additionally forces the verdict to `blocked`
+on both the fresh-scoring and carry-forward paths whenever the flag is set,
+regardless of what the rest of the score says. The combination — no
+agent-visible text, no extraction, and a gate that cannot clear a tainted
+case — means **a tainted document cannot produce an ERP write**.
+
+Grounding is a separate control and is **not** what stops this: `app/grounding.py`
+checks that an extracted field's span traces back to the source document, and
+by design it will accept an extraction that faithfully quotes an injected
+instruction — grounding certifies faithfulness to the text, not the
+trustworthiness of the text's author. `tests/unit/test_grounding.py::test_grounding_accepts_an_injection_obedient_extraction`
+pins exactly this as a regression, not an endorsement: the control that stops
+an injected value from reaching the ERP is the injection gate described
+above, not grounding.
+
 **Idempotency.** Every side effect is a Firestore command with a
 deterministic ID (`{case_id}:{action}`). A command already `DONE` is never
 re-driven, so a replayed event produces exactly one ERP write. ERP records

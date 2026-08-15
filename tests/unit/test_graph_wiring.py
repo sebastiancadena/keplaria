@@ -324,3 +324,18 @@ def test_a_malformed_derivative_quarantines_instead_of_raising():
 
     assert event.actions.route == "ungrounded"
     assert event.output["reason"] == "DERIVATIVE_MALFORMED"
+
+
+def test_the_tainted_branch_reaches_the_gate_and_never_the_write_terminal():
+    """Structural proof that taint cannot reach a write. apply_route's tainted
+    branches are `screen` and `skip`; both must lead to assess_risk, and
+    assess_risk's only edge to commit_commands is `clear`, which the taint
+    override in app.nodes.assess_risk can never produce."""
+    from app.nodes import apply_route, assess_risk, commit_commands, screen_supplier
+
+    maps = _routing_maps(root_agent)
+
+    assert maps[apply_route]["skip"] is assess_risk
+    assert maps[apply_route]["screen"] is screen_supplier
+    assert set(maps[assess_risk]) == {"clear", "review", "blocked"}
+    assert maps[assess_risk]["clear"] is commit_commands

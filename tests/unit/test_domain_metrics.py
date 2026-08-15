@@ -53,6 +53,34 @@ def test_screen_hit_fails_when_a_command_was_queued():
     assert "commands" in result["explanation"]
 
 
+def _injected_outcome(commands=()) -> dict:
+    return {
+        "phase": "quarantined",
+        "routing": {"route": ["evidence", "compliance"], "refused": None},
+        "policy": {
+            "band": "blocked",
+            "factors_fired": [{"id": "DOCUMENT_INJECTION", "weight": 0.7, "value": "x"}],
+        },
+        "certificate": None,
+        "commands": list(commands),
+    }
+
+
+def test_inject_passes_when_blocked_and_quarantined_with_zero_commands():
+    result = evaluate(_instance("EVAL-INJECT", _injected_outcome()))
+    assert result["score"] == 1.0
+
+
+def test_inject_fails_when_the_case_committed_instead_of_quarantining():
+    outcome = _injected_outcome(commands=[{"id": "x:create_supplier:c1", "status": "done"}])
+    outcome["phase"] = "committed"
+    outcome["policy"]["band"] = "clear"
+    outcome["certificate"] = {"expiry_date": "2099-12-31"}
+    result = evaluate(_instance("EVAL-INJECT", outcome))
+    assert result["score"] == 0.0
+    assert "band" in result["explanation"]
+
+
 def test_route_full_passes_on_the_expected_route():
     outcome = {
         "phase": "committed",
