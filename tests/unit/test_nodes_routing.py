@@ -139,7 +139,7 @@ def test_empty_route_when_agents_are_required_is_blocked_not_skipped():
 def test_empty_route_when_no_agents_are_required_skips_not_blocked():
     """The crux of the fix: 'no agents required' must not collapse into
     'refused'. evidence_overdue maps to an empty ALLOWED_ROUTES set, so an
-    empty proposal is legitimate and must reach queue_supplier via 'skip',
+    empty proposal is legitimate and must reach commit_commands via 'skip',
     not be quarantined."""
     ctx = _StubContext({"case": _case("CASE-5", "evidence_overdue")})
     node_input = {"route": [], "reason": "deterministic, no agents needed"}
@@ -195,8 +195,12 @@ def test_quarantine_case_claims_no_command_but_records_the_refusal(
     case = db.collection(CASES).document(case_id).get().to_dict()
     assert case["phase"] == "quarantined"
     assert case["routing"] == routing
-    assert case["screening"] is None
-    assert case["policy"] is None
+    # screening/policy are absent from ctx.state here (never written, not
+    # merely None) — _record_outcome must leave them unwritten rather than
+    # merge a null over anything durably stored, so they must not appear as
+    # keys at all rather than merely evaluating falsy.
+    assert "screening" not in case
+    assert "policy" not in case
 
 
 def test_quarantine_case_persists_a_malformed_screening_without_raising(
@@ -244,6 +248,49 @@ def test_quarantine_case_persists_a_malformed_screening_without_raising(
         {"id": None, "score": None, "match": None},
         {"id": ["unhashable"], "score": None, "match": None},
     ]
+
+
+def test_quarantine_case_preserves_a_stored_verdict_when_state_carries_none(
+    db, case_id, monkeypatch
+):
+    """apply_route's 'blocked' branch (an unknown agent name, or a genuinely
+    empty proposal on an event type that requires one) reaches quarantine_case
+    with no 'policy' key in ctx.state at all — assess_risk never ran on this
+    path. _record_outcome used to write {'policy': None} regardless, and
+    merge=True only skips an ABSENT key, not one present with value None — so
+    it nulled the case's previously stored verdict outright. From there,
+    assess_risk's carry-forward reads no stored band, lands
+    NO_STORED_VERDICT -> blocked forever, and the executor's backstop
+    (app.executor.runner._policy_band) returns (None, None) -> every
+    permissive command refused forever: the case is permanently bricked. This
+    proves the fix leaves a previously stored verdict intact."""
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+    stored_policy = {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                      "band": "clear", "factors_fired": [], "reasons": []}
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 1, "policy": stored_policy,
+    })
+
+    routing = {
+        "proposed": ["finance_bot"],
+        "route": [],
+        "reason": "hallucinated agent",
+        "refused": "unknown agent: 'finance_bot'",
+    }
+    ctx = _StubContext(
+        {
+            "case": _case(case_id, "new_supplier_packet"),
+            "routing": routing,
+            # No "policy" key at all — this branch never reached assess_risk.
+        }
+    )
+
+    quarantine_case(None, ctx)
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert stored["policy"] == stored_policy, (
+        "a refused routing proposal must never erase a previously stored risk verdict"
+    )
 
 
 def test_a_clock_event_routes_away_from_the_coordinator(db, case_id):

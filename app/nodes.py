@@ -77,14 +77,27 @@ def _record_outcome(
                 for c in candidates[:3]
             ],
         }
-    # merge=True rather than update(): queue_supplier/quarantine_case run
+    # merge=True rather than update(): commit_commands/quarantine_case run
     # after claim_event in production (the case doc always exists by then),
     # but integration tests that drive the graph directly without going
     # through the ingress adapter never create it — merge tolerates both.
-    db.collection(CASES).document(case_id).set(
-        {"phase": phase, "routing": routing, "screening": summary, "policy": policy},
-        merge=True,
-    )
+    #
+    # merge=True only skips a key that is ABSENT from the payload; a key
+    # present with value None still overwrites whatever is durably stored
+    # with null. Every caller of this function may legitimately lack one or
+    # more of routing/screening/policy in ctx.state (a clock event carries no
+    # routing or screening; quarantine_case/park_case can run before a policy
+    # verdict exists), and that absence must read as "nothing new to say
+    # here," never as "erase what was recorded earlier." So the payload is
+    # built from only the non-None values.
+    payload: dict = {"phase": phase}
+    if routing is not None:
+        payload["routing"] = routing
+    if summary is not None:
+        payload["screening"] = summary
+    if policy is not None:
+        payload["policy"] = policy
+    db.collection(CASES).document(case_id).set(payload, merge=True)
 
 
 def _format_pages(pages: list[str]) -> str:

@@ -285,3 +285,71 @@ def test_commit_commands_persists_a_clear_verdict_alongside_the_claim(db, case_i
 
     stored = db.collection(CASES).document(case_id).get().to_dict()
     assert stored["policy"]["band"] == "clear"
+
+
+def test_commit_commands_preserves_stored_routing_and_screening_on_a_clock_event(
+    db, case_id, monkeypatch
+):
+    """A clock event's ctx.state carries no 'routing' and no 'screening' key
+    at all — load_case_state's coordinator bypass sends a clock event
+    straight to assess_risk, so neither apply_route nor screen_supplier ever
+    run for it (see app.agent's clock/agentic split). Before the
+    _record_outcome fix, merge=True with an explicit routing: None /
+    screening: None nulled the onboarding-time routing decision and
+    screening summary on the very first clock tick — confirmed in the
+    committed lifecycle harness evidence, which shows 'routing': null read
+    back from Firestore after step 1 had written a full routing decision.
+    This pins that a clock event through commit_commands leaves both blocks
+    exactly as onboarding left them.
+
+    evidence_overdue on an already-HELD case is used because it short-circuits
+    to ALREADY_HELD before any expiry-window comparison, so this test needs
+    no dependency on the loaded policy's timing thresholds."""
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+
+    stored_routing = {
+        "proposed": ["evidence", "compliance"],
+        "route": ["evidence", "compliance"],
+        "dropped": [],
+        "reason": "new supplier",
+        "refused": None,
+        "evidence_skipped_no_document": False,
+    }
+    stored_screening = {
+        "reachable": True,
+        "endpoint": "http://10.10.0.2:8000",
+        "flagged": [],
+        "candidate_count": 0,
+        "candidates": [],
+    }
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id,
+        "routing": stored_routing,
+        "screening": stored_screening,
+        "policy": {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                   "band": "clear", "factors_fired": [], "reasons": []},
+        "lifecycle": {"state": "held", "cycle": 1},
+        "certificate": {"expiry_date": "2027-01-01", "evidence_version": 1},
+        "supplier": "Andes",
+    })
+    case_state = db.collection(CASES).document(case_id).get().to_dict()
+
+    ctx = _StubContext({
+        "case": {"case_id": case_id, "event_type": "evidence_overdue",
+                 "supplier": "Andes", "effective_date": "2026-01-01"},
+        "case_state": case_state,
+        # No "routing" or "screening" key in ctx.state at all — exactly what
+        # a clock event carries.
+    })
+
+    event = commit_commands(None, ctx)
+
+    assert event.output["reason"] == "ALREADY_HELD"
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert stored["routing"] == stored_routing, (
+        "a clock event must never null out the onboarding-time routing record"
+    )
+    assert stored["screening"] == stored_screening, (
+        "a clock event must never null out the onboarding-time screening summary"
+    )
