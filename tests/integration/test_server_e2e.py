@@ -38,6 +38,8 @@ from a2a.types import (
 )
 from requests.exceptions import RequestException
 
+from app.state.firestore import CASES, get_client
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -173,6 +175,18 @@ def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
     session_id = session_response.json()["id"]
 
     event = _canonical_event()
+    # certificate_received never populates `screening`, so assess_risk
+    # carries the case's stored verdict forward rather than scoring fresh —
+    # correct (scoring fresh from screening=None would launder a blocked
+    # supplier via a mailed-in certificate), but a case with no prior
+    # verdict at all fails closed to `blocked`. Seed a `clear` verdict
+    # directly so this test keeps exercising the transport, not that
+    # separate, already-covered-elsewhere carry-forward behavior.
+    get_client().collection(CASES).document(event["case_id"]).set({
+        "case_id": event["case_id"],
+        "policy": {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                   "band": "clear", "factors_fired": [], "reasons": []},
+    })
     data = {
         "app_name": "app",
         "user_id": user_id,
@@ -196,9 +210,9 @@ def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
     outputs = [ev["output"] for ev in events if ev.get("output") is not None]
     assert outputs, "Expected the graph to produce at least one structured output"
     # The graph only ever queues the create_supplier command now — see
-    # app.nodes.queue_supplier — since the Agent Runtime engine has no public
+    # app.nodes.commit_commands — since the Agent Runtime engine has no public
     # internet path to Frappe Cloud. Execution happens outside the graph.
-    assert outputs[-1]["status"] == "command_queued"
+    assert outputs[-1]["status"] == "no_action"
     assert outputs[-1]["case_id"] == event["case_id"]
 
 

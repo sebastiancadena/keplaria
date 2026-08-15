@@ -35,6 +35,18 @@ class Thresholds(BaseModel):
     block: float = Field(ge=0.0, le=1.0)
 
 
+class LifecycleTiming(BaseModel):
+    """Clock rules for the station-keeping branches.
+
+    Versioned data rather than constants, for the same reason the scoring
+    weights are: how long before expiry a renewal may be requested, and how
+    long an overdue certificate is tolerated, are compliance decisions.
+    """
+
+    renewal_window_days: int = Field(ge=0)
+    overdue_grace_days: int = Field(ge=0)
+
+
 class Factor(BaseModel):
     id: str
     weight: float = Field(ge=0.0, le=1.0)
@@ -46,6 +58,7 @@ class Policy(BaseModel):
     policy_id: str
     policy_version: int
     thresholds: Thresholds
+    lifecycle: LifecycleTiming
     factors: list[Factor]
 
 
@@ -145,6 +158,19 @@ def _cached_policy(path: Path | None) -> Policy:
     if key not in _CACHE:
         _CACHE[key] = load_policy(path)
     return _CACHE[key]
+
+
+def lifecycle_timing(path: Path | None = None) -> LifecycleTiming:
+    """The loaded policy's timing. Total — never raises.
+
+    Fails closed: with no policy, the renewal window is zero (a renewal is
+    never "due early") and the grace period is zero (an overdue certificate
+    is never tolerated). Both directions withhold rather than grant.
+    """
+    try:
+        return _cached_policy(path).lifecycle
+    except PolicyLoadError:
+        return LifecycleTiming(renewal_window_days=0, overdue_grace_days=0)
 
 
 # --- assessment ------------------------------------------------------------

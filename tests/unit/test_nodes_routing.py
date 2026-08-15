@@ -10,10 +10,34 @@ document, so a reviewer (and verify.py) can see why a case was blocked.
 
 from __future__ import annotations
 
+import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
+
 import app.nodes as nodes_module
-from app.nodes import apply_route, quarantine_case
+from app.nodes import apply_route, commit_commands, load_case_state, quarantine_case
 from app.state.commands import get_command
 from app.state.firestore import CASES
+
+
+@pytest.fixture(scope="module")
+def span_exporter():
+    """Capture finished spans so a test can assert on span attributes.
+
+    `keplaria.nodes`'s module-level `tracer` is an OTel ProxyTracer bound at
+    import time; it delegates lazily to whatever real TracerProvider is
+    installed later via `set_tracer_provider`, which is exactly what this
+    fixture installs — no monkeypatch of `app.nodes.tracer` needed.
+    """
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+    return exporter
 
 
 class _StubContext:
@@ -27,28 +51,69 @@ class _StubContext:
         self.state = state
 
 
-def _case(case_id: str, event_type: str) -> dict:
-    return {"case_id": case_id, "event_type": event_type}
+def _case(case_id: str, event_type: str, document_ref: str | None = None) -> dict:
+    case = {"case_id": case_id, "event_type": event_type}
+    if document_ref is not None:
+        case["document_ref"] = document_ref
+    return case
 
 
-def test_valid_proposal_with_compliance_screens():
-    ctx = _StubContext({"case": _case("CASE-1", "new_supplier_packet")})
+def test_valid_proposal_with_evidence_and_compliance_reaches_evidence_first():
+    """Evidence must run — and be validated — before compliance ever sees a
+    field it extracted, so any route containing 'evidence' goes to the
+    evidence agent regardless of what else is requested, as long as the
+    event actually carries a document to extract from. validate_evidence is
+    what routes on to 'screen' afterward."""
+    ctx = _StubContext({
+        "case": _case("CASE-1", "new_supplier_packet", document_ref="fixture:x"),
+    })
+    node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "evidence"
+    assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is False
+
+
+def test_valid_proposal_with_evidence_only_reaches_evidence():
+    ctx = _StubContext({
+        "case": _case("CASE-2", "certificate_received", document_ref="fixture:x"),
+    })
+    node_input = {"route": ["evidence"], "reason": "cert received"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "evidence"
+    assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is False
+
+
+def test_evidence_and_compliance_with_no_document_falls_through_to_screening():
+    """A brand-new packet with no certificate attached yet is not a failure —
+    app.lifecycle's AWAITING_EVIDENCE branch onboards the supplier and waits
+    for a certificate to arrive later. Evidence has nothing to extract from,
+    so the case must still reach compliance screening rather than quarantine
+    at the evidence gate."""
+    ctx = _StubContext({"case": _case("CASE-7", "new_supplier_packet")})
     node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
 
     result = apply_route(node_input, ctx)
 
     assert result.actions.route == "screen"
     assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is True
 
 
-def test_valid_proposal_without_compliance_skips():
-    ctx = _StubContext({"case": _case("CASE-2", "certificate_received")})
+def test_evidence_only_with_no_document_falls_through_to_skip():
+    ctx = _StubContext({"case": _case("CASE-8", "certificate_received")})
     node_input = {"route": ["evidence"], "reason": "cert received"}
 
     result = apply_route(node_input, ctx)
 
     assert result.actions.route == "skip"
     assert result.output["refused"] is None
+    assert result.output["evidence_skipped_no_document"] is True
 
 
 def test_unknown_agent_name_is_blocked_not_skipped():
@@ -74,7 +139,7 @@ def test_empty_route_when_agents_are_required_is_blocked_not_skipped():
 def test_empty_route_when_no_agents_are_required_skips_not_blocked():
     """The crux of the fix: 'no agents required' must not collapse into
     'refused'. evidence_overdue maps to an empty ALLOWED_ROUTES set, so an
-    empty proposal is legitimate and must reach queue_supplier via 'skip',
+    empty proposal is legitimate and must reach commit_commands via 'skip',
     not be quarantined."""
     ctx = _StubContext({"case": _case("CASE-5", "evidence_overdue")})
     node_input = {"route": [], "reason": "deterministic, no agents needed"}
@@ -113,7 +178,6 @@ def test_quarantine_case_claims_no_command_but_records_the_refusal(
         "route": [],
         "reason": "hallucinated agent",
         "refused": "unknown agent: 'finance_bot'",
-        "pending_implementation": [],
     }
     ctx = _StubContext(
         {
@@ -126,13 +190,17 @@ def test_quarantine_case_claims_no_command_but_records_the_refusal(
 
     assert result.output["status"] == "quarantined"
     assert result.output["case_id"] == case_id
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None
 
     case = db.collection(CASES).document(case_id).get().to_dict()
     assert case["phase"] == "quarantined"
     assert case["routing"] == routing
-    assert case["screening"] is None
-    assert case["policy"] is None
+    # screening/policy are absent from ctx.state here (never written, not
+    # merely None) — _record_outcome must leave them unwritten rather than
+    # merge a null over anything durably stored, so they must not appear as
+    # keys at all rather than merely evaluating falsy.
+    assert "screening" not in case
+    assert "policy" not in case
 
 
 def test_quarantine_case_persists_a_malformed_screening_without_raising(
@@ -155,7 +223,6 @@ def test_quarantine_case_persists_a_malformed_screening_without_raising(
         "route": [],
         "reason": "screening malformed",
         "refused": None,
-        "pending_implementation": [],
     }
     malformed_screening = {
         "reachable": True,
@@ -181,3 +248,163 @@ def test_quarantine_case_persists_a_malformed_screening_without_raising(
         {"id": None, "score": None, "match": None},
         {"id": ["unhashable"], "score": None, "match": None},
     ]
+
+
+def test_quarantine_case_preserves_a_stored_verdict_when_state_carries_none(
+    db, case_id, monkeypatch
+):
+    """apply_route's 'blocked' branch (an unknown agent name, or a genuinely
+    empty proposal on an event type that requires one) reaches quarantine_case
+    with no 'policy' key in ctx.state at all — assess_risk never ran on this
+    path. _record_outcome used to write {'policy': None} regardless, and
+    merge=True only skips an ABSENT key, not one present with value None — so
+    it nulled the case's previously stored verdict outright. From there,
+    assess_risk's carry-forward reads no stored band, lands
+    NO_STORED_VERDICT -> blocked forever, and the executor's backstop
+    (app.executor.runner._policy_band) returns (None, None) -> every
+    permissive command refused forever: the case is permanently bricked. This
+    proves the fix leaves a previously stored verdict intact."""
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+    stored_policy = {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                      "band": "clear", "factors_fired": [], "reasons": []}
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 1, "policy": stored_policy,
+    })
+
+    routing = {
+        "proposed": ["finance_bot"],
+        "route": [],
+        "reason": "hallucinated agent",
+        "refused": "unknown agent: 'finance_bot'",
+    }
+    ctx = _StubContext(
+        {
+            "case": _case(case_id, "new_supplier_packet"),
+            "routing": routing,
+            # No "policy" key at all — this branch never reached assess_risk.
+        }
+    )
+
+    quarantine_case(None, ctx)
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert stored["policy"] == stored_policy, (
+        "a refused routing proposal must never erase a previously stored risk verdict"
+    )
+
+
+def test_a_clock_event_routes_away_from_the_coordinator(db, case_id):
+    db.collection("cases").document(case_id).set(
+        {"case_id": case_id, "lifecycle": {"state": "active", "cycle": 1}}
+    )
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "renewal_due"}})
+
+    event = load_case_state(None, ctx)
+
+    assert event.actions.route == "clock"
+    assert event.actions.state_delta["case_state"]["lifecycle"]["cycle"] == 1
+
+
+def test_a_document_event_routes_to_the_coordinator_and_loads_the_derivative(db, case_id):
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                         "document_ref": "fixture:andes-verde-cert-2028"}})
+
+    event = load_case_state(None, ctx)
+
+    assert event.actions.route == "agentic"
+    assert "2028-01-01" in event.actions.state_delta["derivative"]["pages"][0]
+
+
+def test_an_unresolvable_document_reference_does_not_raise(db, case_id):
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                         "document_ref": "fixture:nope"}})
+
+    event = load_case_state(None, ctx)
+
+    assert event.actions.state_delta["derivative"] is None, (
+        "an unreadable document must reach the grounding gate as absent "
+        "evidence, not crash the graph"
+    )
+
+
+def test_every_path_into_the_write_terminal_carries_a_verdict():
+    """The invariant the executor's backstop depends on.
+
+    If any edge reached commit_commands without passing assess_risk, a
+    command could be claimed for a case with no policy band — and the
+    executor would have to tolerate a missing verdict instead of treating it
+    as an anomaly to refuse.
+    """
+    from app.agent import root_agent
+    from app.nodes import assess_risk, commit_commands
+
+    predecessors = set()
+    for source, target in root_agent.edges:
+        targets = target.values() if isinstance(target, dict) else [target]
+        if commit_commands in targets:
+            predecessors.add(source)
+
+    assert predecessors == {assess_risk}, (
+        f"commit_commands must be reachable only from the gate; found {predecessors}"
+    )
+
+
+def test_onboarding_claims_the_create_supplier_command_at_cycle_one(db, case_id):
+    ctx = _StubContext({
+        "case": {"case_id": case_id, "event_type": "new_supplier_packet",
+                 "supplier": "Andes", "effective_date": "2026-01-01"},
+        "case_state": {},
+        "evidence": {"document_checksum": "abc123",
+                     "fields": [{"name": "certificate_expiry", "value": "2027-01-01",
+                                 "page": 0, "span": "Expiry: 2027-01-01",
+                                 "confidence": 0.9}]},
+    })
+
+    event = commit_commands(None, ctx)
+
+    assert event.output["reason"] == "ONBOARDED"
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == "pending"
+    stored = db.collection("cases").document(case_id).get().to_dict()
+    assert stored["lifecycle"]["state"] == "active"
+    assert stored["certificate"]["expiry_date"] == "2027-01-01"
+
+
+def test_a_refused_decision_claims_nothing(db, case_id):
+    db.collection("cases").document(case_id).set(
+        {"case_id": case_id, "supplier": "Andes",
+         "lifecycle": {"state": "active", "cycle": 1},
+         "certificate": {"expiry_date": "2027-01-01", "evidence_version": 1}}
+    )
+    ctx = _StubContext({
+        "case": {"case_id": case_id, "event_type": "renewal_due",
+                 "supplier": "Andes", "effective_date": "2026-06-01"},
+        "case_state": db.collection("cases").document(case_id).get().to_dict(),
+    })
+
+    event = commit_commands(None, ctx)
+
+    assert event.output["reason"] == "NOT_DUE"
+    assert get_command(db, case_id, "request_renewal", 1) is None, (
+        "a refused decision must produce zero outbox writes"
+    )
+
+
+def test_document_unavailable_span_carries_no_entity_identifying_value(
+    case_id, span_exporter
+):
+    """A document_ref deterministically names the entity it belongs to (a
+    supplier's certificate fixture), so DocumentUnavailable's message — which
+    embeds the raw ref — must never reach a span. The span attribute must be
+    exactly the exception type name, not merely 'present' or 'non-empty',
+    otherwise a regression that puts str(exc) back on the span would still
+    pass this test."""
+    span_exporter.clear()
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                         "document_ref": "fixture:nope"}})
+
+    load_case_state(None, ctx)
+
+    spans = {s.name: s for s in span_exporter.get_finished_spans()}
+    error_attr = spans["document_unavailable"].attributes["keplaria.document_error"]
+
+    assert error_attr == "DocumentUnavailable"

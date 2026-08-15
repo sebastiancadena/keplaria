@@ -12,23 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Keplaria workflow — the thin vertical.
+"""Keplaria workflow — the durable post-onboarding lifecycle graph.
 
-event → canonical parse → structured routing decision → validated branch →
-sanctions screening → deterministic risk gate → command queue. The
-coordinator proposes a route; deterministic policy code decides whether it is
-allowed, and a second deterministic node decides whether the screened
-supplier may be onboarded at all. No model output reaches a side effect
-unvalidated, and a flagged supplier never reaches the command queue.
+event → reload durable case state → classify → (agentic path only)
+structured routing decision → validated branch → grounded evidence
+extraction → sanctions screening → deterministic risk gate → command queue.
+
+load_case_state is the first node on every path. It reloads the case's
+durable lifecycle and certificate blocks from Firestore and classifies the
+inbound event as `agentic` (a human- or document-driven event: a new
+supplier packet or a received certificate) or `clock` (a scheduler-driven
+event: a renewal due date or an overdue evidence check). A clock event
+bypasses the coordinator entirely and goes straight to the risk gate — it
+carries no document and needs no delegation decision, so routing it through
+an LlmAgent would spend a model call to be told "no agents" and put a
+delegation decision in the trace that was never made.
+
+An agentic event reaches the coordinator, which proposes a route; apply_route
+validates that proposal against deterministic policy and picks the branch
+(evidence extraction, compliance screening, both, or neither). When evidence
+is routed, the Evidence agent extracts fields from the document and
+validate_evidence — a deterministic grounding check, not a model call —
+independently confirms every extracted value resolves to a verbatim span on
+the exact document supplied, bounded to one retry before quarantining. No
+model output reaches a side effect unvalidated.
+
+Every path, agentic or clock, converges on assess_risk: the deterministic
+risk gate that decides whether the case may be onboarded, renewed, or held at
+all. A flagged or otherwise non-clear case never reaches the command queue.
 
 The screening node reaches the self-hosted yente service on the private VM. It
 has no public address, so that call only succeeds when the serving workload has
 private VPC connectivity — on Agent Runtime, a PSC-I network attachment.
 
-The graph never calls the ERP itself: queue_supplier only claims the
-create_supplier command (see app/nodes.py's docstring for why — the same
-PSC-I attachment has no public internet egress). app.executor.runner, driven
-by the ingress, does the actual write.
+The graph never calls the ERP itself: commit_commands only claims the
+commands `app.lifecycle.decide` names (see app/nodes.py's docstring for why —
+the same PSC-I attachment has no public internet egress). app.executor.runner,
+driven by the ingress, does the actual write.
 """
 
 from google.adk.agents import LlmAgent
@@ -39,13 +59,15 @@ from google.genai import types
 from app.nodes import (
     apply_route,
     assess_risk,
+    commit_commands,
+    load_case_state,
     park_case,
     parse_case,
     quarantine_case,
-    queue_supplier,
     screen_supplier,
+    validate_evidence,
 )
-from app.schemas import RoutingDecision
+from app.schemas import EvidenceResult, RoutingDecision
 
 coordinator = LlmAgent(
     name="mission_coordinator",
@@ -74,31 +96,83 @@ coordinator = LlmAgent(
     disallow_transfer_to_peers=True,
 )
 
+evidence_agent = LlmAgent(
+    name="evidence_agent",
+    model="gemini-3.6-flash",
+    # {document_checksum} and {document_pages} are ADK state-template
+    # placeholders, not Python format fields — a plain str instruction is
+    # run through instructions_utils.inject_session_state, which resolves a
+    # bare {identifier} against a top-level session-state key. app.nodes
+    # .load_case_state is what populates these two keys from the derivative
+    # it loads. Without a placeholder here the model would never see the
+    # document at all: the edge into this agent carries apply_route's
+    # routing decision as its content, not the document.
+    instruction=(
+        "You extract corporate fields from a supplier document.\n\n"
+        "Document checksum: {document_checksum}\n\n"
+        "Document pages, each labeled with its zero-based index:\n"
+        "{document_pages}\n\n"
+        "Extract every field you can support, and for each one return the "
+        "verbatim span of page text the value came from.\n\n"
+        "Rules:\n"
+        "  - Copy document_checksum exactly as given above. Never alter it.\n"
+        "  - Every value MUST appear inside the span you cite, and the span "
+        "MUST appear verbatim on the page you cite. An independent validator "
+        "checks both, and an unsupported value quarantines the case.\n"
+        "  - Extract 'certificate_expiry' as an ISO date (YYYY-MM-DD).\n"
+        "  - If a field is not in the document, omit it. Never guess."
+    ),
+    output_schema=EvidenceResult,
+    output_key="evidence_result",
+    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True,
+)
+
 root_agent = Workflow(
     name="keplaria_workflow",
     edges=[
         ("START", parse_case),
-        (parse_case, coordinator),
+        (parse_case, load_case_state),
+        # The coordinator bypass: clock-driven events engage no agents, so
+        # they never reach an LlmAgent. They still pass through assess_risk,
+        # which keeps the "every write path carries a verdict" invariant.
+        (load_case_state, {"agentic": coordinator, "clock": assess_risk}),
         (coordinator, apply_route),
         # A routing-map chain element is this ADK version's syntax for a
         # conditional edge. "skip" goes to assess_risk rather than straight to
-        # queue_supplier so that EVERY path to the command queue carries a
+        # commit_commands so that EVERY path to the command queue carries a
         # policy verdict — that invariant is what lets the executor refuse a
         # case with no verdict instead of having to tolerate one.
         (
             apply_route,
             {
+                "evidence": evidence_agent,
                 "screen": screen_supplier,
                 "skip": assess_risk,
                 "blocked": quarantine_case,
             },
         ),
+        (evidence_agent, validate_evidence),
+        # The back-edge is the bounded retry: one fresh extraction, then
+        # quarantine. Verified against ADK 2.5.0 — Workflow performs no cycle
+        # validation and ctx.state persists across the loop, so the attempt
+        # counter in validate_evidence is what bounds it.
+        (
+            validate_evidence,
+            {
+                "retry": evidence_agent,
+                "screen": screen_supplier,
+                "skip": assess_risk,
+                "ungrounded": quarantine_case,
+            },
+        ),
         (screen_supplier, assess_risk),
-        # The gate. Only "clear" reaches the command queue.
+        # The gate. Only "clear" reaches the write terminal.
         (
             assess_risk,
             {
-                "clear": queue_supplier,
+                "clear": commit_commands,
                 "review": park_case,
                 "blocked": quarantine_case,
             },

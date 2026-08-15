@@ -23,6 +23,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 from app.agent import root_agent
+from app.state.firestore import CASES, get_client
 
 pytestmark = [
     pytest.mark.live,
@@ -53,6 +54,20 @@ def test_agent_stream() -> None:
     runner = Runner(agent=root_agent, session_service=session_service, app_name="test")
 
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
+    # certificate_received never populates `screening` (see app/policy.py's
+    # ALLOWED_ROUTES), so assess_risk carries the case's stored verdict
+    # forward instead of scoring fresh from screening=None — correct
+    # (re-scoring fresh would launder a blocked supplier via a mailed-in
+    # certificate), but it means a case with no prior verdict at all fails
+    # closed to `blocked` rather than reaching commit_commands. This test is
+    # about a different property (the graph produces structured output over
+    # this transport), so seed a `clear` verdict directly rather than route
+    # through a full onboarding sequence first.
+    get_client().collection(CASES).document(case_id).set({
+        "case_id": case_id,
+        "policy": {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                   "band": "clear", "factors_fired": [], "reasons": []},
+    })
     event = {
         "event_id": f"evt-{uuid.uuid4().hex[:8]}",
         "case_id": case_id,
@@ -79,7 +94,7 @@ def test_agent_stream() -> None:
     outputs = [ev.output for ev in events if ev.output is not None]
     assert outputs, "Expected the graph to produce at least one structured output"
     # The graph only ever queues the create_supplier command now — see
-    # app.nodes.queue_supplier — since the Agent Runtime engine has no public
+    # app.nodes.commit_commands — since the Agent Runtime engine has no public
     # internet path to Frappe Cloud. Execution happens outside the graph.
-    assert outputs[-1]["status"] == "command_queued"
+    assert outputs[-1]["status"] == "no_action"
     assert outputs[-1]["case_id"] == case_id

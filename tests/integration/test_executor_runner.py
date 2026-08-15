@@ -1,5 +1,5 @@
 """execute_pending_commands is what actually writes to the ERP now that the
-graph only ever queues the command (see app.nodes.queue_supplier). Its
+graph only ever queues the command (see app.nodes.commit_commands). Its
 idempotency guarantee — a DONE command is never re-driven — is the whole
 point of moving execution out of the graph without weakening the
 no-duplicate-effect contract (at-least-once delivery made safe by the
@@ -37,7 +37,7 @@ def _payload(name: str) -> dict:
 
 def test_pending_command_executes_and_reaches_done(db, case_id):
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
-    claim_command(db, case_id, "create_supplier", _payload(supplier))
+    claim_command(db, case_id, "create_supplier", 1, _payload(supplier))
     # The runner's policy guard refuses to drain any command whose case is
     # not `clear` — seed a cleared verdict so this test exercises the path
     # it was written for, not the refusal guard.
@@ -53,16 +53,16 @@ def test_pending_command_executes_and_reaches_done(db, case_id):
             "created": True,
         }
     ]
-    command = get_command(db, case_id, "create_supplier")
+    command = get_command(db, case_id, "create_supplier", 1)
     assert command["status"] == DONE
     assert command["external_id"] == supplier
 
 
 def test_done_command_is_skipped_not_reexecuted(db, case_id):
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
-    claim_command(db, case_id, "create_supplier", _payload(supplier))
+    claim_command(db, case_id, "create_supplier", 1, _payload(supplier))
     record_success(
-        db, case_id, "create_supplier", supplier, {"external_id": supplier, "created": True}
+        db, case_id, "create_supplier", 1, supplier, {"external_id": supplier, "created": True}
     )
 
     # No real Frappe call happens here at all — the DONE check short-circuits
@@ -72,7 +72,7 @@ def test_done_command_is_skipped_not_reexecuted(db, case_id):
     results = execute_pending_commands(db, case_id)
 
     assert results == [], "a DONE command must never be re-driven"
-    assert get_command(db, case_id, "create_supplier")["status"] == DONE
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == DONE
 
 
 def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
@@ -88,12 +88,16 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     call is made — create_supplier_if_absent is monkeypatched to raise
     before any network I/O happens."""
     supplier = f"TEST Supplier {uuid.uuid4().hex[:8]}"
-    claim_command(db, case_id, "create_supplier", _payload(supplier))
+    claim_command(db, case_id, "create_supplier", 1, _payload(supplier))
     # Same guard as above: without a `clear` verdict on the case, the runner
     # refuses before the monkeypatched call below is ever reached.
     db.collection(CASES).document(case_id).set({"policy": {"band": "clear", "policy_version": 1}})
 
-    def _boom(client, name):
+    def _boom(client, name, **kwargs):
+        # **kwargs absorbs the `email_id` keyword _run now always passes to
+        # create_supplier_if_absent (see app/executor/runner.py), so this
+        # stand-in still fails the way the test intends instead of a
+        # TypeError on an unexpected keyword argument.
         raise KeyError("data")
 
     monkeypatch.setattr(runner_module, "create_supplier_if_absent", _boom)
@@ -103,6 +107,6 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     assert results == [
         {"action": "create_supplier", "status": "failed", "error": "KeyError: 'data'"}
     ]
-    command = get_command(db, case_id, "create_supplier")
+    command = get_command(db, case_id, "create_supplier", 1)
     assert command["status"] == FAILED
     assert "KeyError" in command["error"]

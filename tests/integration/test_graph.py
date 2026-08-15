@@ -29,7 +29,7 @@ from google.genai import types
 
 from app.agent import app
 from app.state.commands import get_command
-from app.state.firestore import get_client
+from app.state.firestore import CASES, get_client
 
 pytestmark = [
     pytest.mark.live,
@@ -78,7 +78,7 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
     """yente is unreachable from this machine (see module docstring), so
     screening comes back `reachable=False`. Under the risk gate that fires
     SCREENING_UNAVAILABLE and lands in `review`, which routes to park_case —
-    not queue_supplier. This pins the deliberate, fail-closed behavior: an
+    not commit_commands. This pins the deliberate, fail-closed behavior: an
     unreachable screening service must park the case for a human, not queue
     an ERP write and not claim any command."""
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
@@ -97,40 +97,55 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
     assert final["case_id"] == case_id
     assert final["policy"]["band"] == "review"
 
-    command = get_command(get_client(), case_id, "create_supplier")
+    command = get_command(get_client(), case_id, "create_supplier", 1)
     assert command is None, "an unreachable screening service must claim no command"
 
 
 @pytest.mark.asyncio
 async def test_certificate_received_skips_screening():
-    """Two event types must take visibly different paths through the graph."""
+    """Two event types must take visibly different paths through the graph.
+
+    certificate_received never populates `screening` (its permitted route is
+    {evidence} only), so assess_risk carries the case's stored verdict
+    forward rather than scoring fresh — correct, since scoring fresh from
+    screening=None would launder a blocked supplier via a mailed-in
+    certificate, but it means a case with no prior verdict at all fails
+    closed to `blocked`. Seed a `clear` verdict directly so this test keeps
+    isolating the property it's named for (no compliance engagement) from
+    that separate, already-covered-elsewhere carry-forward behavior.
+    """
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
+    get_client().collection(CASES).document(case_id).set({
+        "case_id": case_id,
+        "policy": {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.0,
+                   "band": "clear", "factors_fired": [], "reasons": []},
+    })
 
     outputs = await _run(_event(case_id, "certificate_received"))
 
     screening = [o for o in outputs if isinstance(o, dict) and "reachable" in o]
     assert not screening, "certificate_received must not engage compliance"
-    assert outputs[-1]["status"] == "command_queued"
+    assert outputs[-1]["status"] == "no_action"
 
 
 @pytest.mark.asyncio
 async def test_replayed_case_does_not_reclaim_a_done_command():
     """Same fail-closed gate as the previous test: yente is unreachable from
     this machine, so every event for this case lands in `review` and parks
-    at park_case rather than ever reaching queue_supplier — there is no DONE
+    at park_case rather than ever reaching commit_commands — there is no DONE
     command here for a replay to reclaim. What this proves instead is the
     review branch's own replay idempotency: running the identical event
     twice for the same case must park it both times and must never claim a
     command on either run — a graph-wiring bug that let a replay slip past
-    park_case into queue_supplier would show up here as a stray command."""
+    park_case into commit_commands would show up here as a stray command."""
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
     db = get_client()
 
     first = await _run(_event(case_id, "new_supplier_packet"))
     assert first[-1]["status"] == "awaiting_approval"
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None
 
     second = await _run(_event(case_id, "new_supplier_packet"))
 
     assert second[-1]["status"] == "awaiting_approval"
-    assert get_command(db, case_id, "create_supplier") is None
+    assert get_command(db, case_id, "create_supplier", 1) is None

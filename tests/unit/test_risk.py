@@ -16,8 +16,10 @@ from app.risk import (
     CLEAR,
     REVIEW,
     PolicyLoadError,
+    LifecycleTiming,
     assess,
     assess_case,
+    lifecycle_timing,
     load_policy,
     reset_policy_cache,
 )
@@ -291,6 +293,7 @@ def test_candidate_above_with_no_score_key_renders_safely(tmp_path):
                 "policy_id": "test_policy",
                 "policy_version": 1,
                 "thresholds": {"review": 0.2, "block": 0.6},
+                "lifecycle": {"renewal_window_days": 35, "overdue_grace_days": 0},
                 "factors": [
                     {
                         "id": "CANDIDATE_AT_ZERO",
@@ -311,4 +314,34 @@ def test_candidate_above_with_no_score_key_renders_safely(tmp_path):
     fired = [f.id for f in verdict.factors_fired]
     assert "CANDIDATE_AT_ZERO" in fired
     assert verdict.factors_fired[0].value == "syn-co-008 @ 0.000"
+    reset_policy_cache()
+
+
+def test_the_policy_fixture_supplies_lifecycle_timing():
+    policy = load_policy()
+
+    assert policy.lifecycle.renewal_window_days == 35
+    assert policy.lifecycle.overdue_grace_days == 0
+
+
+def test_a_policy_without_lifecycle_timing_is_rejected(tmp_path):
+    broken = tmp_path / "no_lifecycle.json"
+    broken.write_text(
+        '{"policy_id": "p", "policy_version": 1, '
+        '"thresholds": {"review": 0.2, "block": 0.6}, "factors": []}'
+    )
+
+    with pytest.raises(PolicyLoadError):
+        load_policy(broken)
+
+
+def test_lifecycle_timing_is_total_and_fails_closed(tmp_path):
+    reset_policy_cache()
+    missing = tmp_path / "absent.json"
+
+    timing = lifecycle_timing(missing)
+
+    assert timing == LifecycleTiming(renewal_window_days=0, overdue_grace_days=0), (
+        "an unloadable policy must not widen the renewal window"
+    )
     reset_policy_cache()

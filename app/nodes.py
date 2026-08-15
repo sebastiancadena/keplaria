@@ -13,9 +13,13 @@ import httpx
 from google.adk.agents.context import Context
 from google.adk.events.event import Event
 from opentelemetry import trace
+from pydantic import ValidationError
 
-from app.policy import PolicyError, validate_route
-from app.risk import assess_case
+from app.documents import DocumentUnavailable, load_document
+from app.grounding import RedactedDerivative, validate as grounding_validate
+from app.lifecycle import decide
+from app.policy import CLOCK_EVENTS, PolicyError, validate_route
+from app.risk import BLOCKED, RiskVerdict, assess_case, lifecycle_timing
 from app.schemas import CanonicalEvent, ScreeningResult
 from app.state.commands import DONE, claim_command
 from app.state.firestore import CASES, get_client
@@ -73,13 +77,115 @@ def _record_outcome(
                 for c in candidates[:3]
             ],
         }
-    # merge=True rather than update(): queue_supplier/quarantine_case run
+    # merge=True rather than update(): commit_commands/quarantine_case run
     # after claim_event in production (the case doc always exists by then),
     # but integration tests that drive the graph directly without going
     # through the ingress adapter never create it — merge tolerates both.
-    db.collection(CASES).document(case_id).set(
-        {"phase": phase, "routing": routing, "screening": summary, "policy": policy},
-        merge=True,
+    #
+    # merge=True only skips a key that is ABSENT from the payload; a key
+    # present with value None still overwrites whatever is durably stored
+    # with null. Every caller of this function may legitimately lack one or
+    # more of routing/screening/policy in ctx.state (a clock event carries no
+    # routing or screening; quarantine_case/park_case can run before a policy
+    # verdict exists), and that absence must read as "nothing new to say
+    # here," never as "erase what was recorded earlier." So the payload is
+    # built from only the non-None values.
+    payload: dict = {"phase": phase}
+    if routing is not None:
+        payload["routing"] = routing
+    if summary is not None:
+        payload["screening"] = summary
+    if policy is not None:
+        payload["policy"] = policy
+    db.collection(CASES).document(case_id).set(payload, merge=True)
+
+
+def _format_pages(pages: list[str]) -> str:
+    """Render page text with explicit zero-based page markers.
+
+    The Evidence agent must cite a page index for every field it extracts,
+    and app.grounding.validate checks that index against the derivative's
+    page list — so the prompt must make the index-to-text mapping explicit,
+    not just concatenate the pages and hope the model counts correctly.
+    """
+    return "\n\n".join(f"Page {i}:\n{text}" for i, text in enumerate(pages))
+
+
+def load_case_state(node_input, ctx: Context) -> Event:
+    """Reload durable case state, then classify the event.
+
+    This is what makes a wake-up months later meaningful: the graph decides
+    from the stored lifecycle and certificate blocks, not from whatever the
+    event happens to carry.
+
+    Routing here is the coordinator bypass. A clock-driven event engages no
+    agents, so sending it to an LlmAgent would spend a model call to be told
+    'no agents' and would put a delegation decision in the trace that was
+    never made.
+
+    Also publishes the derivative as flat, top-level state keys
+    (`document_checksum`, `document_pages`) rather than only the nested
+    `derivative` dict. ADK's instruction-template state injection
+    (instructions_utils.inject_session_state) only resolves a bare
+    identifier against a top-level session-state key — it has no subscript
+    or attribute syntax for reaching into a nested dict — so evidence_agent's
+    instruction templates against these flat keys, not `{derivative}`.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+    event_type = case.get("event_type", "")
+
+    snap = get_client().collection(CASES).document(case_id).get()
+    case_state = (snap.to_dict() or {}) if snap.exists else {}
+
+    derivative = None
+    ref = case.get("document_ref")
+    if ref:
+        try:
+            derivative = load_document(ref).model_dump()
+        except DocumentUnavailable as exc:
+            # Absent evidence, not a crash: the grounding gate is the single
+            # place that decides what unusable evidence means, and it
+            # quarantines rather than proceeding.
+            #
+            # The span carries only the exception type name, never str(exc)
+            # or the ref itself: DocumentUnavailable's messages embed the raw
+            # document_ref, and in this system a document_ref deterministically
+            # names the entity it belongs to (e.g. a supplier's certificate
+            # fixture) — so it is entity-identifying data, which this
+            # project's telemetry contract keeps off spans. IDs, codes, and
+            # counts only; entity-identifying values go to Firestore, never
+            # to a span.
+            derivative = None
+            with tracer.start_as_current_span("document_unavailable") as span:
+                span.set_attribute("keplaria.case_id", case_id)
+                span.set_attribute("keplaria.document_error", type(exc).__name__)
+
+    document_checksum = ""
+    document_pages = ""
+    if derivative:
+        document_checksum = derivative.get("checksum", "")
+        document_pages = _format_pages(derivative.get("pages") or [])
+
+    route = "clock" if event_type in CLOCK_EVENTS else "agentic"
+
+    with tracer.start_as_current_span("load_case_state") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.event_class", route)
+        span.set_attribute(
+            "keplaria.lifecycle_state",
+            (case_state.get("lifecycle") or {}).get("state", "onboarding"),
+        )
+
+    return Event(
+        output={"event_class": route},
+        state={
+            "case_state": case_state,
+            "derivative": derivative,
+            "document_checksum": document_checksum,
+            "document_pages": document_pages,
+        },
+        route=route,
     )
 
 
@@ -101,19 +207,33 @@ def parse_case(node_input, ctx: Context) -> Event:
 def apply_route(node_input, ctx: Context) -> Event:
     """Validate the coordinator's proposal and pick the executable branch.
 
-    Any PolicyError blocks the case rather than skipping it: a refused
-    proposal must never reach queue_supplier. validate_route already
-    encodes the one legitimate empty route (an event type that requires no
-    agents, e.g. evidence_overdue) as a normal return rather than a raise, so
-    checking `refused is not None` here is sufficient to distinguish
-    "genuinely nothing to do" from "the proposal was rejected" without
-    duplicating the ALLOWED_ROUTES policy table in this module.
+    A remaining PolicyError still blocks the case rather than skipping it: a
+    refused proposal must never reach commit_commands. But validate_route no
+    longer raises just because the coordinator over-proposed — a known agent
+    the event type doesn't permit (e.g. `compliance` on `certificate_received`)
+    is silently dropped from the route it returns, not refused. `refused`
+    here is therefore reserved for what validate_route still does raise on:
+    an unknown agent name, or a genuinely empty proposal on an event type
+    that requires one. `dropped` records the narrowing separately, so the
+    persisted case still shows exactly what the coordinator asked for versus
+    what policy actually ran — an audit trail the earlier all-or-nothing
+    refusal didn't need, because a refusal already carried `proposed` and an
+    empty `route` was self-explanatory. A narrowed route needs the diff
+    spelled out or a reviewer can't tell "coordinator proposed exactly this"
+    from "coordinator proposed more and policy trimmed it."
 
-    The evidence agent is not built yet, so a permitted 'evidence' selection is
-    recorded and skipped rather than silently dropped.
+    Evidence only has a document to extract from when the event actually
+    carries a `document_ref`. A packet with no document is not a failure —
+    app.lifecycle's AWAITING_EVIDENCE branch onboards the supplier and waits
+    for a certificate to arrive later — so a permitted "evidence" route with
+    no document reaches the gate as if evidence had nothing to do, not as a
+    quarantine. validate_evidence's own NO_DOCUMENT path is reserved for the
+    other case: a document_ref was given and could not be loaded, which is a
+    real failure of a promise someone made.
     """
     case = ctx.state.get("case", {})
     event_type = case.get("event_type", "")
+    has_document = bool(case.get("document_ref"))
 
     proposed = list((node_input or {}).get("route", []))
     reason = (node_input or {}).get("reason", "")
@@ -121,22 +241,28 @@ def apply_route(node_input, ctx: Context) -> Event:
     try:
         route = validate_route(event_type, proposed)
         refused = None
+        dropped = [agent for agent in dict.fromkeys(proposed) if agent not in route]
     except PolicyError as exc:
         # A rejected proposal is a policy outcome the trace must show, and it
         # must never fall through to a side effect — quarantine_case is the
         # only node this can reach next.
-        route, refused = [], str(exc)
+        route, refused, dropped = [], str(exc), []
+
+    evidence_skipped_no_document = "evidence" in route and not has_document
 
     decision = {
         "proposed": proposed,
         "route": route,
+        "dropped": dropped,
         "reason": reason,
         "refused": refused,
-        "pending_implementation": [a for a in route if a == "evidence"],
+        "evidence_skipped_no_document": evidence_skipped_no_document,
     }
 
     if refused is not None:
         next_route = "blocked"
+    elif "evidence" in route and has_document:
+        next_route = "evidence"
     elif "compliance" in route:
         next_route = "screen"
     else:
@@ -145,6 +271,88 @@ def apply_route(node_input, ctx: Context) -> Event:
     return Event(
         output=decision,
         state={"routing": decision},
+        route=next_route,
+    )
+
+
+MAX_EVIDENCE_ATTEMPTS = 2
+
+
+def validate_evidence(node_input, ctx: Context) -> Event:
+    """Independently check the Evidence agent's output against the document.
+
+    A schema-valid answer is not a grounded one. Every value must resolve to
+    a verbatim span on a declared page of the exact document supplied, or the
+    case quarantines with zero writes.
+
+    The retry is bounded and explicit: one re-ask, then quarantine. The
+    back-edge to the agent is what makes the second attempt a genuinely fresh
+    extraction rather than a re-validation of the same output, and the
+    attempt counter in state is what keeps it from looping.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+    routing = ctx.state.get("routing") or {}
+    attempts = int(ctx.state.get("evidence_attempts") or 0) + 1
+
+    raw = node_input
+    if hasattr(raw, "model_dump"):
+        raw = raw.model_dump()
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            raw = {}
+
+    derivative_state = ctx.state.get("derivative")
+    with tracer.start_as_current_span("validate_evidence") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.evidence_attempt", attempts)
+
+        if not derivative_state:
+            span.set_attribute("keplaria.grounding_reason", "NO_DOCUMENT")
+            return Event(
+                output={"grounded": False, "reason": "NO_DOCUMENT"},
+                state={"evidence_attempts": attempts},
+                route="ungrounded",
+            )
+
+        try:
+            derivative = RedactedDerivative(**derivative_state)
+        except ValidationError:
+            # derivative_state is a plain dict written to session state
+            # (see load_case_state) and read back here after a round trip
+            # through ADK's session store under is_resumable=True. A
+            # malformed round trip must quarantine, not raise out of the
+            # node: the platform allows only one concurrent query, so a
+            # raising node becomes retry pressure rather than a decision.
+            # This is not a retry candidate the way an ungrounded extraction
+            # is — the corrupted value is the stored derivative itself, so a
+            # fresh Evidence Agent extraction would be validated against the
+            # exact same malformed data on the next attempt.
+            span.set_attribute("keplaria.grounding_reason", "DERIVATIVE_MALFORMED")
+            return Event(
+                output={"grounded": False, "reason": "DERIVATIVE_MALFORMED"},
+                state={"evidence_attempts": attempts},
+                route="ungrounded",
+            )
+        verdict = grounding_validate(raw if isinstance(raw, dict) else {}, derivative)
+        span.set_attribute("keplaria.grounded", verdict.grounded)
+        span.set_attribute("keplaria.grounding_reason", verdict.reason)
+
+        if not verdict.grounded:
+            route = "retry" if attempts < MAX_EVIDENCE_ATTEMPTS else "ungrounded"
+            return Event(
+                output={"grounded": False, "reason": verdict.reason,
+                        "field": verdict.field, "attempt": attempts},
+                state={"evidence_attempts": attempts},
+                route=route,
+            )
+
+    next_route = "screen" if "compliance" in (routing.get("route") or []) else "skip"
+    return Event(
+        output={"grounded": True, "attempt": attempts},
+        state={"evidence": raw, "evidence_attempts": attempts},
         route=next_route,
     )
 
@@ -267,26 +475,73 @@ def screen_supplier(node_input, ctx: Context) -> Event:
 
 
 def assess_risk(node_input, ctx: Context) -> Event:
-    """The gate. Deterministic policy decides whether the ERP command may be queued.
+    """The gate. Deterministic policy decides whether commands may be queued.
 
-    Routes on the band, never on model output. Reached from BOTH the screened
-    branch and the skip branch, so no path to queue_supplier bypasses a
-    verdict — which is what lets the executor treat a missing verdict as an
-    anomaly to refuse rather than a state it must tolerate.
+    Two modes. An event that performed its own screening is scored fresh. An
+    event that brought no screening of its own carries the stored verdict
+    forward instead.
 
-    Only factor IDs reach the span. The values that triggered them go to
-    Firestore via _record_outcome: the data handling contract keeps
-    entity-identifying values out of telemetry.
+    Carry-forward is not an optimization. Re-scoring from `screening=None`
+    fires no factors, scores zero, and lands `clear`: the passage of time
+    alone would launder a blocked supplier, and the executor's backstop
+    reads exactly this stored band. A stored band therefore carries forward
+    unchanged, and a case with no stored verdict at all is an anomaly that
+    carries `blocked`.
+
+    The condition is `screening is None`, not "is this a clock event" — an
+    earlier version of this gate conditioned on event type, which happened
+    to coincide with "no screening" for every clock event but silently
+    stopped coinciding the moment an agentic event could also reach this
+    node with no fresh screening of its own: certificate_received's route is
+    `{evidence}` only (see app/policy.py's ALLOWED_ROUTES), so it never
+    engages compliance and never populates `screening`. Scoring that fresh
+    from `screening=None` would land `clear` regardless of what the last
+    real screening found — laundering a previously blocked supplier via a
+    mailed-in certificate, which is exactly the outcome carry-forward exists
+    to prevent. Conditioning on the actual absence of screening, rather than
+    on event type as a proxy for it, covers every event that can reach this
+    node with nothing of its own to score, present or future.
+
+    Only factor IDs reach the span; the values that triggered them go to
+    Firestore via _record_outcome.
     """
     case = ctx.state.get("case", {})
     screening = ctx.state.get("screening")
+    case_state = ctx.state.get("case_state") or {}
+    carry_forward = screening is None
 
     with tracer.start_as_current_span("assess_risk") as span:
-        verdict = assess_case(screening=screening, case=case)
+        if carry_forward:
+            stored = case_state.get("policy")
+            stored = stored if isinstance(stored, dict) else {}
+            carried = True
+            if stored.get("band"):
+                try:
+                    verdict = RiskVerdict(**stored)
+                except ValidationError:
+                    # The stored block came out of a schemaless Firestore
+                    # document. A gate that raises here is worse than one that
+                    # refuses: the platform allows a single concurrent query,
+                    # so an exception becomes retry pressure instead of a
+                    # decision. Fail closed and say why.
+                    verdict = RiskVerdict(
+                        policy_id="carry_forward", policy_version=0, score=1.0,
+                        band=BLOCKED, reasons=["STORED_VERDICT_MALFORMED"],
+                    )
+            else:
+                verdict = RiskVerdict(
+                    policy_id="carry_forward", policy_version=0, score=1.0,
+                    band=BLOCKED, reasons=["NO_STORED_VERDICT"],
+                )
+        else:
+            verdict = assess_case(screening=screening, case=case)
+            carried = False
+
         span.set_attribute("keplaria.case_id", case.get("case_id", ""))
         span.set_attribute("keplaria.policy_version", verdict.policy_version)
         span.set_attribute("keplaria.risk_score", verdict.score)
         span.set_attribute("keplaria.risk_band", verdict.band)
+        span.set_attribute("keplaria.verdict_carried_forward", carried)
         span.set_attribute(
             "keplaria.factors_fired", [f.id for f in verdict.factors_fired]
         )
@@ -295,65 +550,89 @@ def assess_risk(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"policy": payload}, route=verdict.band)
 
 
-def queue_supplier(node_input, ctx: Context) -> Event:
-    """Claim the create_supplier command and stop. Never calls the ERP.
+def commit_commands(node_input, ctx: Context) -> Event:
+    """The single write terminal. Claims commands; never calls the ERP.
 
-    Reached only via the assess_risk gate's `clear` branch, so by the time
-    this node runs the case already carries a policy verdict that permits an
-    ERP command. A flagged or near-match supplier terminates at
-    quarantine_case or park_case instead and never arrives here.
+    Every path that may write converges here — onboarding and every clock
+    branch alike — so there is one place that decides what a case does next
+    and one audit record of why. Reached only via the assess_risk gate's
+    `clear` branch, so by the time this node runs the case already carries a
+    policy verdict that permits a write. A flagged or near-match supplier
+    terminates at quarantine_case or park_case instead and never arrives
+    here.
 
-    The Agent Runtime engine's PSC-I network attachment routes egress through
-    keplaria-vpc, whose Cloud NAT is ENDPOINT_TYPE_VM only — it does not cover
-    a PSC-I NIC, so the engine has a path to the private VPC (yente) but none
-    to the public internet. A Frappe Cloud call from inside this node times
-    out on TCP connect every time, deterministically; it is not a transient
-    fault to retry around.
+    The graph still never calls the ERP itself. The Agent Runtime engine's
+    PSC-I network attachment routes egress through keplaria-vpc, whose Cloud
+    NAT is ENDPOINT_TYPE_VM only — it does not cover a PSC-I NIC, so the
+    engine has a path to the private VPC (yente) but none to the public
+    internet. A Frappe Cloud call from inside this node times out on TCP
+    connect every time, deterministically; it is not a transient fault to
+    retry around.
 
     This is also the architecturally correct split, not just a network
     workaround: the ERP executor is a deterministic non-agent component and a
     separate authorization boundary from the graph. This node's only job is
-    to record the deterministic command via claim_command; the actual write
-    happens in app.executor.runner.execute_pending_commands, run from the
-    ingress (ordinary Cloud Run, normal egress) after the engine call
-    returns, and again — idempotently — on any duplicate-event redelivery.
+    to record each deterministic command `decide()` names via claim_command;
+    the actual write happens in app.executor.runner.execute_pending_commands,
+    run from the ingress (ordinary Cloud Run, normal egress) after the engine
+    call returns, and again — idempotently — on any duplicate-event
+    redelivery.
+
+    A decision with zero commands (a refusal — e.g. NOT_DUE, ALREADY_HELD)
+    must write nothing to the outbox: only the lifecycle/certificate blocks
+    and the outcome summary are persisted, exactly like quarantine_case and
+    park_case.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
-    supplier = case.get("supplier", "")
+    case_state = ctx.state.get("case_state") or {}
+
+    decision = decide(
+        case_state=case_state or {"supplier": case.get("supplier")},
+        event=case,
+        evidence=ctx.state.get("evidence"),
+        timing=lifecycle_timing(),
+    )
 
     db = get_client()
-    payload = {"supplier_name": supplier, "country": "Colombia"}
+    claimed: list[dict] = []
 
-    with tracer.start_as_current_span("queue_supplier") as span:
+    with tracer.start_as_current_span("commit_commands") as span:
         span.set_attribute("keplaria.case_id", case_id)
-        claim = claim_command(db, case_id, "create_supplier", payload)
+        span.set_attribute("keplaria.lifecycle_reason", decision.reason)
+        span.set_attribute("keplaria.lifecycle_state", decision.state)
+        span.set_attribute("keplaria.cycle", decision.cycle)
+        span.set_attribute(
+            "keplaria.commands", [c.action for c in decision.commands]
+        )
 
-        if not claim.acquired and claim.status == DONE:
-            span.set_attribute("keplaria.command_replayed", True)
-            _record_outcome(
-                db,
-                case_id,
-                "executed",
-                ctx.state.get("routing"),
-                ctx.state.get("screening"),
-                ctx.state.get("policy"),
+        for command in decision.commands:
+            claim = claim_command(
+                db, case_id, command.action, decision.cycle, command.payload
             )
-            return Event(
-                output={
-                    "status": "already_executed",
-                    "case_id": case_id,
-                    "external_id": claim.external_id,
-                    "screening": ctx.state.get("screening"),
-                    "routing": ctx.state.get("routing"),
-                }
-            )
+            claimed.append({
+                "action": command.action,
+                "cycle": decision.cycle,
+                "status": "already_done" if (not claim.acquired and claim.status == DONE)
+                else "queued",
+                "external_id": claim.external_id,
+            })
 
-        span.set_attribute("keplaria.command_queued", True)
+        lifecycle_block = {
+            "state": decision.state,
+            "cycle": decision.cycle,
+            "last_effective_date": case.get("effective_date"),
+            "last_reason": decision.reason,
+        }
+        update = {"lifecycle": lifecycle_block}
+        if decision.certificate is not None:
+            update["certificate"] = decision.certificate
+
+        db.collection(CASES).document(case_id).set(update, merge=True)
         _record_outcome(
             db,
             case_id,
-            "queued",
+            "committed" if decision.commands else "no_action",
             ctx.state.get("routing"),
             ctx.state.get("screening"),
             ctx.state.get("policy"),
@@ -361,9 +640,11 @@ def queue_supplier(node_input, ctx: Context) -> Event:
 
     return Event(
         output={
-            "status": "command_queued",
+            "status": "committed" if decision.commands else "no_action",
             "case_id": case_id,
-            "screening": ctx.state.get("screening"),
-            "routing": ctx.state.get("routing"),
+            "reason": decision.reason,
+            "state": decision.state,
+            "cycle": decision.cycle,
+            "commands": claimed,
         }
     )
