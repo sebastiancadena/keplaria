@@ -101,6 +101,21 @@ echo "== Agent Runtime deploy preconditions =="
 grep -qE '^policy/?$' .gcloudignore \
   && bad ".gcloudignore excludes policy/ — the runtime-required fixture would not ship, every case fails closed" \
   || ok "policy/ is not excluded from the deploy package"
+# .gcloudignore controls the Cloud Build source upload; it does not control
+# what lands inside the image — only the Dockerfile's COPY list does that.
+# policy/ and fixtures/ live outside app/ (see app/risk.py DEFAULT_POLICY_PATH,
+# app/documents.py FIXTURE_ROOT), so an unmodified `COPY ./app ./app`-only
+# Dockerfile ships neither: load_policy() fails closed to blocked, and
+# load_document() raises DocumentUnavailable on every documented event,
+# quarantining the case before screening ever runs. Caught live on 2026-08-14
+# — the deployed engine quarantined a lifecycle harness run at step 1 with
+# zero indication in Firestore beyond "DocumentUnavailable" on a trace span.
+grep -qE '^\s*COPY\s+\./policy\s+\./policy\s*$' Dockerfile \
+  && ok "Dockerfile copies policy/ into the image" \
+  || bad "Dockerfile does not COPY ./policy ./policy — load_policy() fails closed on every deployed case"
+grep -qE '^\s*COPY\s+\./fixtures\s+\./fixtures\s*$' Dockerfile \
+  && ok "Dockerfile copies fixtures/ into the image" \
+  || bad "Dockerfile does not COPY ./fixtures ./fixtures — load_document() raises DocumentUnavailable on every deployed case with a document_ref"
 gcloud compute network-attachments describe keplaria-psc2 --region=us-central1 \
   --project=keplaria >/dev/null 2>&1 \
   && ok "network attachment keplaria-psc2" || bad "keplaria-psc2 missing (PSC-I → yente will fail)"

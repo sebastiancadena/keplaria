@@ -26,6 +26,17 @@ COPY ./pyproject.toml ./README.md ./uv.lock* ./
 
 COPY ./app ./app
 
+# app/risk.py's DEFAULT_POLICY_PATH resolves to policy/supplier_risk.v1.json
+# and app/documents.py's FIXTURE_ROOT resolves to fixtures/documents/ at
+# runtime — both outside app/. .gcloudignore controls what reaches the build
+# context, but it is this COPY list that decides what actually lands in the
+# image; omitting either directory here means load_policy() and
+# load_document() both fail closed (DocumentUnavailable -> quarantine,
+# POLICY_UNAVAILABLE -> blocked) on every case that reaches them, silently,
+# because .gcloudignore alone does not catch it.
+COPY ./policy ./policy
+COPY ./fixtures ./fixtures
+
 RUN uv sync --frozen
 
 ARG AGENT_VERSION=0.0.0
