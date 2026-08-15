@@ -494,11 +494,9 @@ def apply_compliance(node_input, ctx: Context) -> Event:
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
     screening = ctx.state.get("screening") or {}
-    known_ids = {
-        c.get("id")
-        for c in (screening.get("candidates") or [])
-        if isinstance(c, dict)
-    }
+    raw_candidates = screening.get("candidates")
+    candidates = raw_candidates if isinstance(raw_candidates, list) else []
+    known_ids = {c.get("id") for c in candidates if isinstance(c, dict)}
 
     raw = node_input
     if hasattr(raw, "model_dump"):

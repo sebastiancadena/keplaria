@@ -93,3 +93,14 @@ def test_apply_compliance_rejects_unparseable_input():
     assert result.output["valid"] is False
     assert result.output["invalid_reason"] == "UNPARSEABLE"
     assert result.actions.state_delta["compliance"]["valid"] is False
+
+
+def test_apply_compliance_handles_non_list_candidates_without_raising():
+    screening = _screening_state()
+    screening["candidates"] = 1
+    ctx = _StubContext({"case": {"case_id": "TEST-AC-5"}, "screening": screening})
+
+    result = apply_compliance(_assessment(), ctx)
+
+    assert result.output["valid"] is False
+    assert result.output["invalid_reason"] == "UNKNOWN_CANDIDATE_ID"
