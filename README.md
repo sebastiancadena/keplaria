@@ -97,13 +97,19 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 36 read-only checks covering toolchain, auth,
+- `scripts/doctor.sh` — 45 read-only checks covering toolchain, auth,
   provisioned infra, and the event-flow wiring (topic, push subscription
   OIDC, ingress auth, concurrency/maxScale, retry policy).
-- `spikes/thin_vertical/verify.py` — proves the vertical end to end against
-  the deployed engine and ingress, and writes
-  `spikes/thin_vertical/evidence.json`. This is the current post-deploy
-  verification script — see [Deploying](#deploying-to-agent-runtime).
+- `spikes/lifecycle/harness.py` — drives the full five-step station-keeping
+  lifecycle (onboarding, early renewal check, renewal request, overdue hold,
+  renewed evidence and hold release) against the deployed engine and ingress,
+  and writes `spikes/lifecycle/evidence.json`. This is the current
+  post-deploy verification script — see
+  [Deploying](#deploying-to-agent-runtime). The committed evidence is one
+  five-step deployed lifecycle run with all five steps passing.
+- `spikes/thin_vertical/verify.py` — the narrower single-event vertical
+  (event → route → screen → ERP write), superseded by the lifecycle harness
+  as the post-deploy check but still runnable.
 
 ## Setup from a fresh clone
 
@@ -368,9 +374,12 @@ agents-cli deploy --project keplaria --region us-central1 \
 `--project` is required in non-interactive use — without it, `agents-cli`
 falls back to an interactive project picker.
 
-Verify afterwards with `uv run python spikes/thin_vertical/verify.py`, which
-proves the event-to-ERP vertical end to end against the deployed engine and
-ingress, and writes `spikes/thin_vertical/evidence.json`.
+Verify afterwards with
+`uv run --env-file .env python spikes/lifecycle/harness.py`, which drives the
+full five-step station-keeping lifecycle against the deployed engine and
+ingress, and writes `spikes/lifecycle/evidence.json`.
+`spikes/thin_vertical/verify.py` remains as the narrower single-event
+vertical check.
 
 `spikes/agent_runtime/spike.py` and `spikes/hitl_resume/spike.py` are
 point-in-time records from when the graph still paused mid-run on a public
