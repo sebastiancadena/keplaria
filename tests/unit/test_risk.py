@@ -46,12 +46,13 @@ def policy():
 
 def test_shipped_fixture_parses_and_registers_every_kind(policy):
     assert policy.policy_id == "supplier_risk"
-    assert policy.policy_version == 1
+    assert policy.policy_version == 2
     assert policy.thresholds.review <= policy.thresholds.block
     assert {f.id for f in policy.factors} == {
         "SANCTIONS_MATCH",
         "SUBTHRESHOLD_CANDIDATE",
         "SCREENING_UNAVAILABLE",
+        "DOCUMENT_INJECTION",
     }
 
 
@@ -345,3 +346,54 @@ def test_lifecycle_timing_is_total_and_fails_closed(tmp_path):
         "an unloadable policy must not widen the renewal window"
     )
     reset_policy_cache()
+
+
+def test_a_case_flag_factor_fires_from_case_state():
+    policy = load_policy()
+    verdict = assess(policy, screening=_screening(), case={**CASE, "document_tainted": True})
+
+    assert verdict.band == BLOCKED
+    assert "DOCUMENT_INJECTION" in [f.id for f in verdict.factors_fired]
+
+
+def test_a_case_flag_factor_does_not_fire_on_a_clean_case():
+    policy = load_policy()
+    verdict = assess(policy, screening=_screening(), case=CASE)
+
+    assert verdict.band == CLEAR
+    assert "DOCUMENT_INJECTION" not in [f.id for f in verdict.factors_fired]
+
+
+def test_a_case_flag_factor_fires_even_with_no_screening():
+    """Screening-kind factors are meaningless without a screen; a case-state
+    fact is not. Gating case-kind factors on `screening is not None` would make
+    a document fact invisible on every event type that never screens."""
+    policy = load_policy()
+    verdict = assess(policy, screening=None, case={**CASE, "document_tainted": True})
+
+    assert verdict.band == BLOCKED
+    assert "DOCUMENT_INJECTION" in [f.id for f in verdict.factors_fired]
+
+
+def test_screening_factors_still_do_not_fire_when_screening_is_absent():
+    """The guard this change must not break. `screening is None` means the
+    event never required a screen — it is not a failed screen, and firing
+    SCREENING_UNAVAILABLE against it would penalise every clock event."""
+    policy = load_policy()
+    verdict = assess(policy, screening=None, case=CASE)
+
+    assert verdict.factors_fired == []
+    assert verdict.band == CLEAR
+
+
+def test_the_injection_factor_alone_exceeds_the_block_threshold():
+    """Weight 1.00 against a 0.60 block threshold: the factor must be
+    sufficient on its own, not merely contributory."""
+    policy = load_policy()
+    factor = next(f for f in policy.factors if f.id == "DOCUMENT_INJECTION")
+
+    assert factor.weight >= policy.thresholds.block
+
+
+def test_the_default_policy_is_version_2():
+    assert load_policy().policy_version == 2

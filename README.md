@@ -47,7 +47,7 @@ proposes a route; `app/policy.py` decides whether it is permitted, and a
 refused proposal routes to a `quarantine_case` terminal that performs no
 command claim and no ERP write. Screening results then pass through a second,
 independent gate: `app/risk.py` scores the case against a versioned policy
-fixture (`policy/supplier_risk.v1.json`) and returns one of three bands.
+fixture (`policy/supplier_risk.v2.json`) and returns one of three bands.
 `clear` queues the ERP command; `review` parks the case as
 `awaiting_approval`; `blocked` quarantines it. A supplier yente flags as a
 match scores at or above the block threshold and never reaches the command

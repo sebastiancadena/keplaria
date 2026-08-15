@@ -23,7 +23,7 @@ CLEAR = "clear"
 REVIEW = "review"
 BLOCKED = "blocked"
 
-DEFAULT_POLICY_PATH = Path(__file__).resolve().parent.parent / "policy" / "supplier_risk.v1.json"
+DEFAULT_POLICY_PATH = Path(__file__).resolve().parent.parent / "policy" / "supplier_risk.v2.json"
 
 
 class PolicyLoadError(ValueError):
@@ -81,7 +81,7 @@ class RiskVerdict(BaseModel):
 # Each returns (fired, value_description). `value_description` is persisted to
 # Firestore only, never to a span attribute.
 
-def _screening_match(params: dict, screening: dict) -> tuple[bool, str]:
+def _screening_match(params: dict, screening: dict, case: dict) -> tuple[bool, str]:
     flagged = screening.get("flagged") or []
     if not flagged:
         return False, ""
@@ -90,7 +90,7 @@ def _screening_match(params: dict, screening: dict) -> tuple[bool, str]:
     return True, f"{top} @ {scores.get(top, 0.0):.3f}"
 
 
-def _screening_candidate_above(params: dict, screening: dict) -> tuple[bool, str]:
+def _screening_candidate_above(params: dict, screening: dict, case: dict) -> tuple[bool, str]:
     floor = params["score"]
     above = [c for c in screening.get("candidates") or [] if (c.get("score") or 0.0) >= floor]
     if not above:
@@ -99,19 +99,41 @@ def _screening_candidate_above(params: dict, screening: dict) -> tuple[bool, str
     return True, f"{top.get('id')} @ {(top.get('score') or 0.0):.3f}"
 
 
-def _screening_unreachable(params: dict, screening: dict) -> tuple[bool, str]:
+def _screening_unreachable(params: dict, screening: dict, case: dict) -> tuple[bool, str]:
     if screening.get("reachable") is False:
         return True, screening.get("error") or "screening service did not answer"
     return False, ""
 
 
-CONDITION_KINDS: dict[str, Callable[[dict, dict], tuple[bool, str]]] = {
+def _case_flag(params: dict, screening: dict, case: dict) -> tuple[bool, str]:
+    """Fire on a boolean fact about the case itself rather than about a screen.
+
+    Deliberately reads only `is True`, not truthiness: this decides a block,
+    and a stray non-empty string arriving from a schemaless document must not
+    be read as an assertion nobody made.
+    """
+    flag = params.get("flag", "")
+    if case.get(flag) is True:
+        return True, flag
+    return False, ""
+
+
+CONDITION_KINDS: dict[str, Callable[[dict, dict, dict], tuple[bool, str]]] = {
     "screening_match": _screening_match,
     "screening_candidate_above": _screening_candidate_above,
     "screening_unreachable": _screening_unreachable,
+    "case_flag": _case_flag,
 }
 
 _REQUIRED_PARAMS = {"screening_candidate_above": ("score",)}
+
+# Kinds that describe a screen. They are meaningless without one, so they are
+# skipped when screening is None — which means "this event never required a
+# screen", NOT "the screen failed" (that fires SCREENING_UNAVAILABLE). Every
+# other kind describes the case itself and is evaluated unconditionally.
+SCREENING_KINDS = frozenset({
+    "screening_match", "screening_candidate_above", "screening_unreachable",
+})
 
 
 # --- loading ---------------------------------------------------------------
@@ -141,6 +163,8 @@ def load_policy(path: Path | None = None) -> Policy:
         for param in _REQUIRED_PARAMS.get(kind, ()):
             if not isinstance(factor.when.get(param), (int, float)):
                 raise PolicyLoadError(f"factor {factor.id}: {kind} needs a numeric {param!r}")
+        if kind == "case_flag" and not isinstance(factor.when.get("flag"), str):
+            raise PolicyLoadError(f"factor {factor.id}: case_flag needs a string 'flag'")
 
     return policy
 
@@ -257,9 +281,10 @@ def assess(policy: Policy, *, screening: dict | None, case: dict) -> RiskVerdict
     `ValidationError` on an out-of-range score, which would violate the
     total-function contract this docstring opens with.
 
-    `case` is accepted but not yet read by any condition kind: it is reserved
-    for the case-state factors the fixture schema leaves room for (see
-    Factor.when), not dead weight to be dropped.
+    `case` is read by case-kind condition kinds (e.g. `case_flag`), which
+    describe a fact about the case rather than about a screen and so are
+    evaluated unconditionally — unlike the kinds in SCREENING_KINDS, which
+    are skipped when `screening is None`.
     """
     if screening is not None and (not isinstance(screening, dict) or _is_malformed(screening)):
         return RiskVerdict(
@@ -271,12 +296,13 @@ def assess(policy: Policy, *, screening: dict | None, case: dict) -> RiskVerdict
         )
 
     fired: list[FiredFactor] = []
-    if screening is not None:
-        for factor in policy.factors:
-            kind = factor.when["kind"]
-            hit, value = CONDITION_KINDS[kind](factor.when, screening)
-            if hit:
-                fired.append(FiredFactor(id=factor.id, weight=factor.weight, value=value))
+    for factor in policy.factors:
+        kind = factor.when["kind"]
+        if kind in SCREENING_KINDS and screening is None:
+            continue
+        hit, value = CONDITION_KINDS[kind](factor.when, screening or {}, case or {})
+        if hit:
+            fired.append(FiredFactor(id=factor.id, weight=factor.weight, value=value))
 
     score = min(1.0, round(sum(f.weight for f in fired), 6))
     return RiskVerdict(

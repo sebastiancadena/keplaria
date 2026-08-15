@@ -96,7 +96,7 @@ def test_new_supplier_packet_always_carries_real_screening(case_id):
     result = assess_risk(None, ctx)
 
     assert result.actions.route == "clear"
-    assert result.output["policy_version"] == 1
+    assert result.output["policy_version"] == 2
 
 
 def test_certificate_received_with_no_screening_carries_forward_instead_of_clear():

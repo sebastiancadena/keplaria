@@ -1,0 +1,32 @@
+{
+  "policy_id": "supplier_risk",
+  "policy_version": 2,
+  "thresholds": { "review": 0.20, "block": 0.60 },
+  "lifecycle": { "renewal_window_days": 35, "overdue_grace_days": 0 },
+  "factors": [
+    {
+      "id": "SANCTIONS_MATCH",
+      "weight": 0.70,
+      "description": "yente returned a confirmed match for the legal entity.",
+      "when": { "kind": "screening_match" }
+    },
+    {
+      "id": "SUBTHRESHOLD_CANDIDATE",
+      "weight": 0.25,
+      "description": "A near-match a human should adjudicate.",
+      "when": { "kind": "screening_candidate_above", "score": 0.50 }
+    },
+    {
+      "id": "SCREENING_UNAVAILABLE",
+      "weight": 0.30,
+      "description": "Screening was attempted and the service did not answer.",
+      "when": { "kind": "screening_unreachable" }
+    },
+    {
+      "id": "DOCUMENT_INJECTION",
+      "weight": 1.00,
+      "description": "The supplied document carried machine-directed instructions.",
+      "when": { "kind": "case_flag", "flag": "document_tainted" }
+    }
+  ]
+}
