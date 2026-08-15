@@ -150,6 +150,23 @@ def test_overdue_after_the_certificate_already_arrived_is_superseded():
     )
 
 
+def test_overdue_when_a_renewal_was_never_requested_is_not_applicable():
+    """ONBOARDING is the state renewal_due's analogous non-ACTIVE branch
+    already calls NOT_APPLICABLE — nothing was superseded here because no
+    renewal was ever requested for this case, so the two clock branches must
+    agree on vocabulary for 'this event has nothing to do' rather than one of
+    them claiming a supersession that never happened."""
+    decision = decide(
+        case_state=_case(ONBOARDING),
+        event=_event("evidence_overdue", "2027-01-15"),
+        evidence=None,
+        timing=TIMING,
+    )
+
+    assert decision.commands == []
+    assert decision.reason == "NOT_APPLICABLE"
+
+
 def test_a_renewed_certificate_advances_the_cycle_and_releases_the_hold():
     decision = decide(
         case_state=_case(HELD, cycle=1, expiry="2027-01-01"),

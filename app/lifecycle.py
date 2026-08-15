@@ -175,10 +175,19 @@ def decide(
     if event_type == "evidence_overdue":
         if state == HELD:
             return no_op("ALREADY_HELD")
-        if state != RENEWAL_REQUESTED:
-            # A certificate arrived and moved the case on; a late overdue
-            # event must not hold a supplier who already renewed.
+        if state == ACTIVE:
+            # A certificate arrived and moved the case on past the overdue
+            # event; the only way to reach ACTIVE from here is a prior
+            # certificate_received advancing the case, so something was
+            # genuinely superseded.
             return no_op("SUPERSEDED")
+        if state != RENEWAL_REQUESTED:
+            # A renewal was never requested for this case (e.g. still
+            # ONBOARDING) — there is nothing an overdue event could have
+            # superseded, so this mirrors renewal_due's NOT_APPLICABLE for
+            # the analogous situation rather than claiming a supersession
+            # that never happened.
+            return no_op("NOT_APPLICABLE")
         if expiry is None:
             return no_op("NO_CERTIFICATE")
         if on <= expiry + timedelta(days=timing.overdue_grace_days):
