@@ -190,3 +190,27 @@ def test_absent_evidence_quarantines_immediately():
                 "derivative": None, "routing": {"route": ["evidence"]}})
 
     assert validate_evidence({}, ctx).actions.route == "ungrounded"
+
+
+def test_a_malformed_derivative_quarantines_instead_of_raising():
+    """derivative_state is a plain dict written to session state by
+    load_case_state and read back here after a round trip through ADK's
+    session store under is_resumable=True. A round trip that comes back
+    missing a field RedactedDerivative requires (here: 'pages') must
+    quarantine, not raise out of the node — the platform allows only one
+    concurrent query, so a raising node becomes retry pressure instead of a
+    decision. Matches the pattern already used for a malformed stored risk
+    verdict in assess_risk (see test_a_clock_event_with_a_malformed_stored_
+    verdict_fails_closed in test_nodes_risk.py)."""
+    malformed_derivative = {"checksum": "abc123"}  # missing the required "pages"
+    good = {"document_checksum": "abc123",
+            "fields": [{"name": "certificate_expiry", "value": "2027-01-01",
+                        "page": 0, "span": "Expiry: 2027-01-01", "confidence": 0.9}]}
+
+    ctx = _StubContext({"case": {"case_id": "C1", "event_type": "certificate_received"},
+                "derivative": malformed_derivative, "routing": {"route": ["evidence"]}})
+
+    event = validate_evidence(good, ctx)  # must not raise
+
+    assert event.actions.route == "ungrounded"
+    assert event.output["reason"] == "DERIVATIVE_MALFORMED"

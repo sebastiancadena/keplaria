@@ -208,7 +208,7 @@ def apply_route(node_input, ctx: Context) -> Event:
     """Validate the coordinator's proposal and pick the executable branch.
 
     A remaining PolicyError still blocks the case rather than skipping it: a
-    refused proposal must never reach queue_supplier. But validate_route no
+    refused proposal must never reach commit_commands. But validate_route no
     longer raises just because the coordinator over-proposed — a known agent
     the event type doesn't permit (e.g. `compliance` on `certificate_received`)
     is silently dropped from the route it returns, not refused. `refused`
@@ -317,7 +317,25 @@ def validate_evidence(node_input, ctx: Context) -> Event:
                 route="ungrounded",
             )
 
-        derivative = RedactedDerivative(**derivative_state)
+        try:
+            derivative = RedactedDerivative(**derivative_state)
+        except ValidationError:
+            # derivative_state is a plain dict written to session state
+            # (see load_case_state) and read back here after a round trip
+            # through ADK's session store under is_resumable=True. A
+            # malformed round trip must quarantine, not raise out of the
+            # node: the platform allows only one concurrent query, so a
+            # raising node becomes retry pressure rather than a decision.
+            # This is not a retry candidate the way an ungrounded extraction
+            # is — the corrupted value is the stored derivative itself, so a
+            # fresh Evidence Agent extraction would be validated against the
+            # exact same malformed data on the next attempt.
+            span.set_attribute("keplaria.grounding_reason", "DERIVATIVE_MALFORMED")
+            return Event(
+                output={"grounded": False, "reason": "DERIVATIVE_MALFORMED"},
+                state={"evidence_attempts": attempts},
+                route="ungrounded",
+            )
         verdict = grounding_validate(raw if isinstance(raw, dict) else {}, derivative)
         span.set_attribute("keplaria.grounded", verdict.grounded)
         span.set_attribute("keplaria.grounding_reason", verdict.reason)
