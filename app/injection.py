@@ -27,9 +27,9 @@ from pydantic import BaseModel
 
 # Patterns target text that addresses a machine READER rather than describing
 # the entity the document is about. A certificate states facts; it never tells
-# its reader what to report or what to conceal. Each id is stable and appears
-# in the persisted audit record, so a false positive is diagnosable without
-# quoting the payload back.
+# its reader what to report or what to conceal. Each id is stable and will be
+# included in the persisted audit record by downstream tasks, making false
+# positives diagnosable without quoting the payload back.
 PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "IGNORE_PRIOR_INSTRUCTIONS",
@@ -45,13 +45,13 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     (
         "DICTATES_OUTPUT",
-        re.compile(r"\byou\s+must\s+(?:report|return|output|extract|state)\b", re.I),
+        re.compile(r"(?:\w+_\w+)\s+you\s+must\s+(?:report|return|output|extract|state)\b", re.I),
     ),
     (
         "DEMANDS_CONCEALMENT",
         re.compile(
-            r"\bdo\s+not\s+(?:mention|reveal|disclose|report)\b.{0,40}\b"
-            r"(?:note|instruction|this)\b",
+            r"\bdo\s+not\s+(?:mention|reveal|disclose|report)\b.*?"
+            r"(?:in\s+your\s+)?(?:output|response|answer|return|extraction|analysis)\b",
             re.I,
         ),
     ),

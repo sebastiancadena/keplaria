@@ -94,3 +94,32 @@ def test_an_empty_document_is_not_tainted():
     """Distinct from malformed: a document with no pages is absent evidence,
     which the grounding gate already handles, not a hostile one."""
     assert scan([]).tainted is False
+
+
+def test_confidentiality_notice_is_not_tainted():
+    """Ordinary NDA-style confidentiality clauses are human-directed, not
+    machine-directed instructions. This certificate's boilerplate must not
+    trigger the scanner, or every legitimate document gets quarantined."""
+    verdict = scan(["This certificate is confidential. Do not disclose this document to third parties without written consent."])
+
+    assert verdict.tainted is False
+    assert verdict.findings == []
+
+
+def test_holder_obligations_are_not_tainted():
+    """Requirements on the certificate holder ('you must state...') address
+    humans, not machines. The scanner targets machine-directed instructions."""
+    verdict = scan(["You must state your business registration number upon request."])
+
+    assert verdict.tainted is False
+    assert verdict.findings == []
+
+
+def test_a_realistic_certificate_with_boilerplate_is_not_tainted():
+    """A real certificate may include both confidentiality clauses and holder
+    obligations. The false-positive control must be rich enough to exercise
+    this scenario."""
+    verdict = scan(_pages("boilerplate-cert-clean"))
+
+    assert verdict.tainted is False
+    assert verdict.findings == []
