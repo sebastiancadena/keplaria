@@ -12,14 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Keplaria workflow — the thin vertical.
+"""Keplaria workflow — the durable post-onboarding lifecycle graph.
 
-event → canonical parse → structured routing decision → validated branch →
-sanctions screening → deterministic risk gate → command queue. The
-coordinator proposes a route; deterministic policy code decides whether it is
-allowed, and a second deterministic node decides whether the screened
-supplier may be onboarded at all. No model output reaches a side effect
-unvalidated, and a flagged supplier never reaches the command queue.
+event → reload durable case state → classify → (agentic path only)
+structured routing decision → validated branch → grounded evidence
+extraction → sanctions screening → deterministic risk gate → command queue.
+
+load_case_state is the first node on every path. It reloads the case's
+durable lifecycle and certificate blocks from Firestore and classifies the
+inbound event as `agentic` (a human- or document-driven event: a new
+supplier packet or a received certificate) or `clock` (a scheduler-driven
+event: a renewal due date or an overdue evidence check). A clock event
+bypasses the coordinator entirely and goes straight to the risk gate — it
+carries no document and needs no delegation decision, so routing it through
+an LlmAgent would spend a model call to be told "no agents" and put a
+delegation decision in the trace that was never made.
+
+An agentic event reaches the coordinator, which proposes a route; apply_route
+validates that proposal against deterministic policy and picks the branch
+(evidence extraction, compliance screening, both, or neither). When evidence
+is routed, the Evidence agent extracts fields from the document and
+validate_evidence — a deterministic grounding check, not a model call —
+independently confirms every extracted value resolves to a verbatim span on
+the exact document supplied, bounded to one retry before quarantining. No
+model output reaches a side effect unvalidated.
+
+Every path, agentic or clock, converges on assess_risk: the deterministic
+risk gate that decides whether the case may be onboarded, renewed, or held at
+all. A flagged or otherwise non-clear case never reaches the command queue.
 
 The screening node reaches the self-hosted yente service on the private VM. It
 has no public address, so that call only succeeds when the serving workload has
