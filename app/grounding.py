@@ -14,7 +14,7 @@ Reason codes emitted by validate():
 - PAGE_OUT_OF_RANGE: page index out of bounds
 - SPAN_NOT_FOUND: span does not appear in page
 - VALUE_NOT_IN_SPAN: value does not appear in span (or for DATE_FIELDS, value
-  does not match the extracted date, or no ISO date appears in span)
+  does not match the single ISO date extracted from the span)
 - CONFIDENCE_OUT_OF_RANGE: confidence outside [0, 1]
 - VALUE_NOT_A_DATE: value is in span but is not a valid ISO date
 - AMBIGUOUS_SPAN: span contains multiple distinct dates (DATE_FIELDS only)
