@@ -66,3 +66,34 @@ class ScreeningResult(BaseModel):
     candidates: list[dict] = []
     flagged: list[str] = []
     error: str | None = None
+
+
+class CandidateAssessment(BaseModel):
+    """The Compliance agent's reading of one screening candidate."""
+
+    candidate_id: str = Field(
+        description="The candidate id from the screening result, copied exactly."
+    )
+    relevant: bool = Field(
+        description="Whether this candidate plausibly refers to the supplier."
+    )
+    reasoning: str = Field(description="One or two sentences of justification.")
+
+
+class ComplianceAssessment(BaseModel):
+    """The Compliance agent's structured output. Checked by app.nodes.apply_compliance.
+
+    `recommendation` stays a plain string: the allowed vocabulary is enforced
+    deterministically by the validator so an out-of-vocabulary value becomes a
+    recorded invalid assessment (fail closed), not a hard schema error.
+    """
+
+    assessments: list[CandidateAssessment] = Field(
+        description="One entry per screening candidate considered."
+    )
+    recommendation: str = Field(
+        description=(
+            "One of 'corroborate_block', 'escalate_review', 'note_clear'."
+        )
+    )
+    rationale: str = Field(description="Overall human-readable justification.")
