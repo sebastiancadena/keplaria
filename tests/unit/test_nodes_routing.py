@@ -452,6 +452,56 @@ def test_document_unavailable_span_carries_no_entity_identifying_value(
     assert error_attr == "DocumentUnavailable"
 
 
+def test_a_tainted_document_skips_evidence_but_still_screens(case_id):
+    """An injected certificate is itself a fraud signal — the entity still gets
+    screened. Skipping straight to a terminal would throw away the screening
+    record for exactly the case most worth having one."""
+    ctx = _StubContext({
+        "case": _case(case_id, "new_supplier_packet", "fixture:manglar-cert-injected"),
+        "document_tainted": True,
+    })
+
+    event = apply_route({"route": ["evidence", "compliance"], "reason": "new supplier"}, ctx)
+
+    assert event.actions.route == "screen"
+    assert event.output["evidence_skipped_tainted_document"] is True
+    assert event.output["refused"] is None, "taint is not a routing failure"
+
+
+def test_a_tainted_document_on_an_evidence_only_event_skips_to_the_gate(case_id):
+    ctx = _StubContext({
+        "case": _case(case_id, "certificate_received", "fixture:manglar-cert-injected"),
+        "document_tainted": True,
+    })
+
+    event = apply_route({"route": ["evidence"], "reason": "certificate arrived"}, ctx)
+
+    assert event.actions.route == "skip"
+    assert event.output["evidence_skipped_tainted_document"] is True
+
+
+def test_the_two_evidence_skip_reasons_stay_distinct(case_id):
+    """A reviewer must be able to tell 'no document was supplied' from 'a
+    document was supplied and refused'. One merged flag loses that."""
+    ctx = _StubContext({"case": _case(case_id, "new_supplier_packet")})
+
+    event = apply_route({"route": ["evidence", "compliance"], "reason": "x"}, ctx)
+
+    assert event.output["evidence_skipped_no_document"] is True
+    assert event.output["evidence_skipped_tainted_document"] is False
+
+
+def test_a_clean_document_still_routes_to_evidence(case_id):
+    ctx = _StubContext({
+        "case": _case(case_id, "new_supplier_packet", "fixture:andes-verde-cert-2028"),
+        "document_tainted": False,
+    })
+
+    event = apply_route({"route": ["evidence", "compliance"], "reason": "x"}, ctx)
+
+    assert event.actions.route == "evidence"
+
+
 def test_a_tainted_document_is_never_published_to_the_agent_state_keys(db, case_id):
     """The whole claim in one assertion. document_pages is the ONLY channel by
     which page text reaches the Evidence agent's prompt (ADK resolves that

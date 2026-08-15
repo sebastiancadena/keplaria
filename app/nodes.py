@@ -195,12 +195,11 @@ def load_case_state(node_input, ctx: Context) -> Event:
         # which page text reaches a model prompt: ADK's instruction-template
         # state injection resolves a bare identifier against a top-level
         # session-state key (see this function's docstring), and both are
-        # blanked above for a tainted document. This is deliberately not a
-        # claim that routing skips a tainted case — apply_route routes on
-        # event_type alone today, with no document_tainted check anywhere in
-        # the graph, so a tainted new_supplier_packet still reaches
-        # evidence_agent. It is harmless there only because the two state
-        # keys the agent's instruction can resolve are already empty.
+        # blanked above for a tainted document. apply_route does check
+        # document_tainted and steers a tainted new_supplier_packet past
+        # evidence_agent entirely — but the blanking here does not rely on
+        # that: whichever route a future change picks, {document_pages} and
+        # {document_checksum} resolve to nothing for this event either way.
         # Patterns and offsets only on the span, never the matched text
         # itself — this module's telemetry contract keeps entity-identifying
         # and payload values off spans (see the DocumentUnavailable branch
@@ -298,10 +297,21 @@ def apply_route(node_input, ctx: Context) -> Event:
     quarantine. validate_evidence's own NO_DOCUMENT path is reserved for the
     other case: a document_ref was given and could not be loaded, which is a
     real failure of a promise someone made.
+
+    A tainted document (load_case_state's `document_tainted`) is treated the
+    same way: evidence has nothing it may safely extract from, since
+    document_pages/document_checksum were already blanked at load time. The
+    case still reaches compliance screening rather than a terminal, because
+    an injected certificate is itself a fraud signal and the screening
+    record is most worth having for exactly that case. This is deliberately
+    not routed to "blocked" — that branch is reserved for a refused
+    coordinator proposal, and taint is a fact about the document, not a
+    routing failure.
     """
     case = ctx.state.get("case", {})
     event_type = case.get("event_type", "")
     has_document = bool(case.get("document_ref"))
+    tainted = bool(ctx.state.get("document_tainted"))
 
     proposed = list((node_input or {}).get("route", []))
     reason = (node_input or {}).get("reason", "")
@@ -317,6 +327,7 @@ def apply_route(node_input, ctx: Context) -> Event:
         route, refused, dropped = [], str(exc), []
 
     evidence_skipped_no_document = "evidence" in route and not has_document
+    evidence_skipped_tainted_document = "evidence" in route and has_document and tainted
 
     decision = {
         "proposed": proposed,
@@ -325,11 +336,21 @@ def apply_route(node_input, ctx: Context) -> Event:
         "reason": reason,
         "refused": refused,
         "evidence_skipped_no_document": evidence_skipped_no_document,
+        "evidence_skipped_tainted_document": evidence_skipped_tainted_document,
     }
 
     if refused is not None:
         next_route = "blocked"
-    elif "evidence" in route and has_document:
+    elif "evidence" in route and has_document and not tainted:
+        # A tainted document is handled exactly like a permitted evidence
+        # route with nothing to extract from: evidence has no work it may
+        # do. Not "blocked" — that branch is reserved for a refused
+        # coordinator proposal, and taint is a fact about the document, not
+        # a routing failure. The case still reaches assess_risk (via
+        # "screen" below when compliance is also proposed, or "skip"
+        # otherwise), which is what actually blocks it — an injected
+        # certificate is itself a fraud signal, so the entity is worth
+        # screening precisely because it was tainted.
         next_route = "evidence"
     elif "compliance" in route:
         next_route = "screen"
