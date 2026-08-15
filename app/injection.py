@@ -105,9 +105,14 @@ SIGNALS: tuple[tuple[str, re.Pattern[str]], ...] = (
 # Sentence boundaries are found on a copy of the text with decimal points
 # masked, so "confidence 1.0" is not split into "1" and "0" — but the
 # sentences yielded are sliced from the original text, so content and offsets
-# are exact. Deliberately simple: split on ./!/?/newline, no NLP dependency.
+# are exact. Deliberately simple: split on ./!/?, and on a paragraph break
+# (a blank line). A single newline is NOT a sentence boundary: this module's
+# input is OCR/PDF-extracted page text, where a directive and its signal are
+# routinely wrapped onto separate lines by the extractor with no adversarial
+# intent, and \s+ inside the directive/signal patterns already spans a bare
+# newline, so a wrapped sentence still matches as one.
 _DECIMAL_POINT = re.compile(r"(?<=\d)\.(?=\d)")
-_TERMINATOR = re.compile(r"[.!?]+|\n+")
+_TERMINATOR = re.compile(r"[.!?]+|\n[ \t]*\n+")
 
 
 def _iter_sentences(text: str):
