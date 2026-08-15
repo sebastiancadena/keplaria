@@ -450,3 +450,67 @@ def test_document_unavailable_span_carries_no_entity_identifying_value(
     error_attr = spans["document_unavailable"].attributes["keplaria.document_error"]
 
     assert error_attr == "DocumentUnavailable"
+
+
+def test_a_tainted_document_is_never_published_to_the_agent_state_keys(db, case_id):
+    """The whole claim in one assertion. document_pages is the ONLY channel by
+    which page text reaches the Evidence agent's prompt (ADK resolves that
+    placeholder against top-level session state). Leaving it populated for a
+    tainted document would put the payload in a model context window even
+    though routing skips extraction."""
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "new_supplier_packet",
+                                 "supplier": "Logistica Manglar SAS",
+                                 "document_ref": "fixture:manglar-cert-injected"}})
+
+    delta = load_case_state(None, ctx).actions.state_delta
+
+    assert delta["document_tainted"] is True
+    assert delta["document_pages"] == ""
+    assert delta["document_checksum"] == ""
+
+
+def test_a_tainted_document_records_which_patterns_fired(db, case_id):
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "new_supplier_packet",
+                                 "document_ref": "fixture:manglar-cert-injected"}})
+
+    delta = load_case_state(None, ctx).actions.state_delta
+
+    assert delta["injection_findings"], "a taint decision must be auditable"
+    assert all("pattern_id" in f for f in delta["injection_findings"])
+
+
+def test_a_clean_document_is_not_tainted_and_still_reaches_the_agent(db, case_id):
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
+                                 "document_ref": "fixture:andes-verde-cert-2028"}})
+
+    delta = load_case_state(None, ctx).actions.state_delta
+
+    assert delta["document_tainted"] is False
+    assert "2028-01-01" in delta["document_pages"]
+
+
+def test_the_taint_span_carries_no_payload_text(db, case_id, span_exporter):
+    """Telemetry contract: ids, codes and counts only. A span attribute holding
+    the matched text would put a hostile payload into the trace backend, which
+    is both a leak and the one place this project has said entity-identifying
+    values never go."""
+    span_exporter.clear()
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "new_supplier_packet",
+                                 "document_ref": "fixture:manglar-cert-injected"}})
+
+    load_case_state(None, ctx)
+
+    spans = [s for s in span_exporter.get_finished_spans() if s.name == "document_tainted"]
+    assert spans, "a taint decision must emit its own span"
+    attributes = spans[0].attributes
+    assert attributes["keplaria.injection_finding_count"] >= 1
+    # The stale literal "IGNORE_PRIOR_INSTRUCTIONS" predates Task 1's
+    # directive+signal restructure; pattern_id is now a composite
+    # "{DIRECTIVE}+{SIGNAL}" id. Assert the attribute is populated with real,
+    # non-empty composite ids (never the raw matched text), including one
+    # this fixture is known to fire.
+    patterns = attributes["keplaria.injection_patterns"]
+    assert patterns
+    assert all(isinstance(p, str) for p in patterns)
+    assert "DISREGARD_PRIOR_INSTRUCTIONS+ADDRESSES_AUTOMATED_READER" in patterns
+    assert not any("2099-12-31" in str(v) for v in attributes.values())

@@ -17,6 +17,7 @@ from pydantic import ValidationError
 
 from app.documents import DocumentUnavailable, load_document
 from app.grounding import RedactedDerivative, validate as grounding_validate
+from app.injection import scan as scan_for_injection
 from app.lifecycle import decide
 from app.policy import CLOCK_EVENTS, PolicyError, validate_route
 from app.risk import BLOCKED, CLEAR, REVIEW, RiskVerdict, assess_case, lifecycle_timing
@@ -174,9 +175,36 @@ def load_case_state(node_input, ctx: Context) -> Event:
 
     document_checksum = ""
     document_pages = ""
-    if derivative:
+    # app.injection.scan is total and heuristic (see its module docstring):
+    # it never raises, and it taints on a directive+machine-reader-signal
+    # conjunction found in the document's own text, not on anything an event
+    # carries. Scanning here, before a single page reaches document_pages, is
+    # what makes the taint decision precede every other read of this
+    # derivative in the graph.
+    injection = scan_for_injection(derivative.get("pages") or []) if derivative else None
+    tainted = bool(injection and injection.tainted)
+
+    if derivative and not tainted:
         document_checksum = derivative.get("checksum", "")
         document_pages = _format_pages(derivative.get("pages") or [])
+
+    if tainted:
+        # The payload must not reach any state key an agent instruction can
+        # resolve. document_pages is the Evidence agent's only channel to the
+        # page text (see this function's docstring), so leaving it populated
+        # would put the injected text in a model context window even though
+        # routing below never sends a tainted case to extraction. Patterns
+        # and offsets only on the span, never the matched text itself — this
+        # module's telemetry contract keeps entity-identifying and payload
+        # values off spans (see the DocumentUnavailable branch above for the
+        # same rule applied to a document_ref).
+        with tracer.start_as_current_span("document_tainted") as span:
+            span.set_attribute("keplaria.case_id", case_id)
+            span.set_attribute("keplaria.injection_finding_count", len(injection.findings))
+            span.set_attribute(
+                "keplaria.injection_patterns",
+                sorted({f.pattern_id for f in injection.findings}),
+            )
 
     route = "clock" if event_type in CLOCK_EVENTS else "agentic"
 
@@ -195,6 +223,8 @@ def load_case_state(node_input, ctx: Context) -> Event:
             "derivative": derivative,
             "document_checksum": document_checksum,
             "document_pages": document_pages,
+            "document_tainted": tainted,
+            "injection_findings": [f.model_dump() for f in injection.findings] if injection else [],
             # The coordinator's channel to the event. Its node_input is this
             # Event's `output` — {"event_class": ...} — which names the event's
             # *class*, not its type, so without these keys the only place
