@@ -20,7 +20,7 @@ from app.grounding import RedactedDerivative, validate as grounding_validate
 from app.lifecycle import decide
 from app.policy import CLOCK_EVENTS, PolicyError, validate_route
 from app.risk import BLOCKED, RiskVerdict, assess_case, lifecycle_timing
-from app.schemas import CanonicalEvent, ScreeningResult
+from app.schemas import CanonicalEvent, ComplianceAssessment, ScreeningResult
 from app.state.commands import DONE, claim_command
 from app.state.firestore import CASES, get_client
 
@@ -472,6 +472,76 @@ def screen_supplier(node_input, ctx: Context) -> Event:
 
     payload = screening.model_dump()
     return Event(output=payload, state={"screening": payload})
+
+
+ALLOWED_RECOMMENDATIONS = ("corroborate_block", "escalate_review", "note_clear")
+
+
+def apply_compliance(node_input, ctx: Context) -> Event:
+    """Independently check the Compliance agent's output against the screening.
+
+    This is the deterministic seam between the model and the risk gate: an
+    LlmAgent's structured output is a claim, not a fact, and this is what
+    holds it to the candidates screen_supplier actually returned. The agent
+    cannot invent a candidate id out of nothing — every id it references
+    must trace back to `ctx.state["screening"]`, and the recommendation must
+    fall within the fixed vocabulary the gate understands. A malformed,
+    ungrounded, or out-of-vocabulary assessment is recorded as invalid and
+    carried forward for the gate to see; it is never raised, for the same
+    reason validate_evidence never raises — the engine allows one concurrent
+    query, so an exception here becomes retry pressure instead of a decision.
+    """
+    case = ctx.state.get("case", {})
+    case_id = case.get("case_id", "")
+    screening = ctx.state.get("screening") or {}
+    known_ids = {
+        c.get("id")
+        for c in (screening.get("candidates") or [])
+        if isinstance(c, dict)
+    }
+
+    raw = node_input
+    if hasattr(raw, "model_dump"):
+        raw = raw.model_dump()
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            raw = None
+
+    valid = True
+    invalid_reason = None
+    assessment = None
+    if isinstance(raw, dict):
+        try:
+            assessment = ComplianceAssessment(**raw)
+        except ValidationError:
+            valid, invalid_reason = False, "UNPARSEABLE"
+    else:
+        valid, invalid_reason = False, "UNPARSEABLE"
+
+    if assessment is not None:
+        if assessment.recommendation not in ALLOWED_RECOMMENDATIONS:
+            valid, invalid_reason = False, "BAD_RECOMMENDATION"
+        elif any(a.candidate_id not in known_ids for a in assessment.assessments):
+            valid, invalid_reason = False, "UNKNOWN_CANDIDATE_ID"
+
+    record = assessment.model_dump() if assessment is not None else {}
+    record["valid"] = valid
+    if invalid_reason is not None:
+        record["invalid_reason"] = invalid_reason
+
+    with tracer.start_as_current_span("apply_compliance") as span:
+        span.set_attribute("keplaria.case_id", case_id)
+        span.set_attribute("keplaria.compliance_valid", valid)
+        if invalid_reason is not None:
+            span.set_attribute("keplaria.compliance_invalid_reason", invalid_reason)
+        if assessment is not None:
+            span.set_attribute(
+                "keplaria.compliance_recommendation", assessment.recommendation
+            )
+
+    return Event(output=record, state={"compliance": record})
 
 
 def assess_risk(node_input, ctx: Context) -> Event:
