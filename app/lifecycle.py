@@ -12,6 +12,8 @@ look" must never be indistinguishable.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import date, timedelta
 
 from pydantic import BaseModel
@@ -36,6 +38,24 @@ CLEAR_HOLD = "clear_hold"
 RESTRICTIVE = frozenset({APPLY_HOLD})
 
 EXPIRY_FIELD = "certificate_expiry"
+
+# example.com is RFC 2606-reserved and already this repo's convention for a
+# synthetic contact address (see tests/integration/test_frappe_executor.py) —
+# guaranteed non-deliverable, never a real supplier's real mailbox. Onboarding
+# has no source of a real one today (no CanonicalEvent field, nothing in the
+# certificate fixtures carries a contact address), and
+# app.executor.frappe.send_supplier_message deliberately fails a Supplier
+# with no email_id rather than silently skipping the send — so every
+# onboarded supplier needs SOME address or every renewal notice fails
+# closed forever, not just until a real one is wired up.
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _synthetic_email(supplier_name: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", supplier_name or "")
+    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    slug = _SLUG_RE.sub("-", stripped.casefold()).strip("-")
+    return f"{slug or 'supplier'}@example.com"
 
 
 class Command(BaseModel):
@@ -107,7 +127,8 @@ def decide(
         if state != ONBOARDING:
             return no_op("ALREADY_ONBOARDED")
         commands = [Command(action=CREATE_SUPPLIER,
-                            payload={"supplier_name": supplier, "country": "Colombia"})]
+                            payload={"supplier_name": supplier, "country": "Colombia",
+                                     "email_id": _synthetic_email(supplier)})]
         new_expiry = _expiry_from_evidence(evidence)
         if new_expiry is None:
             # Onboarded, but no certificate yet — the renewal clock cannot

@@ -93,7 +93,11 @@ def test_unexpected_exception_is_recorded_as_failed_not_left_pending(
     # refuses before the monkeypatched call below is ever reached.
     db.collection(CASES).document(case_id).set({"policy": {"band": "clear", "policy_version": 1}})
 
-    def _boom(client, name):
+    def _boom(client, name, **kwargs):
+        # **kwargs absorbs the `email_id` keyword _run now always passes to
+        # create_supplier_if_absent (see app/executor/runner.py), so this
+        # stand-in still fails the way the test intends instead of a
+        # TypeError on an unexpected keyword argument.
         raise KeyError("data")
 
     monkeypatch.setattr(runner_module, "create_supplier_if_absent", _boom)

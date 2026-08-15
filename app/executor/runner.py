@@ -112,7 +112,7 @@ def _run(action: str, client, payload: dict, cycle: int) -> dict:
     """
     supplier = payload.get("supplier_name", "")
     if action == CREATE_SUPPLIER:
-        return create_supplier_if_absent(client, supplier)
+        return create_supplier_if_absent(client, supplier, email_id=payload.get("email_id", ""))
     if action == ATTACH_EVIDENCE:
         # PLACEHOLDER_CERTIFICATE_PDF, not an ad-hoc byte literal: the live
         # ERP runs a server-side pypdf content scan and rejects anything

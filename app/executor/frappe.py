@@ -69,7 +69,7 @@ def leaf_supplier_group(client: httpx.Client) -> str:
 
 
 def create_supplier_if_absent(
-    client: httpx.Client, supplier_name: str, country: str = "Colombia"
+    client: httpx.Client, supplier_name: str, country: str = "Colombia", email_id: str = ""
 ) -> dict:
     """Create the Supplier, treating a native duplicate as success.
 
@@ -77,6 +77,18 @@ def create_supplier_if_absent(
     `created: False` with no reconciliation of any field against `payload`.
     The name reflects that: it is a create-once-if-absent operation, not an
     upsert.
+
+    `email_id` is opt-in and omitted from the create payload entirely when
+    falsy, rather than defaulted here: `send_supplier_message` deliberately
+    fails a Supplier with no `email_id` rather than silently skipping the
+    send (see its docstring), and a Supplier onboarded through
+    app.lifecycle's CREATE_SUPPLIER command always carries a synthetic
+    `@example.com` address in its payload precisely so that check doesn't
+    fire on every real case — leaving the default here empty keeps that an
+    explicit choice made by the caller (or not made, for a caller that wants
+    the bare-create path, e.g. a test fixture exercising the no-email
+    rejection itself) rather than something this function invents on its
+    own.
 
     Returns the deterministic external ID and whether this call created it.
     """
@@ -86,6 +98,8 @@ def create_supplier_if_absent(
         "supplier_type": "Company",
         "country": country,
     }
+    if email_id:
+        payload["email_id"] = email_id
     response = client.post("/api/resource/Supplier", json=payload)
 
     if response.status_code in (409, 417):
