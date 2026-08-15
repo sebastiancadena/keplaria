@@ -190,14 +190,21 @@ def load_case_state(node_input, ctx: Context) -> Event:
 
     if tainted:
         # The payload must not reach any state key an agent instruction can
-        # resolve. document_pages is the Evidence agent's only channel to the
-        # page text (see this function's docstring), so leaving it populated
-        # would put the injected text in a model context window even though
-        # routing below never sends a tainted case to extraction. Patterns
-        # and offsets only on the span, never the matched text itself — this
-        # module's telemetry contract keeps entity-identifying and payload
-        # values off spans (see the DocumentUnavailable branch above for the
-        # same rule applied to a document_ref).
+        # resolve — and that holds regardless of which route this event
+        # takes. document_pages/document_checksum are the ONLY channel by
+        # which page text reaches a model prompt: ADK's instruction-template
+        # state injection resolves a bare identifier against a top-level
+        # session-state key (see this function's docstring), and both are
+        # blanked above for a tainted document. This is deliberately not a
+        # claim that routing skips a tainted case — apply_route routes on
+        # event_type alone today, with no document_tainted check anywhere in
+        # the graph, so a tainted new_supplier_packet still reaches
+        # evidence_agent. It is harmless there only because the two state
+        # keys the agent's instruction can resolve are already empty.
+        # Patterns and offsets only on the span, never the matched text
+        # itself — this module's telemetry contract keeps entity-identifying
+        # and payload values off spans (see the DocumentUnavailable branch
+        # above for the same rule applied to a document_ref).
         with tracer.start_as_current_span("document_tainted") as span:
             span.set_attribute("keplaria.case_id", case_id)
             span.set_attribute("keplaria.injection_finding_count", len(injection.findings))
@@ -220,6 +227,15 @@ def load_case_state(node_input, ctx: Context) -> Event:
         output={"event_class": route},
         state={
             "case_state": case_state,
+            # Deliberately still published even when tainted — not an
+            # oversight. validate_evidence needs the raw derivative (page
+            # text included) to feed app.grounding.validate, which returns
+            # structured reason codes rather than forwarding text to a model.
+            # No LlmAgent instruction references {derivative} (only the flat
+            # document_pages/document_checksum keys resolve into a prompt),
+            # so this is a bounded exposure — present in session state and
+            # the persisted session store, but never reachable by a model —
+            # not the "nowhere in state" claim the blanked keys above make.
             "derivative": derivative,
             "document_checksum": document_checksum,
             "document_pages": document_pages,
