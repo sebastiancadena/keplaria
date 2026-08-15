@@ -20,7 +20,7 @@ Cloud Run IAM check and must come back 403 to an anonymous caller.
 
 Routing and screening are read off the case document, not engine session
 state: app.nodes persists a compact summary onto `cases/{case_id}` at
-execution time (see queue_supplier / quarantine_case), which is what makes
+execution time (see commit_commands / quarantine_case), which is what makes
 those decisions inspectable from outside the engine.
 
 SUPPLIER is deliberately a name that does NOT match any sanctioned entity in

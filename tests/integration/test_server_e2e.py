@@ -210,7 +210,7 @@ def test_adk_run_sse(server_fixture: subprocess.Popen[str]) -> None:
     outputs = [ev["output"] for ev in events if ev.get("output") is not None]
     assert outputs, "Expected the graph to produce at least one structured output"
     # The graph only ever queues the create_supplier command now — see
-    # app.nodes.queue_supplier — since the Agent Runtime engine has no public
+    # app.nodes.commit_commands — since the Agent Runtime engine has no public
     # internet path to Frappe Cloud. Execution happens outside the graph.
     assert outputs[-1]["status"] == "no_action"
     assert outputs[-1]["case_id"] == event["case_id"]

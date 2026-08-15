@@ -7,7 +7,7 @@ invoked only after a successful claim, and the claim is only marked dispatched
 once the engine call actually succeeds — so a transient engine failure is
 retried by Pub/Sub redelivery instead of silently dropping the case.
 
-The engine's graph only ever queues the ERP command (see app.nodes.queue_supplier
+The engine's graph only ever queues the ERP command (see app.nodes.commit_commands
 for why: no public internet egress from the PSC-attached engine). This ingress
 adapter, an ordinary Cloud Run service with normal egress, is what actually
 drains the outbox via app.executor.runner.execute_pending_commands — once

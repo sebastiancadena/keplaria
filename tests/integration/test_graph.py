@@ -78,7 +78,7 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
     """yente is unreachable from this machine (see module docstring), so
     screening comes back `reachable=False`. Under the risk gate that fires
     SCREENING_UNAVAILABLE and lands in `review`, which routes to park_case —
-    not queue_supplier. This pins the deliberate, fail-closed behavior: an
+    not commit_commands. This pins the deliberate, fail-closed behavior: an
     unreachable screening service must park the case for a human, not queue
     an ERP write and not claim any command."""
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
@@ -132,12 +132,12 @@ async def test_certificate_received_skips_screening():
 async def test_replayed_case_does_not_reclaim_a_done_command():
     """Same fail-closed gate as the previous test: yente is unreachable from
     this machine, so every event for this case lands in `review` and parks
-    at park_case rather than ever reaching queue_supplier — there is no DONE
+    at park_case rather than ever reaching commit_commands — there is no DONE
     command here for a replay to reclaim. What this proves instead is the
     review branch's own replay idempotency: running the identical event
     twice for the same case must park it both times and must never claim a
     command on either run — a graph-wiring bug that let a replay slip past
-    park_case into queue_supplier would show up here as a stray command."""
+    park_case into commit_commands would show up here as a stray command."""
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
     db = get_client()
 

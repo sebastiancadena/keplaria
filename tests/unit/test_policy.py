@@ -67,7 +67,6 @@ def test_allowlist_covers_every_supported_event_type():
 
 
 def test_clock_events_engage_no_agents():
-    from app.policy import CLOCK_EVENTS
     assert ALLOWED_ROUTES["renewal_due"] == set()
     assert ALLOWED_ROUTES["evidence_overdue"] == set()
     assert validate_route("renewal_due", []) == []

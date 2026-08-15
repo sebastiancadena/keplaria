@@ -141,7 +141,7 @@ root_agent = Workflow(
         (coordinator, apply_route),
         # A routing-map chain element is this ADK version's syntax for a
         # conditional edge. "skip" goes to assess_risk rather than straight to
-        # queue_supplier so that EVERY path to the command queue carries a
+        # commit_commands so that EVERY path to the command queue carries a
         # policy verdict — that invariant is what lets the executor refuse a
         # case with no verdict instead of having to tolerate one.
         (
