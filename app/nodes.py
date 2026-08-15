@@ -729,15 +729,28 @@ def assess_risk(node_input, ctx: Context) -> Event:
             )
             carried = False
 
-        # Taint tightens both branches, including a carried-forward verdict —
-        # the one thing the compliance escalation below is forbidden to touch.
-        # The two are not alike. The compliance record is a model's
-        # interpretation of a screen, so it may only nudge a fresh `clear` to
-        # `review`. Taint is a deterministic fact about the document THIS event
-        # brought, established by code before any agent ran. Carrying a verdict
-        # forward over evidence it does not cover is exactly what carry-forward
-        # exists to prevent in the other direction. One-directional, like every
-        # other guard here: it can only tighten, so it cannot launder anything.
+        # Taint tightens both branches. It is load-bearing on the carry-
+        # forward path above — that's the whole reason it exists: a
+        # certificate_received event never screens, so without this, a
+        # tainted certificate would inherit whatever band was stored before
+        # this document arrived. On the fresh-scoring path it is currently
+        # unreachable in practice, because DOCUMENT_INJECTION's factor weight
+        # already clears the policy's block threshold inside assess_case, so
+        # `verdict.band` is already BLOCKED by the time this guard runs;
+        # here it stands as deliberate defence against a future reweighting
+        # of that factor, not active logic today.
+        #
+        # It is deliberately allowed to tighten a carried-forward verdict,
+        # unlike the compliance escalation below (whose own `not carried`
+        # guard — not this block's position above it — is what keeps it off
+        # the carried path). The two are not alike: the compliance record is
+        # a model's interpretation of a screen, so it may only nudge a fresh
+        # `clear` to `review`. Taint is a deterministic fact about the
+        # document THIS event brought, established by code before any agent
+        # ran. Carrying a verdict forward over evidence it does not cover is
+        # exactly what carry-forward exists to prevent in the other
+        # direction. One-directional, like every other guard here: it can
+        # only tighten, so it cannot launder anything.
         if ctx.state.get("document_tainted") and verdict.band != BLOCKED:
             verdict = verdict.model_copy(
                 update={

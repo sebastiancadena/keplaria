@@ -421,3 +421,7 @@ def test_the_taint_override_only_tightens(case_id):
 
     assert result.actions.route == "blocked"
     assert "SANCTIONS_MATCH" in [f["id"] for f in result.output["factors_fired"]]
+    assert "DOCUMENT_INJECTION" not in result.output["reasons"], (
+        "a case already blocked for a sanctions match must keep its original "
+        "reasons, not be restated as an injection case"
+    )
