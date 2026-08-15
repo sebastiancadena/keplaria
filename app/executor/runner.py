@@ -27,14 +27,26 @@ draining a command queued under older state, or a graph-wiring bug — and it
 matters because this process runs under a different identity (the Cloud Run
 ingress) than the graph.
 
-The gate is deliberately one-directional. It exists to stop the system
-GRANTING something — creating a supplier, attaching evidence, releasing a
-hold, asking for a renewal — never to stop it WITHHOLDING something. A hold
-(`apply_hold`) is restrictive: it always executes, regardless of the case's
-policy band, because refusing to hold a risky supplier for scoring badly is
-exactly backwards. `app.lifecycle.RESTRICTIVE` is the single source of truth
-for which actions bypass the gate; every other known action is permissive and
-stays gated on a `clear` verdict.
+This executor-side guard is deliberately one-directional. It exists to stop
+THIS PROCESS from GRANTING something — creating a supplier, attaching
+evidence, releasing a hold, asking for a renewal — never to stop it
+WITHHOLDING something. A hold (`apply_hold`) is restrictive: this guard
+always lets it execute, regardless of the case's policy band, because
+refusing to hold a risky supplier for scoring badly is exactly backwards.
+`app.lifecycle.RESTRICTIVE` is the single source of truth for which actions
+bypass this guard; every other known action is permissive and stays gated on
+a `clear` verdict.
+
+That one-directional promise covers only what reaches this module, not the
+graph upstream of it. The graph's own routing is more restrictive still:
+`assess_risk` sends a non-`clear` verdict straight to `quarantine_case`, so
+`commit_commands` never runs and `apply_hold` is never even claimed for a
+case the graph has already deemed non-clear — the graph withholds there,
+today, by construction. What this guard backstops is narrower: a command
+claimed under state that was current when the graph decided, then drained
+later under state that has since changed (a duplicate-event redelivery, or a
+graph-wiring bug) — not a live capability to hold a newly-sanctioned
+supplier the moment screening flags it.
 """
 
 from __future__ import annotations

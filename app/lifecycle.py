@@ -32,9 +32,16 @@ REQUEST_RENEWAL = "request_renewal"
 APPLY_HOLD = "apply_hold"
 CLEAR_HOLD = "clear_hold"
 
-# Actions the policy gate may never withhold. The gate exists to stop the
-# system granting something; refusing to apply a hold because the supplier
-# scored badly would invert its purpose.
+# Actions app.executor.runner's policy-band guard may never withhold. That
+# guard exists to stop the executor from granting something; refusing to
+# apply a hold because the supplier scored badly would invert its purpose.
+# This is a claim about the executor's guard specifically, not about the
+# graph: assess_risk already routes a non-clear case to quarantine_case
+# before commit_commands ever runs, so in practice apply_hold is claimed only
+# for a case the graph found clear at decision time. RESTRICTIVE governs what
+# the executor does with a command already claimed under earlier state — a
+# duplicate-event redelivery or a graph-wiring bug — not a live capability to
+# hold a supplier the graph itself has just flagged.
 RESTRICTIVE = frozenset({APPLY_HOLD})
 
 EXPIRY_FIELD = "certificate_expiry"
