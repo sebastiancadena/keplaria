@@ -40,6 +40,7 @@ def _record_outcome(
     routing: dict | None,
     screening: dict | None,
     policy: dict | None = None,
+    compliance: dict | None = None,
 ) -> None:
     """Persist a compact routing/screening summary onto the case doc.
 
@@ -50,6 +51,14 @@ def _record_outcome(
     The persisted `policy` block is the authoritative record of the gate's
     decision. app.executor.runner re-reads it before draining a command, so
     this is not merely a projection — it is read back for enforcement.
+
+    The persisted `compliance` block is the durable audit record of the
+    interpreter's assessment — the full recommendation, rationale, and
+    per-candidate reasoning, not a trimmed summary. A trace span is fine for
+    debugging a single run, but spans expire and are never the place a
+    reviewer should have to go looking for why a case was escalated; that
+    text has to still be readable from Firestore long after the run that
+    produced it.
 
     A malformed `screening` dict (one app.risk.assess already rejected as
     SCREENING_MALFORMED) still flows in here from the quarantine_case /
@@ -97,6 +106,8 @@ def _record_outcome(
         payload["screening"] = summary
     if policy is not None:
         payload["policy"] = policy
+    if compliance is not None:
+        payload["compliance"] = compliance
     db.collection(CASES).document(case_id).set(payload, merge=True)
 
 
@@ -377,6 +388,7 @@ def quarantine_case(node_input, ctx: Context) -> Event:
             routing,
             ctx.state.get("screening"),
             ctx.state.get("policy"),
+            compliance=ctx.state.get("compliance"),
         )
 
     return Event(
@@ -411,6 +423,7 @@ def park_case(node_input, ctx: Context) -> Event:
             ctx.state.get("routing"),
             ctx.state.get("screening"),
             policy,
+            compliance=ctx.state.get("compliance"),
         )
 
     return Event(
@@ -744,6 +757,7 @@ def commit_commands(node_input, ctx: Context) -> Event:
             ctx.state.get("routing"),
             ctx.state.get("screening"),
             ctx.state.get("policy"),
+            compliance=ctx.state.get("compliance"),
         )
 
     return Event(

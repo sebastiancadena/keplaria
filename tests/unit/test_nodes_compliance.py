@@ -287,3 +287,23 @@ def test_screen_supplier_skips_the_interpreter_when_unreachable(case_id, monkeyp
 
     assert result.actions.route == "score"
     assert result.actions.state_delta["screening"]["reachable"] is False
+
+
+from app.nodes import park_case
+from app.state.firestore import CASES, get_client
+
+
+def test_park_case_persists_the_compliance_block(case_id):
+    compliance = _compliance(recommendation="escalate_review")
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": _screening_state(),
+            "compliance": compliance,
+        }
+    )
+
+    park_case(None, ctx)
+
+    doc = get_client().collection(CASES).document(case_id).get().to_dict()
+    assert doc["compliance"] == compliance
