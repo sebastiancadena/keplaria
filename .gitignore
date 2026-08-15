@@ -21,3 +21,8 @@ docs/superpowers/
 
 # Playwright MCP page snapshots (browser tooling scratch output)
 .playwright-mcp/
+
+# Eval run outputs (agents-cli traces/grades; committed evidence lives in
+# spikes/domain_evals/) and the CLI's local server log.
+artifacts/
+.google-agents-cli/

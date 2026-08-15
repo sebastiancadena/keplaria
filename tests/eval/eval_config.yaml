@@ -6,6 +6,12 @@ custom_metrics:
   # google-genai on Agent Platform (ADC) or Google AI Studio (GEMINI_API_KEY).
   - name: custom_response_quality
     custom_function_file: response_quality.py
+  # Deterministic domain grading for tests/eval/datasets/domain-dataset.json
+  # traces produced by generate_traces.py. Selected explicitly via
+  # `eval grade --metrics domain_case_pass` (see run_domain_evals.sh); not in
+  # metrics_to_run because it only understands domain-eval instances.
+  - name: domain_case_pass
+    custom_function_file: domain_metrics.py
   - name: agent_turn_count
     custom_function: |
       def evaluate(instance):
