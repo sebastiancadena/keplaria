@@ -315,6 +315,48 @@ def test_a_document_event_routes_to_the_coordinator_and_loads_the_derivative(db,
     assert "2028-01-01" in event.actions.state_delta["derivative"]["pages"][0]
 
 
+def test_load_case_state_publishes_the_event_as_flat_coordinator_keys(db, case_id):
+    """The coordinator's only reliable channel to the event.
+
+    load_case_state's Event carries `output={"event_class": ...}`, so that dict
+    — and nothing else — is the coordinator's node_input. Without flat state
+    keys the coordinator never receives `event_type` at all and has to infer it
+    from parse_case's output sitting in session history, which is what produced
+    the observed empty-route flake ("event class 'agentic' does not match any
+    known workflow triggers") on a new_supplier_packet. These three keys are
+    top-level and flat for the same reason document_checksum/document_pages
+    are: ADK's instruction-template injection resolves bare identifiers against
+    top-level session state only.
+    """
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "new_supplier_packet",
+                                 "supplier": "Empaques Rio Claro SAS",
+                                 "document_ref": "fixture:andes-verde-cert-2028"}})
+
+    event = load_case_state(None, ctx)
+
+    delta = event.actions.state_delta
+    assert delta["event_type"] == "new_supplier_packet"
+    assert delta["supplier_name"] == "Empaques Rio Claro SAS"
+    assert delta["has_document"] == "yes"
+
+
+def test_load_case_state_publishes_coordinator_keys_on_the_clock_path_too(db, case_id):
+    """A clock event bypasses the coordinator, but the keys must still be
+    published — leaving them absent on one path makes them absent from session
+    state on any resumed continuation of that case, and an unresolved
+    placeholder renders as a literal brace in the prompt rather than failing."""
+    ctx = _StubContext({"case": {"case_id": case_id, "event_type": "renewal_due",
+                                 "supplier": "Comercializadora Andes Verde SAS"}})
+
+    event = load_case_state(None, ctx)
+
+    delta = event.actions.state_delta
+    assert event.actions.route == "clock"
+    assert delta["event_type"] == "renewal_due"
+    assert delta["supplier_name"] == "Comercializadora Andes Verde SAS"
+    assert delta["has_document"] == "no"
+
+
 def test_an_unresolvable_document_reference_does_not_raise(db, case_id):
     ctx = _StubContext({"case": {"case_id": case_id, "event_type": "certificate_received",
                          "document_ref": "fixture:nope"}})

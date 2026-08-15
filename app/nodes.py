@@ -195,6 +195,17 @@ def load_case_state(node_input, ctx: Context) -> Event:
             "derivative": derivative,
             "document_checksum": document_checksum,
             "document_pages": document_pages,
+            # The coordinator's channel to the event. Its node_input is this
+            # Event's `output` — {"event_class": ...} — which names the event's
+            # *class*, not its type, so without these keys the only place
+            # `new_supplier_packet` appears is parse_case's output in session
+            # history. Reading the class instead of the type is what produced
+            # the observed empty-route flake. Published on both paths and as
+            # flat top-level keys, for the same reason document_checksum and
+            # document_pages are.
+            "event_type": event_type,
+            "supplier_name": case.get("supplier") or "",
+            "has_document": "yes" if ref else "no",
         },
         route=route,
     )

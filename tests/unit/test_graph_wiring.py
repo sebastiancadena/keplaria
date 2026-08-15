@@ -14,7 +14,7 @@ suite, not in live-marked tests.
 
 import pytest
 
-from app.agent import compliance_agent, evidence_agent, root_agent
+from app.agent import compliance_agent, coordinator, evidence_agent, root_agent
 from app.nodes import (
     MAX_EVIDENCE_ATTEMPTS,
     apply_compliance,
@@ -90,6 +90,62 @@ class _StubContext:
 
     def __init__(self, state: dict):
         self.state = state
+
+
+def test_the_coordinator_instruction_references_the_event_state_keys():
+    """The coordinator must be shown the event, not left to infer it.
+
+    Its node_input is load_case_state's output — `{"event_class": "agentic"}`
+    — which names the event's *class*, never its type. With no placeholder the
+    only remaining source of `new_supplier_packet` is parse_case's output in
+    session history, and reading the wrong one of those two produced an empty
+    route on a packet that requires both agents, quarantining a legitimate
+    event. These placeholders are what put the event type in the prompt
+    directly; this pins them so a later edit that drops one fails loudly."""
+    assert isinstance(coordinator.instruction, str), (
+        "state injection only runs for a plain string instruction "
+        "(LlmAgent.canonical_instruction bypasses it for a callable one)"
+    )
+    assert "{event_type}" in coordinator.instruction
+    assert "{supplier_name}" in coordinator.instruction
+    assert "{has_document}" in coordinator.instruction
+
+
+@pytest.mark.asyncio
+async def test_the_coordinator_instruction_renders_the_actual_event_type():
+    """Same end-to-end check the evidence agent gets: prove the placeholders
+    are wired to real state through the function ADK itself calls, rather than
+    trusting that a brace in the instruction means anything."""
+    from google.adk.agents.invocation_context import InvocationContext
+    from google.adk.agents.readonly_context import ReadonlyContext
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.utils.instructions_utils import inject_session_state
+
+    service = InMemorySessionService()
+    session = await service.create_session(
+        app_name="test",
+        user_id="u1",
+        state={
+            "event_type": "new_supplier_packet",
+            "supplier_name": "Empaques Rio Claro SAS",
+            "has_document": "yes",
+        },
+    )
+    ctx = InvocationContext(session_service=service, invocation_id="inv-1", session=session)
+
+    rendered = await inject_session_state(coordinator.instruction, ReadonlyContext(ctx))
+
+    assert "new_supplier_packet" in rendered
+    assert "Empaques Rio Claro SAS" in rendered
+
+
+def test_the_coordinator_is_told_an_empty_route_is_never_valid_for_these_events():
+    """The observed flake was the coordinator answering "no agents" for an
+    event type whose every valid answer contains at least one. validate_route
+    still refuses that proposal — this is about the coordinator not producing
+    it, so the backstop stops being the thing that catches a routine event."""
+    instruction = coordinator.instruction.lower()
+    assert "never return an empty route" in instruction
 
 
 def test_the_evidence_agent_holds_no_operational_tools():

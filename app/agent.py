@@ -80,18 +80,37 @@ from app.schemas import ComplianceAssessment, EvidenceResult, RoutingDecision
 coordinator = LlmAgent(
     name="mission_coordinator",
     model="gemini-3.6-flash",
+    # {event_type}, {supplier_name} and {has_document} are ADK state-template
+    # placeholders, the same mechanism evidence_agent and compliance_agent use
+    # below. They are not decoration: this node's input is load_case_state's
+    # output, `{"event_class": "agentic"}`, which carries the event's CLASS and
+    # never its TYPE. Without these placeholders the only place the event type
+    # appears is parse_case's output sitting in session history, and reading
+    # the class instead of the type is exactly what produced an empty route on
+    # a new_supplier_packet — an event whose every valid answer names at least
+    # one agent. app.nodes.load_case_state publishes all three as flat
+    # top-level state keys, which is the only shape inject_session_state can
+    # resolve.
     instruction=(
         "You are the Mission Coordinator for a supplier onboarding workflow.\n"
-        "You receive a canonical event describing a supplier case. Decide which "
-        "specialist agents must be engaged.\n\n"
+        "Decide which specialist agents must be engaged for the event below.\n\n"
+        "Event type: {event_type}\n"
+        "Supplier: {supplier_name}\n"
+        "Document attached: {has_document}\n\n"
         "Available agents:\n"
         "  - evidence: extracts grounded corporate fields from submitted documents.\n"
         "  - compliance: screens the legal entity against a sanctions service.\n\n"
-        "Rules:\n"
+        "Rules, keyed on the event type exactly as written above:\n"
         "  - new_supplier_packet: a brand new supplier. Both evidence and "
         "compliance are required, because nothing about the entity is verified yet.\n"
         "  - certificate_received: a document arrived for a known supplier. "
         "Engage evidence only; do not re-screen unless entity fields changed.\n\n"
+        "Both event types above require at least one agent. Never return an "
+        "empty route for either of them, and never answer that the event does "
+        "not match a known workflow: if the event type is one of the two "
+        "named above, apply its rule. Decide from the event type alone — the "
+        "presence or absence of a document does not change which agents are "
+        "required.\n\n"
         "Return the agents in the route field and one sentence of justification "
         "in the reason field. Never invent agent names."
     ),
