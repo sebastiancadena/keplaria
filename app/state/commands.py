@@ -3,8 +3,16 @@
 The executor claims a command transactionally, calls the destination, then
 records the external ID. A command already marked done is never re-driven, so a
 replayed event produces exactly one downstream write. A command left pending by
-a dead process is re-claimable, because the destination call is idempotent by
-deterministic ID on the far side too.
+a dead process is re-claimable, and for most actions the destination call is
+also idempotent by deterministic ID on the far side, so a redundant re-drive
+of a still-pending command is harmless there too.
+
+`request_renewal` is the exception: the ERP does not deduplicate outbound
+mail, so nothing on the far side stops a second identical renewal notice from
+actually sending (see app.executor.frappe.send_supplier_message). For that
+action, this cycle-scoped ledger — never re-driving a command already marked
+done — is the *only* guard against a duplicate send, not a second layer on
+top of destination-side idempotency.
 """
 
 from __future__ import annotations
