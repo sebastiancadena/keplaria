@@ -19,7 +19,7 @@ from app.documents import DocumentUnavailable, load_document
 from app.grounding import RedactedDerivative, validate as grounding_validate
 from app.lifecycle import decide
 from app.policy import CLOCK_EVENTS, PolicyError, validate_route
-from app.risk import BLOCKED, RiskVerdict, assess_case, lifecycle_timing
+from app.risk import BLOCKED, CLEAR, REVIEW, RiskVerdict, assess_case, lifecycle_timing
 from app.schemas import CanonicalEvent, ComplianceAssessment, ScreeningResult
 from app.state.commands import DONE, claim_command
 from app.state.firestore import CASES, get_client
@@ -604,6 +604,27 @@ def assess_risk(node_input, ctx: Context) -> Event:
         else:
             verdict = assess_case(screening=screening, case=case)
             carried = False
+
+        # The compliance record can only tighten a fresh clear verdict to
+        # review, never loosen review/blocked and never touch a carried-
+        # forward verdict — it has an opinion, not veto power over the gate.
+        if not carried and verdict.band == CLEAR:
+            compliance = ctx.state.get("compliance")
+            if isinstance(compliance, dict):
+                if not compliance.get("valid"):
+                    verdict = verdict.model_copy(
+                        update={
+                            "band": REVIEW,
+                            "reasons": [*verdict.reasons, "COMPLIANCE_ASSESSMENT_INVALID"],
+                        }
+                    )
+                elif compliance.get("recommendation") == "escalate_review":
+                    verdict = verdict.model_copy(
+                        update={
+                            "band": REVIEW,
+                            "reasons": [*verdict.reasons, "COMPLIANCE_ESCALATION"],
+                        }
+                    )
 
         span.set_attribute("keplaria.case_id", case.get("case_id", ""))
         span.set_attribute("keplaria.policy_version", verdict.policy_version)

@@ -104,3 +104,121 @@ def test_apply_compliance_handles_non_list_candidates_without_raising():
 
     assert result.output["valid"] is False
     assert result.output["invalid_reason"] == "UNKNOWN_CANDIDATE_ID"
+
+
+from app.nodes import assess_risk
+
+
+def _case(case_id: str) -> dict:
+    return {"case_id": case_id, "event_type": "new_supplier_packet", "supplier": "Acme"}
+
+
+def _compliance(valid=True, recommendation="note_clear") -> dict:
+    record = _assessment(recommendation=recommendation)
+    record["valid"] = valid
+    if not valid:
+        record["invalid_reason"] = "UNKNOWN_CANDIDATE_ID"
+    return record
+
+
+def test_escalate_review_tightens_clear_to_review(case_id):
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": _screening_state(),  # low scores, no match -> clear
+            "compliance": _compliance(recommendation="escalate_review"),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "review"
+    assert "COMPLIANCE_ESCALATION" in result.output["reasons"]
+
+
+def test_invalid_assessment_tightens_clear_to_review(case_id):
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": _screening_state(),
+            "compliance": _compliance(valid=False),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "review"
+    assert "COMPLIANCE_ASSESSMENT_INVALID" in result.output["reasons"]
+
+
+def test_note_clear_leaves_clear_untouched(case_id):
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": _screening_state(),
+            "compliance": _compliance(recommendation="note_clear"),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "clear"
+    assert "COMPLIANCE_ESCALATION" not in result.output["reasons"]
+
+
+def test_blocked_is_never_downgraded_by_the_agent(case_id):
+    screening = _screening_state()
+    screening["candidates"][0].update({"score": 1.0, "match": True})
+    screening["flagged"] = [screening["candidates"][0]["id"]]
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": screening,
+            "compliance": _compliance(recommendation="note_clear"),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "blocked"
+
+
+def test_review_band_is_not_double_modified_by_escalation(case_id):
+    screening = _screening_state()
+    screening["candidates"][0]["score"] = 0.55  # sub-threshold factor -> review
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": screening,
+            "compliance": _compliance(recommendation="escalate_review"),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "review"
+    assert "COMPLIANCE_ESCALATION" not in result.output["reasons"]
+
+
+def test_carry_forward_path_ignores_a_compliance_block(case_id):
+    ctx = _StubContext(
+        {
+            "case": _case(case_id),
+            "screening": None,
+            "case_state": {
+                "policy": {
+                    "policy_id": "supplier_risk",
+                    "policy_version": 1,
+                    "score": 0.0,
+                    "band": "clear",
+                    "factors_fired": [],
+                    "reasons": [],
+                }
+            },
+            "compliance": _compliance(recommendation="escalate_review"),
+        }
+    )
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "clear"
