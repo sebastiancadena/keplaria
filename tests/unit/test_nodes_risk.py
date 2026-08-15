@@ -353,3 +353,71 @@ def test_commit_commands_preserves_stored_routing_and_screening_on_a_clock_event
     assert stored["screening"] == stored_screening, (
         "a clock event must never null out the onboarding-time screening summary"
     )
+
+
+def test_a_tainted_document_blocks_on_the_fresh_scoring_path(case_id):
+    ctx = _StubContext({
+        "case": _case(case_id),
+        "screening": _screening(candidates=[{"id": "x", "score": 0.1, "match": False}]),
+        "document_tainted": True,
+    })
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "DOCUMENT_INJECTION" in [f["id"] for f in result.output["factors_fired"]]
+
+
+def test_a_tainted_document_blocks_a_carried_forward_clear_verdict(case_id):
+    """The path Task 4's factor cannot reach. A certificate_received never
+    screens, so assess_risk carries the stored verdict forward and never scores
+    at all — without the override, a tainted certificate would inherit the
+    supplier's previous `clear` band and commit."""
+    ctx = _StubContext({
+        "case": _case(case_id),
+        "screening": None,
+        "case_state": {"policy": {"policy_id": "supplier_risk", "policy_version": 2,
+                                  "score": 0.0, "band": "clear",
+                                  "factors_fired": [], "reasons": []}},
+        "document_tainted": True,
+    })
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "DOCUMENT_INJECTION" in result.output["reasons"]
+
+
+def test_a_clean_certificate_still_carries_its_verdict_forward(case_id):
+    """The regression guard: the override must not disturb the carry-forward
+    behaviour that stops time laundering a verdict."""
+    ctx = _StubContext({
+        "case": _case(case_id),
+        "screening": None,
+        "case_state": {"policy": {"policy_id": "supplier_risk", "policy_version": 2,
+                                  "score": 0.0, "band": "clear",
+                                  "factors_fired": [], "reasons": []}},
+        "document_tainted": False,
+    })
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "clear"
+    assert "DOCUMENT_INJECTION" not in result.output["reasons"]
+
+
+def test_the_taint_override_only_tightens(case_id):
+    """One-directional, like every other guard here. A case already blocked for
+    a sanctions match keeps its original reasons rather than being restated as
+    an injection case."""
+    ctx = _StubContext({
+        "case": _case(case_id),
+        "screening": _screening(candidates=[{"id": "s", "score": 1.0, "match": True}],
+                                flagged=["s"]),
+        "document_tainted": True,
+    })
+
+    result = assess_risk(None, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "SANCTIONS_MATCH" in [f["id"] for f in result.output["factors_fired"]]

@@ -723,8 +723,28 @@ def assess_risk(node_input, ctx: Context) -> Event:
                     band=BLOCKED, reasons=["NO_STORED_VERDICT"],
                 )
         else:
-            verdict = assess_case(screening=screening, case=case)
+            verdict = assess_case(
+                screening=screening,
+                case={**case, "document_tainted": bool(ctx.state.get("document_tainted"))},
+            )
             carried = False
+
+        # Taint tightens both branches, including a carried-forward verdict —
+        # the one thing the compliance escalation below is forbidden to touch.
+        # The two are not alike. The compliance record is a model's
+        # interpretation of a screen, so it may only nudge a fresh `clear` to
+        # `review`. Taint is a deterministic fact about the document THIS event
+        # brought, established by code before any agent ran. Carrying a verdict
+        # forward over evidence it does not cover is exactly what carry-forward
+        # exists to prevent in the other direction. One-directional, like every
+        # other guard here: it can only tighten, so it cannot launder anything.
+        if ctx.state.get("document_tainted") and verdict.band != BLOCKED:
+            verdict = verdict.model_copy(
+                update={
+                    "band": BLOCKED,
+                    "reasons": [*verdict.reasons, "DOCUMENT_INJECTION"],
+                }
+            )
 
         # The compliance record can only tighten a fresh clear verdict to
         # review, never loosen review/blocked and never touch a carried-
