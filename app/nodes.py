@@ -72,13 +72,22 @@ def _record_outcome(
 
     The persisted `injection` block is the durable proof that the document
     injection gate fired and where — pattern ids, page indices, offsets,
-    counts. It must never carry the matched payload text: `injection_findings`
-    entries hold only ids/locations already (app.injection.scan is total and
-    never captures the matched string), so passing that list straight through
-    cannot leak a hostile payload into Firestore. A reviewer needs to
-    substantiate the block without reaching into a trace that has since
-    expired; they do not need, and must never be handed, a stored copy of the
-    payload itself.
+    counts. It must never carry the matched payload text, and that is
+    enforced HERE, at the write boundary, by projecting each finding to
+    exactly pattern_id/page/offset rather than storing the caller's list
+    verbatim — not merely inherited from app.injection.Finding's current
+    schema. A reviewer needs to substantiate the block without reaching into
+    a trace that has since expired; they do not need, and must never be
+    handed, a stored copy of the payload itself.
+
+    `injection` distinguishes "never scanned" from "scanned and clean":
+    `None` means no derivative ever existed to scan (a clock event, or one
+    with no document_ref) and this function writes no `injection` key at
+    all, same absence discipline as routing/screening/policy/compliance
+    above. An empty list means a document WAS scanned and came back clean,
+    and that positive fact is worth recording — `{"tainted": False,
+    "finding_count": 0, "findings": []}` — because it says the gate ran,
+    not that it never applied.
     """
     summary = None
     if screening:
@@ -121,10 +130,29 @@ def _record_outcome(
     if compliance is not None:
         payload["compliance"] = compliance
     if injection is not None:
+        # Project each finding to exactly pattern_id/page/offset rather than
+        # storing the list verbatim. app.injection.Finding carries only those
+        # three fields today, so this is currently a no-op filter — but the
+        # no-payload-text guarantee this function's docstring promises must
+        # be enforced HERE, at the write boundary, not merely inherited from
+        # whatever shape the caller happens to pass in. If a future scanner
+        # widens Finding with a matched-text field, this projection is what
+        # stops it reaching Firestore instead of silently starting to.
+        # Read every field with `.get()`, same defensive discipline as the
+        # screening-candidates projection above: injection is total and must
+        # never raise on a malformed entry either.
+        findings = [
+            {
+                "pattern_id": f.get("pattern_id") if isinstance(f, dict) else None,
+                "page": f.get("page") if isinstance(f, dict) else None,
+                "offset": f.get("offset") if isinstance(f, dict) else None,
+            }
+            for f in injection
+        ]
         payload["injection"] = {
-            "tainted": bool(injection),
-            "finding_count": len(injection),
-            "findings": injection,
+            "tainted": bool(findings),
+            "finding_count": len(findings),
+            "findings": findings,
         }
     db.collection(CASES).document(case_id).set(payload, merge=True)
 
@@ -256,7 +284,22 @@ def load_case_state(node_input, ctx: Context) -> Event:
             "document_checksum": document_checksum,
             "document_pages": document_pages,
             "document_tainted": tainted,
-            "injection_findings": [f.model_dump() for f in injection.findings] if injection else [],
+            # None (not []) when there was no derivative to scan at all (a
+            # clock event, or one with no document_ref) — distinct from a
+            # document that was scanned and came back clean, which publishes
+            # the genuinely empty list `injection.findings` produces. `scan`
+            # is total, so `injection` is only ever None here when it was
+            # never called; `injection is not None` (not truthiness) is what
+            # keeps that distinction, since an InjectionVerdict with no
+            # findings is still a truthy object. _record_outcome's `injection
+            # is not None` guard downstream depends on this: without it,
+            # every quarantined/parked/committed case — clock events
+            # included — got an `injection: {tainted: false, ...}` block
+            # implying a scan that never happened.
+            "injection_findings": (
+                [f.model_dump() for f in injection.findings]
+                if injection is not None else None
+            ),
             # The coordinator's channel to the event. Its node_input is this
             # Event's `output` — {"event_class": ...} — which names the event's
             # *class*, not its type, so without these keys the only place
