@@ -1,0 +1,228 @@
+{
+  "captured_at": "2026-08-15T00:03:02.808653+00:00",
+  "case_id": "DEMO-1d817bc0",
+  "supplier": "Distribuidora Textiles Occidente SAS",
+  "result": "FAIL",
+  "steps": [
+    {
+      "step": 1,
+      "event_type": "new_supplier_packet",
+      "effective_date": "2026-01-05",
+      "expected": {
+        "state": "active",
+        "cycle": 1
+      },
+      "phase": "committed",
+      "routing": {
+        "refused": null,
+        "evidence_skipped_no_document": false,
+        "reason": "Both evidence and compliance agents are required to extract document fields and screen the entity for this supplier case.",
+        "route": [
+          "evidence",
+          "compliance"
+        ],
+        "proposed": [
+          "evidence",
+          "compliance"
+        ]
+      },
+      "lifecycle": {
+        "last_reason": "ONBOARDED",
+        "last_effective_date": "2026-01-05",
+        "state": "active",
+        "cycle": 1
+      },
+      "certificate": {
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "expiry_date": "2027-01-01",
+        "extracted_at": "2026-01-05",
+        "evidence_version": 1
+      },
+      "commands": {
+        "DEMO-1d817bc0:attach_evidence:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "3b30ce0937"
+        },
+        "DEMO-1d817bc0:create_supplier:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "event_type": "renewal_due",
+      "effective_date": "2026-10-01",
+      "expected": {
+        "state": "active",
+        "reason": "NOT_DUE"
+      },
+      "phase": "no_action",
+      "routing": null,
+      "lifecycle": {
+        "state": "active",
+        "last_effective_date": "2026-10-01",
+        "last_reason": "NOT_DUE",
+        "cycle": 1
+      },
+      "certificate": {
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "expiry_date": "2027-01-01",
+        "extracted_at": "2026-01-05",
+        "evidence_version": 1
+      },
+      "commands": {
+        "DEMO-1d817bc0:attach_evidence:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "3b30ce0937"
+        },
+        "DEMO-1d817bc0:create_supplier:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "event_type": "renewal_due",
+      "effective_date": "2026-12-01",
+      "expected": {
+        "state": "renewal_requested"
+      },
+      "phase": "committed",
+      "routing": null,
+      "lifecycle": {
+        "last_reason": "RENEWAL_REQUESTED",
+        "last_effective_date": "2026-12-01",
+        "state": "renewal_requested",
+        "cycle": 1
+      },
+      "certificate": {
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "expiry_date": "2027-01-01",
+        "extracted_at": "2026-01-05",
+        "evidence_version": 1
+      },
+      "commands": {
+        "DEMO-1d817bc0:attach_evidence:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "3b30ce0937"
+        },
+        "DEMO-1d817bc0:create_supplier:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        },
+        "DEMO-1d817bc0:request_renewal:c1": {
+          "status": "failed",
+          "cycle": 1,
+          "external_id": null
+        }
+      }
+    },
+    {
+      "step": 4,
+      "event_type": "evidence_overdue",
+      "effective_date": "2027-01-15",
+      "expected": {
+        "state": "held"
+      },
+      "phase": "committed",
+      "routing": null,
+      "lifecycle": {
+        "last_reason": "HELD_OVERDUE",
+        "last_effective_date": "2027-01-15",
+        "state": "held",
+        "cycle": 1
+      },
+      "certificate": {
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "expiry_date": "2027-01-01",
+        "extracted_at": "2026-01-05",
+        "evidence_version": 1
+      },
+      "commands": {
+        "DEMO-1d817bc0:apply_hold:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        },
+        "DEMO-1d817bc0:attach_evidence:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "3b30ce0937"
+        },
+        "DEMO-1d817bc0:create_supplier:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        },
+        "DEMO-1d817bc0:request_renewal:c1": {
+          "status": "failed",
+          "cycle": 1,
+          "external_id": null
+        }
+      }
+    },
+    {
+      "step": 5,
+      "event_type": "certificate_received",
+      "effective_date": "2027-01-20",
+      "expected": {
+        "state": "active",
+        "cycle": 2
+      },
+      "phase": "quarantined",
+      "routing": {
+        "refused": "agent 'compliance' is not permitted for event type 'certificate_received'",
+        "evidence_skipped_no_document": false,
+        "reason": "Both evidence and compliance agents are engaged as the event requires full entity extraction and screening.",
+        "route": [],
+        "proposed": [
+          "evidence",
+          "compliance"
+        ]
+      },
+      "lifecycle": {
+        "last_reason": "HELD_OVERDUE",
+        "last_effective_date": "2027-01-15",
+        "state": "held",
+        "cycle": 1
+      },
+      "certificate": {
+        "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
+        "expiry_date": "2027-01-01",
+        "extracted_at": "2026-01-05",
+        "evidence_version": 1
+      },
+      "commands": {
+        "DEMO-1d817bc0:apply_hold:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        },
+        "DEMO-1d817bc0:attach_evidence:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "3b30ce0937"
+        },
+        "DEMO-1d817bc0:create_supplier:c1": {
+          "status": "done",
+          "cycle": 1,
+          "external_id": "Distribuidora Textiles Occidente SAS"
+        },
+        "DEMO-1d817bc0:request_renewal:c1": {
+          "status": "failed",
+          "cycle": 1,
+          "external_id": null
+        }
+      }
+    }
+  ],
+  "failure": "step 5: state was 'held', wanted 'active'"
+}
