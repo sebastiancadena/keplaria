@@ -1,23 +1,17 @@
-"""Unit tests for the compliance assessment path: schema, validator, escalation."""
+"""Unit tests for the compliance interpretation path: schema, apply_compliance's
+grounding check, assess_risk's one-way escalation, screen_supplier's routing
+into the interpreter, and park_case persisting the compliance block."""
 
 from __future__ import annotations
 
-from app.schemas import CandidateAssessment, ComplianceAssessment
+import json
 
+import pytest
 
-def test_compliance_assessment_parses_a_complete_payload():
-    parsed = ComplianceAssessment(
-        assessments=[
-            {"candidate_id": "c-1", "relevant": True, "reasoning": "same name"}
-        ],
-        recommendation="escalate_review",
-        rationale="one plausible candidate",
-    )
-    assert parsed.assessments[0].candidate_id == "c-1"
-    assert parsed.recommendation == "escalate_review"
-
-
-from app.nodes import apply_compliance
+import app.nodes as nodes_module
+from app.nodes import apply_compliance, assess_risk, park_case, screen_supplier
+from app.schemas import ComplianceAssessment
+from app.state.firestore import CASES
 
 
 class _StubContext:
@@ -53,6 +47,45 @@ def _assessment(candidate_id="c-1", recommendation="note_clear") -> dict:
         "recommendation": recommendation,
         "rationale": "no plausible connection",
     }
+
+
+def _case(case_id: str) -> dict:
+    return {"case_id": case_id, "event_type": "new_supplier_packet", "supplier": "Acme"}
+
+
+def _compliance(valid=True, recommendation="note_clear") -> dict:
+    record = _assessment(recommendation=recommendation)
+    record["valid"] = valid
+    if not valid:
+        record["invalid_reason"] = "UNKNOWN_CANDIDATE_ID"
+    return record
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def _yente_payload(candidates):
+    return {"responses": {"q": {"results": candidates}}}
+
+
+def test_compliance_assessment_parses_a_complete_payload():
+    parsed = ComplianceAssessment(
+        assessments=[
+            {"candidate_id": "c-1", "relevant": True, "reasoning": "same name"}
+        ],
+        recommendation="escalate_review",
+        rationale="one plausible candidate",
+    )
+    assert parsed.assessments[0].candidate_id == "c-1"
+    assert parsed.recommendation == "escalate_review"
 
 
 def test_apply_compliance_accepts_a_grounded_assessment():
@@ -106,19 +139,21 @@ def test_apply_compliance_handles_non_list_candidates_without_raising():
     assert result.output["invalid_reason"] == "UNKNOWN_CANDIDATE_ID"
 
 
-from app.nodes import assess_risk
+def test_apply_compliance_handles_a_non_dict_screening_without_raising():
+    """screening is normally a dict written by screen_supplier, but ctx.state
+    is a plain session-state bag with no schema of its own — a state store
+    can hand back a JSON string or any other truthy non-dict value. app.risk
+    .assess already guards this exact shape explicitly; apply_compliance must
+    never raise on it either, since the engine allows only one concurrent
+    query and a raising node becomes retry pressure instead of a decision."""
+    ctx = _StubContext(
+        {"case": {"case_id": "TEST-AC-6"}, "screening": "not-a-dict"}
+    )
 
+    result = apply_compliance(_assessment(), ctx)
 
-def _case(case_id: str) -> dict:
-    return {"case_id": case_id, "event_type": "new_supplier_packet", "supplier": "Acme"}
-
-
-def _compliance(valid=True, recommendation="note_clear") -> dict:
-    record = _assessment(recommendation=recommendation)
-    record["valid"] = valid
-    if not valid:
-        record["invalid_reason"] = "UNKNOWN_CANDIDATE_ID"
-    return record
+    assert result.output["valid"] is False
+    assert result.output["invalid_reason"] == "UNKNOWN_CANDIDATE_ID"
 
 
 def test_escalate_review_tightens_clear_to_review(case_id):
@@ -166,7 +201,21 @@ def test_note_clear_leaves_clear_untouched(case_id):
     assert "COMPLIANCE_ESCALATION" not in result.output["reasons"]
 
 
-def test_blocked_is_never_downgraded_by_the_agent(case_id):
+@pytest.mark.parametrize(
+    "compliance",
+    [
+        _compliance(recommendation="note_clear"),
+        _compliance(recommendation="escalate_review"),
+        _compliance(valid=False),
+    ],
+    ids=["note_clear", "escalate_review", "invalid_record"],
+)
+def test_blocked_is_never_downgraded_by_the_agent(case_id, compliance):
+    """The escalation is one-way: it may only tighten a fresh clear verdict.
+    A blocked verdict must survive every shape the agent's output can take —
+    a clean recommendation, an escalating one, and an invalid record — since
+    a guard as narrow as `if verdict.band != BLOCKED` would still pass a
+    single-case version of this test but fail two of these three."""
     screening = _screening_state()
     screening["candidates"][0].update({"score": 1.0, "match": True})
     screening["flagged"] = [screening["candidates"][0]["id"]]
@@ -174,7 +223,7 @@ def test_blocked_is_never_downgraded_by_the_agent(case_id):
         {
             "case": _case(case_id),
             "screening": screening,
-            "compliance": _compliance(recommendation="note_clear"),
+            "compliance": compliance,
         }
     )
 
@@ -224,27 +273,6 @@ def test_carry_forward_path_ignores_a_compliance_block(case_id):
     assert result.actions.route == "clear"
 
 
-import json as _json
-
-import app.nodes as nodes_module
-from app.nodes import screen_supplier
-
-
-class _FakeResponse:
-    def __init__(self, payload):
-        self._payload = payload
-
-    def raise_for_status(self):
-        pass
-
-    def json(self):
-        return self._payload
-
-
-def _yente_payload(candidates):
-    return {"responses": {"q": {"results": candidates}}}
-
-
 def test_screen_supplier_routes_candidates_to_the_interpreter(case_id, monkeypatch):
     candidates = [
         {"id": "c-1", "caption": "Acme Holdings", "score": 0.4, "match": False,
@@ -260,7 +288,7 @@ def test_screen_supplier_routes_candidates_to_the_interpreter(case_id, monkeypat
     assert result.actions.route == "interpret"
     delta = result.actions.state_delta
     assert delta["screening_supplier_name"] == "Acme"
-    parsed = _json.loads(delta["screening_candidates"])
+    parsed = json.loads(delta["screening_candidates"])
     assert parsed[0]["id"] == "c-1"
 
 
@@ -289,11 +317,7 @@ def test_screen_supplier_skips_the_interpreter_when_unreachable(case_id, monkeyp
     assert result.actions.state_delta["screening"]["reachable"] is False
 
 
-from app.nodes import park_case
-from app.state.firestore import CASES, get_client
-
-
-def test_park_case_persists_the_compliance_block(case_id):
+def test_park_case_persists_the_compliance_block(db, case_id):
     compliance = _compliance(recommendation="escalate_review")
     ctx = _StubContext(
         {
@@ -305,5 +329,5 @@ def test_park_case_persists_the_compliance_block(case_id):
 
     park_case(None, ctx)
 
-    doc = get_client().collection(CASES).document(case_id).get().to_dict()
+    doc = db.collection(CASES).document(case_id).get().to_dict()
     assert doc["compliance"] == compliance

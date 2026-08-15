@@ -29,8 +29,9 @@ topic keplaria-events
      case, bumps case_version)
   -> Agent Runtime graph: parse -> LLM coordinator routing proposal ->
      deterministic route validation (app/policy.py) -> yente screening
-     over PSC-I -> deterministic risk gate (app/risk.py) -> queue ERP
-     command, or park/quarantine the case
+     over PSC-I -> (when candidates exist) compliance interpretation,
+     independently checked -> deterministic risk gate (app/risk.py) ->
+     queue ERP command, or park/quarantine the case
   -> ingress drains the command outbox and performs the ERP write
 ```
 

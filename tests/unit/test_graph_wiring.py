@@ -39,6 +39,11 @@ def test_flagged_supplier_never_reaches_the_write_terminal():
         source = edge[0]
         target = edge[1]
         name = getattr(source, "__name__", None) or getattr(source, "name", str(source))
+        assert name not in edges, (
+            f"{name} already has a recorded edge; a second edge from the same "
+            "source would silently overwrite the first one in this dict, "
+            "hiding a duplicate route out of it instead of failing this test"
+        )
         edges[name] = target
 
     assert edges["screen_supplier"] == {
@@ -58,6 +63,22 @@ def test_flagged_supplier_never_reaches_the_write_terminal():
         "skip": assess_risk,
         "blocked": quarantine_case,
     }
+
+    # The assertions above only check the four sources named explicitly. A
+    # shortcut added from any OTHER source straight into commit_commands
+    # would pass every one of them. Flatten every edge's target — a plain
+    # node or every value of a routing map — and confirm the risk gate is
+    # the only source that ever points at the write terminal.
+    sources_into_commit_commands = set()
+    for name, target in edges.items():
+        targets = target.values() if isinstance(target, dict) else [target]
+        if commit_commands in targets:
+            sources_into_commit_commands.add(name)
+
+    assert sources_into_commit_commands == {"assess_risk"}, (
+        "commit_commands must be reachable from nowhere but assess_risk; "
+        f"found an edge into it from {sources_into_commit_commands}"
+    )
 
 
 class _StubContext:
@@ -123,6 +144,33 @@ async def test_the_evidence_agent_instruction_renders_the_actual_document():
 
     assert "abc123" in rendered
     assert "Expiry: 2027-01-01" in rendered
+
+
+def test_the_compliance_agent_holds_no_operational_tools():
+    assert not getattr(compliance_agent, "tools", []), (
+        "Compliance may call neither the screening service nor the ERP"
+    )
+    assert compliance_agent.disallow_transfer_to_parent is True
+    assert compliance_agent.disallow_transfer_to_peers is True
+
+
+def test_the_compliance_agent_instruction_references_the_screening_state_keys():
+    """screen_supplier publishes screening_supplier_name and
+    screening_candidates as flat, top-level session-state keys precisely so
+    a plain-string instruction can resolve them via ADK's state injection
+    (see the analogous evidence_agent test above). compliance_agent carries
+    no tools, so those two placeholders are the ONLY channel by which the
+    screening result reaches it at all. If a later edit drops
+    {screening_candidates}, the agent is asked to interpret candidates it
+    was never shown — it most likely returns an empty assessment list with
+    note_clear, which validates as clean, and no escalation ever fires. This
+    pins both placeholders' presence so that edit fails loudly instead."""
+    assert isinstance(compliance_agent.instruction, str), (
+        "state injection only runs for a plain string instruction "
+        "(LlmAgent.canonical_instruction bypasses it for a callable one)"
+    )
+    assert "{screening_supplier_name}" in compliance_agent.instruction
+    assert "{screening_candidates}" in compliance_agent.instruction
 
 
 def _routing_maps(workflow):

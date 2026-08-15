@@ -525,7 +525,8 @@ def apply_compliance(node_input, ctx: Context) -> Event:
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
-    screening = ctx.state.get("screening") or {}
+    screening = ctx.state.get("screening")
+    screening = screening if isinstance(screening, dict) else {}
     raw_candidates = screening.get("candidates")
     candidates = raw_candidates if isinstance(raw_candidates, list) else []
     known_ids = {c.get("id") for c in candidates if isinstance(c, dict)}
@@ -537,6 +538,11 @@ def apply_compliance(node_input, ctx: Context) -> Event:
         try:
             raw = json.loads(raw)
         except ValueError:
+            # Falls back to None, not {}: apply_compliance must tell an
+            # unparseable payload apart from a parsed-but-empty one, since
+            # the two are recorded as different outcomes downstream (an
+            # empty-but-valid assessment can still carry a recommendation,
+            # an unparseable one never can).
             raw = None
 
     valid = True
@@ -566,7 +572,12 @@ def apply_compliance(node_input, ctx: Context) -> Event:
         span.set_attribute("keplaria.compliance_valid", valid)
         if invalid_reason is not None:
             span.set_attribute("keplaria.compliance_invalid_reason", invalid_reason)
-        if assessment is not None:
+        if valid:
+            # Only a recommendation that passed the vocabulary check reaches
+            # the span. A BAD_RECOMMENDATION value is arbitrary model output
+            # with unbounded cardinality, and it could carry entity-
+            # identifying text onto the trace; the invalid case is already
+            # fully described by keplaria.compliance_invalid_reason above.
             span.set_attribute(
                 "keplaria.compliance_recommendation", assessment.recommendation
             )

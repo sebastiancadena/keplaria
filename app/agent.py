@@ -16,7 +16,8 @@
 
 event → reload durable case state → classify → (agentic path only)
 structured routing decision → validated branch → grounded evidence
-extraction → sanctions screening → deterministic risk gate → command queue.
+extraction → sanctions screening → compliance interpretation (when there are
+candidates to weigh) → deterministic risk gate → command queue.
 
 load_case_state is the first node on every path. It reloads the case's
 durable lifecycle and certificate blocks from Firestore and classifies the
