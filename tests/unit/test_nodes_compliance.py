@@ -222,3 +222,68 @@ def test_carry_forward_path_ignores_a_compliance_block(case_id):
     result = assess_risk(None, ctx)
 
     assert result.actions.route == "clear"
+
+
+import json as _json
+
+import app.nodes as nodes_module
+from app.nodes import screen_supplier
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def _yente_payload(candidates):
+    return {"responses": {"q": {"results": candidates}}}
+
+
+def test_screen_supplier_routes_candidates_to_the_interpreter(case_id, monkeypatch):
+    candidates = [
+        {"id": "c-1", "caption": "Acme Holdings", "score": 0.4, "match": False,
+         "properties": {"topics": ["sanction"]}}
+    ]
+    monkeypatch.setattr(
+        nodes_module.httpx, "post", lambda *a, **k: _FakeResponse(_yente_payload(candidates))
+    )
+    ctx = _StubContext({"case": _case(case_id)})
+
+    result = screen_supplier(None, ctx)
+
+    assert result.actions.route == "interpret"
+    delta = result.actions.state_delta
+    assert delta["screening_supplier_name"] == "Acme"
+    parsed = _json.loads(delta["screening_candidates"])
+    assert parsed[0]["id"] == "c-1"
+
+
+def test_screen_supplier_skips_the_interpreter_when_no_candidates(case_id, monkeypatch):
+    monkeypatch.setattr(
+        nodes_module.httpx, "post", lambda *a, **k: _FakeResponse(_yente_payload([]))
+    )
+    ctx = _StubContext({"case": _case(case_id)})
+
+    result = screen_supplier(None, ctx)
+
+    assert result.actions.route == "score"
+    assert result.actions.state_delta["screening_candidates"] == "[]"
+
+
+def test_screen_supplier_skips_the_interpreter_when_unreachable(case_id, monkeypatch):
+    def _boom(*a, **k):
+        raise nodes_module.httpx.ConnectError("no route")
+
+    monkeypatch.setattr(nodes_module.httpx, "post", _boom)
+    ctx = _StubContext({"case": _case(case_id)})
+
+    result = screen_supplier(None, ctx)
+
+    assert result.actions.route == "score"
+    assert result.actions.state_delta["screening"]["reachable"] is False

@@ -428,6 +428,16 @@ def screen_supplier(node_input, ctx: Context) -> Event:
 
     Records the outcome either way: an unreachable service is a result the trace
     must show, not an exception that hides the network.
+
+    Also decides whether the compliance interpreter runs at all. With no
+    candidates to weigh, there is nothing for it to interpret, and an
+    unreachable yente is left as a purely deterministic, fail-closed result —
+    routing it to an LlmAgent would spend a model call to reason about an
+    empty screen. Publishes `screening_candidates` and
+    `screening_supplier_name` as flat top-level state keys for the same
+    reason `load_case_state` publishes `document_checksum` /
+    `document_pages`: instruction-template injection only resolves bare
+    top-level keys, never a subscript into the nested `screening` dict.
     """
     case = ctx.state.get("case", {})
     name = case.get("supplier", "")
@@ -471,7 +481,16 @@ def screen_supplier(node_input, ctx: Context) -> Event:
         span.set_attribute("keplaria.screening_reachable", screening.reachable)
 
     payload = screening.model_dump()
-    return Event(output=payload, state={"screening": payload})
+    interpret = screening.reachable and bool(screening.candidates)
+    return Event(
+        output=payload,
+        state={
+            "screening": payload,
+            "screening_candidates": json.dumps(screening.candidates, indent=2),
+            "screening_supplier_name": name,
+        },
+        route="interpret" if interpret else "score",
+    )
 
 
 ALLOWED_RECOMMENDATIONS = ("corroborate_block", "escalate_review", "note_clear")
