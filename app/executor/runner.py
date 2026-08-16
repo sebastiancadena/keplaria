@@ -185,7 +185,7 @@ def _version(value) -> int | None:
         return None
 
 
-def _effective_band(case: dict) -> tuple[str | None, str | None, str | None]:
+def effective_band(case: dict) -> tuple[str | None, str | None, str | None]:
     """Combine the gate's verdict with a human decision, if one applies.
 
     Returns (effective_band, gate_band, approval_id).
@@ -235,7 +235,7 @@ def _policy_band(db, case_id: str) -> tuple[str | None, int | None, str | None, 
     snap = db.collection(CASES).document(case_id).get()
     case = (snap.to_dict() or {}) if snap.exists else {}
     policy = case.get("policy") or {}
-    effective, gate_band, approval_id = _effective_band(case)
+    effective, gate_band, approval_id = effective_band(case)
     return effective, policy.get("policy_version"), gate_band, approval_id
 
 
