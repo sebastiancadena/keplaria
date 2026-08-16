@@ -97,8 +97,17 @@ def commit_approval(
         }
         txn.set(approval_ref, record)
         # merge=True: this must not disturb policy, routing, screening or any
-        # other block the graph wrote.
-        txn.set(case_ref, {"approval": record}, merge=True)
+        # other block the graph wrote. updated_at is refreshed alongside
+        # approval so the console's list_cases (ordered on this field) sees
+        # a case the moment a decision lands on it, not only when the graph
+        # next runs — and so a case document can never end up missing the
+        # field just because the only write it has ever received is an
+        # approval.
+        txn.set(
+            case_ref,
+            {"approval": record, "updated_at": firestore.SERVER_TIMESTAMP},
+            merge=True,
+        )
         return ApprovalResult(True, current_version)
 
     return _commit(db.transaction())

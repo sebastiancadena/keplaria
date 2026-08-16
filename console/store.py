@@ -1,8 +1,15 @@
 """Reads for the console. No writes exist here, by construction.
 
 Both services read case state the same way; only the review service is allowed
-to act on it. Keeping the reads in one module means the public app's module
-graph contains no write path at all.
+to act on it. No route in this app calls a write. That is a claim about the
+route table, not about the module graph: console.public imports
+app.state.firestore, whose namespace also holds claim_event/mark_dispatched,
+and console.projection imports app.executor.runner, which imports
+app.executor.frappe (the ERP writes) and app.state.commands' record_success/
+record_failure. Nothing here calls any of them, but their presence on the
+import graph means the actual enforcement boundary is the route table (see
+console/public.py) plus whatever Firestore IAM role this app is deployed
+under — not the shape of what got imported.
 """
 
 from __future__ import annotations
@@ -35,9 +42,19 @@ def list_cases(db: firestore.Client, limit: int = 50) -> list[dict]:
     could hand back any `limit` documents, and a case parked moments ago is
     not guaranteed to be among them. A single-field `order_by` needs no
     composite index (Firestore auto-indexes every field), so this costs
-    nothing at deploy time. The "parked first" pass still happens in Python:
-    that ranking has nothing to do with recency and would need a second,
-    composite index to express as a Firestore-side sort.
+    nothing at deploy time.
+
+    The behaviour that matters most for whoever next touches this query:
+    `order_by` does not merely sort, it FILTERS. A document missing the
+    `updated_at` field is silently excluded from the result set entirely —
+    not sorted to one end, dropped. Every writer of a case document must set
+    `updated_at` (see app.nodes._record_outcome and
+    app.state.approvals.commit_approval) or its case becomes permanently
+    invisible here, with nothing anywhere to say so.
+
+    The "parked first" pass still happens in Python: that ranking has
+    nothing to do with recency and would need a second, composite index to
+    express as a Firestore-side sort.
     """
     query = db.collection(CASES).order_by(
         "updated_at", direction=firestore.Query.DESCENDING

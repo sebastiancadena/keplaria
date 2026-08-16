@@ -62,7 +62,7 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     _park_a_real_case(db, case_id)
     response = client.get(f"/cases/{case_id}")
     assert response.status_code == 200
-    assert "review" in response.text
+    assert "Gate: review" in response.text
     assert "create_supplier" in response.text
 
 

@@ -17,8 +17,8 @@
         <td class="mono"><a href="/cases/{{ case.case_id }}">{{ case.case_id }}</a></td>
         <td>{{ case.supplier }}</td>
         <td>{{ case.phase }}</td>
-        <td class="band--{{ case.gate_band or 'review' }}">{{ case.gate_band }}</td>
-        <td class="band--{{ case.effective_band or 'review' }}">{{ case.effective_band }}</td>
+        <td><span class="band--{{ case.gate_band or 'review' }}">{{ case.gate_band }}</span></td>
+        <td><span class="band--{{ case.effective_band or 'review' }}">{{ case.effective_band }}</span></td>
       </tr>
     {% endfor %}
     </tbody>

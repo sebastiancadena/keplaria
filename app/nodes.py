@@ -12,6 +12,7 @@ import os
 import httpx
 from google.adk.agents.context import Context
 from google.adk.events.event import Event
+from google.cloud import firestore
 from opentelemetry import trace
 from pydantic import ValidationError
 
@@ -123,7 +124,15 @@ def _record_outcome(
     # verdict exists), and that absence must read as "nothing new to say
     # here," never as "erase what was recorded earlier." So the payload is
     # built from only the non-None values.
-    payload: dict = {"phase": phase}
+    #
+    # updated_at is always present, unlike every other key above: it is not
+    # domain state a caller can legitimately omit, it is the write-boundary
+    # invariant every reader of this collection (the console's list_cases
+    # among them) depends on. claim_event sets it on the ingress path, but a
+    # test that drives the graph directly, bypassing claim_event, must not
+    # produce a case document lacking it — that document would be invisible
+    # to any query ordered on the field, permanently, not just late.
+    payload: dict = {"phase": phase, "updated_at": firestore.SERVER_TIMESTAMP}
     if routing is not None:
         payload["routing"] = routing
     if summary is not None:

@@ -623,7 +623,13 @@ def test_the_persisted_injection_block_never_stores_the_payload(db, case_id, mon
     quarantine_case(None, ctx)
 
     stored = db.collection(CASES).document(case_id).get().to_dict()
-    assert "2099-12-31" not in json.dumps(stored)
+    # default=str: `stored` now always carries `updated_at`, a Firestore
+    # server timestamp (DatetimeWithNanoseconds), which json.dumps cannot
+    # serialize on its own. Falling back to str() keeps this a genuine
+    # whole-document scan for the leaked payload text rather than narrowing
+    # it to exclude whatever new non-JSON field the write boundary happens
+    # to add next.
+    assert "2099-12-31" not in json.dumps(stored, default=str)
     assert stored["injection"]["findings"][0] == {
         "pattern_id": "DICTATES_OUTPUT+SNAKE_CASE_IDENTIFIER",
         "page": 0, "offset": 274,
