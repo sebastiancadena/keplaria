@@ -43,7 +43,9 @@ echo "== judge-visibility (private planning layer must not leak) =="
 # code and commit messages when copied verbatim. Caught in app/risk.py and in a
 # commit message on 2026-08-14. This grep is the automated backstop.
 LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|Ground Control|\bR[1-9][0-9]?\b'
-leak_files=$(git grep -lEi "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' 2>/dev/null)
+# -I skips binary files; the risk-id alternative can match arbitrary bytes in
+# vendored binaries. We only care about text leaks from our own writing.
+leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' 2>/dev/null)
 [ -z "$leak_files" ] \
   && ok "no private planning vocabulary in the tracked tree" \
   || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
