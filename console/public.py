@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -46,7 +46,15 @@ def case_detail(case_id: str, request: Request):
     db = get_client()
     case, commands = load_case(db, case_id)
     if case is None:
-        raise HTTPException(status_code=404, detail="no such case")
+        # HTML, not FastAPI's default JSON {"detail": ...} — this is a page
+        # a person mistyping a case id lands on, not an API client parsing a
+        # body.
+        return templates.TemplateResponse(
+            request=request,
+            name="not_found.html",
+            context={"case_id": case_id},
+            status_code=404,
+        )
     return templates.TemplateResponse(
         request=request,
         name="case.html",

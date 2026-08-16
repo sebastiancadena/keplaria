@@ -54,9 +54,22 @@ def client():
 
 @pytest.fixture
 def anonymous_client():
-    """No override: the real dependency runs and must refuse."""
+    """No override: the real dependency runs and must refuse.
+
+    Saves and restores `api.dependency_overrides` rather than only clearing
+    it: `api` is a module-global `FastAPI` instance shared across every test
+    in this file (and, under `-p xdist`, potentially interleaved with other
+    tests importing the same module), so a fixture that clears but never
+    restores leaves whatever override was in place before this test to be
+    silently lost for whoever runs after it.
+    """
+    saved = api.dependency_overrides.copy()
     api.dependency_overrides.clear()
-    return TestClient(api, raise_server_exceptions=False)
+    try:
+        yield TestClient(api, raise_server_exceptions=False)
+    finally:
+        api.dependency_overrides.clear()
+        api.dependency_overrides.update(saved)
 
 
 def _park_a_real_case(db, case_id: str) -> int:
@@ -115,19 +128,27 @@ def test_a_decision_with_a_missing_assertion_is_refused_with_403(
     assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
 
 
-def test_the_review_queue_is_not_reachable_anonymously(anonymous_client):
+def test_the_review_queue_is_not_reachable_anonymously(anonymous_client, monkeypatch):
+    # IAP_AUDIENCE must be set here, same as the 403 test above: unset, every
+    # one of these lands in _audience()'s 503 branch before verify_token is
+    # ever reached, and would keep passing even with require_reviewer's
+    # entire verification body deleted. Pinning 403 (not `in (403, 503)`)
+    # is what actually exercises the guard this test claims to cover.
+    monkeypatch.setenv("IAP_AUDIENCE", "/projects/1/locations/us-central1/services/x")
     response = anonymous_client.get("/review")
-    assert response.status_code in (403, 503)
+    assert response.status_code == 403
 
 
-def test_a_case_page_is_not_reachable_anonymously(anonymous_client, case_id):
+def test_a_case_page_is_not_reachable_anonymously(anonymous_client, case_id, monkeypatch):
+    monkeypatch.setenv("IAP_AUDIENCE", "/projects/1/locations/us-central1/services/x")
     response = anonymous_client.get(f"/review/{case_id}")
-    assert response.status_code in (403, 503)
+    assert response.status_code == 403
 
 
-def test_healthz_is_not_reachable_anonymously(anonymous_client):
+def test_healthz_is_not_reachable_anonymously(anonymous_client, monkeypatch):
+    monkeypatch.setenv("IAP_AUDIENCE", "/projects/1/locations/us-central1/services/x")
     response = anonymous_client.get("/healthz")
-    assert response.status_code in (403, 503)
+    assert response.status_code == 403
 
 
 def test_a_cross_site_decision_is_refused(db, case_id, client, created):

@@ -16,9 +16,9 @@
 <header class="masthead">
   <div class="masthead__brand">
     <img src="/static/keplaria-lockup-horizontal-dark.svg" alt="Keplaria" height="28">
-    <p class="tagline">Case console</p>
+    <p class="tagline">{% block masthead_tagline %}Case console{% endblock %}</p>
   </div>
-  <p class="caption">Public · read-only</p>
+  <p class="caption">{% block masthead_caption %}Public · read-only{% endblock %}</p>
 </header>
 <main>{% block content %}{% endblock %}</main>
 </div>

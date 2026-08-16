@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 
 from google.cloud import firestore
 
@@ -18,8 +19,23 @@ INBOX = "inbox"
 OUTBOX = "outbox"
 
 
+@lru_cache(maxsize=None)
 def get_client(database: str | None = None) -> firestore.Client:
     """Firestore client for the configured project and database.
+
+    Cached with `lru_cache`, keyed on `database`: building a client runs ADC
+    discovery (a metadata-server round trip on Cloud Run) and opens a gRPC
+    channel that is never explicitly closed, and every route on the public
+    console — as well as every route on the review service — called this
+    fresh on every single request before this cache existed. That is a
+    per-request network round trip and a leaked channel for a service whose
+    entire job is serving public pages. Safe to cache: the env vars this
+    resolves (FIRESTORE_PROJECT_ID/GOOGLE_CLOUD_PROJECT/FIRESTORE_DATABASE)
+    are fixed for the life of a deployed process, never changed mid-process
+    the way a test might monkeypatch them — and any test that needs a
+    different client swaps the imported `get_client` name itself (see
+    tests/unit/test_nodes_routing.py, test_ingress.py), not this function's
+    return value, so the cache is invisible to them.
 
     FIRESTORE_PROJECT_ID, not GOOGLE_CLOUD_PROJECT: on Agent Runtime,
     GOOGLE_CLOUD_PROJECT is a reserved env var the platform overwrites with

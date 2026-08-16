@@ -577,9 +577,10 @@ of a parked case: seeing it, and deciding on it.
   `execute_pending_commands` composition `tests/unit/test_approval_release.py`
   pins, then drains. It writes the decision and the resulting command state,
   so it needs `roles/datastore.user`, and because a committed approval can
-  execute a queued ERP write, it also needs Frappe Cloud credentials — a
-  second Cloud Run identity now holds ERP credentials, alongside
-  `keplaria-ingress`.
+  execute a queued ERP write, it will also need Frappe Cloud credentials once
+  deployed — a second Cloud Run identity, alongside `keplaria-ingress` (see
+  "Deploying (documented, not yet run)" below: neither service account
+  exists in this project yet).
 
 ### One image, two entry points
 

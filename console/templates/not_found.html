@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}No such case — Keplaria{% endblock %}
+{% block content %}
+<div class="panel">
+  <h1>No such case</h1>
+  <p><span class="mono">{{ case_id }}</span> does not match any case on record.</p>
+  <p><a href="/">Back to all cases</a></p>
+</div>
+{% endblock %}

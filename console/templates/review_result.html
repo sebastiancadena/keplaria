@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "review_base.html" %}
 {% block title %}Decision — Keplaria{% endblock %}
 {% block content %}
 <h1 class="mono">{{ case_id }}</h1>
@@ -21,7 +21,11 @@
   {% for command in executed %}
     <tr><td class="mono">{{ command.action }}</td>
         <td class="mono"><span class="band--{{ 'clear' if command.status == 'done' else 'blocked' }}">
-            {{ command.status }}</span></td></tr>
+            {{ command.status }}</span>
+            {% if command.status != 'done' and command.error %}
+            <br><span class="body-small">{{ command.error }}</span>
+            {% endif %}
+        </td></tr>
   {% endfor %}
   </tbody>
 </table>

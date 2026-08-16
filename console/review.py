@@ -27,20 +27,24 @@ request itself, deliberately not a new configured-origin environment
 variable (`IAP_AUDIENCE` already showed what a config item that ships unset
 costs).
 
-The host comparison deliberately drops the scheme. Behind Cloud Run and IAP,
-TLS terminates upstream and this container is reached over plain HTTP with
-no `--proxy-headers`/forwarded-proto trust configured (that is deploy
-configuration, out of scope here), so `request.url.scheme` reads `"http"`
-even though the browser's `Origin` always reads `"https"`. Comparing scheme
-would refuse every legitimate decision in production — a same-host,
-different-scheme request is not what an attacker's `Origin` ever looks like
-(their host can never match ours regardless of scheme), so dropping it costs
-no real defence. It also drops the port for the same reason: the port this
-container sees is Cloud Run's internal port, not the public one the browser
-used, so comparing anything but the bare host would fail the same way. The
-residual — a same-host, different-scheme *or* different-port request being
-treated as safe — is exactly the case IAP's forced TLS and its own port
-already make unreachable in this deployment.
+The host comparison deliberately drops the scheme and the port. The durable
+reason is not any particular deploy flag: it is that neither scheme nor port
+is something this code can trust to agree between what the container
+observes and what the browser actually used, under any proxy configuration.
+`request.url.scheme` reflects `https` only when the proxy in front of this
+container is both configured to forward that fact (`--proxy-headers` on
+Cloud Run) and trusted to tell the truth about it; the container's own port
+is likewise whatever the platform's internal port happens to be, never the
+public one the browser addressed. Comparing either would make this check's
+correctness depend on deploy configuration it cannot see and should not have
+to assume — dropping them means the check cannot break when TLS terminates
+upstream or the internal port differs from the public one, independent of
+how proxy headers are configured. It also costs no real defence: an
+attacker's `Origin` carries the attacker's own host, which can never match
+ours regardless of scheme or port. The residual — a same-host request
+differing only in scheme or port being treated as safe — is exactly what
+IAP's forced TLS and Cloud Run's own port already make unreachable in this
+deployment.
 
 The residual, stated rather than assumed: this defends a browser making the
 request on a tricked page. It does nothing against a scripted caller that
@@ -63,15 +67,13 @@ from app.executor.runner import effective_band, execute_pending_commands
 from app.state.approvals import commit_approval
 from app.state.firestore import get_client
 from console.iap import require_reviewer
-from console.store import list_cases, load_case
+from console.store import case_id_is_addressable, list_awaiting_cases, load_case
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 api = FastAPI(title="keplaria-review")
 api.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
-
-AWAITING = "awaiting_approval"
 
 # A refusal reason is a thing that happened to a person, not a code to look up.
 REFUSAL_MESSAGES = {
@@ -95,12 +97,12 @@ def _is_cross_site(request: Request) -> bool:
     origin = request.headers.get("origin")
     if origin is not None:
         # Host only — deliberately not scheme or port. See the module
-        # docstring: this container sees "http" and an internal port behind
-        # Cloud Run/IAP regardless of what the browser used, so comparing
-        # either would refuse every legitimate decision in production. An
-        # attacker's Origin carries the attacker's own host and can never
-        # match ours under any scheme or port, so dropping them costs no
-        # real defence.
+        # docstring: neither is trustworthy to compare regardless of proxy
+        # configuration (TLS terminates upstream, and the container's own
+        # port is never the public one the browser used), so comparing
+        # either risks refusing a legitimate decision. An attacker's Origin
+        # carries the attacker's own host and can never match ours under any
+        # scheme or port, so dropping them costs no real defence.
         if urlparse(origin).hostname != request.url.hostname:
             return True
     return False
@@ -127,6 +129,13 @@ def healthz(reviewer: str = Depends(require_reviewer)) -> dict:
 @api.get("/review", response_class=HTMLResponse)
 def review_list(request: Request, reviewer: str = Depends(require_reviewer)):
     db = get_client()
+    # list_awaiting_cases, not list_cases: the latter caps at 50 and orders
+    # by updated_at for the public console's "recent cases" view, so a case
+    # parked long enough to fall out of that window would silently vanish
+    # from a queue that claims to show everything awaiting a decision. See
+    # console/store.py for why that query is a bare `where phase ==`, no
+    # `order_by` — this project has no composite index.
+    #
     # A case whose phase is still AWAITING but whose current-version approval
     # already applies has been decided; commit_approval never touches phase
     # (only app.nodes' park_case does), so phase alone cannot tell "parked"
@@ -134,10 +143,7 @@ def review_list(request: Request, reviewer: str = Depends(require_reviewer)):
     # _case_is_decided is what keeps a released case off this list instead
     # of it sitting here forever with a form that can only ever be refused
     # as a duplicate.
-    parked = [
-        c for c in list_cases(db)
-        if c.get("phase") == AWAITING and not _case_is_decided(c)
-    ]
+    parked = [c for c in list_awaiting_cases(db) if not _case_is_decided(c)]
     return templates.TemplateResponse(
         request=request,
         name="review_list.html",
@@ -190,6 +196,33 @@ def decide(
         raise HTTPException(status_code=403, detail="cross-site request blocked")
 
     db = get_client()
+
+    # A case_id containing "/" (only reachable URL-encoded — see
+    # console.store.case_id_is_addressable) would otherwise reach
+    # commit_approval, which builds its own Firestore document reference
+    # from the raw case_id and raises a bare ValueError on exactly this
+    # shape: an unhandled 500 on the write route instead of a refusal.
+    # Checking here first — before any write is attempted, and without the
+    # extra read a full load_case call would cost on every ordinary
+    # decision — converts that crash into the same "no such case" refusal
+    # an unknown case gets, which is also the outcome an unaddressable id
+    # deserves.
+    if not case_id_is_addressable(case_id):
+        return templates.TemplateResponse(
+            request=request,
+            name="review_result.html",
+            context={
+                "case_id": case_id,
+                "committed": False,
+                "reason": "unknown_case",
+                "message": REFUSAL_MESSAGES["unknown_case"],
+                "case_version": None,
+                "executed": [],
+                "existing_decision": None,
+            },
+            status_code=200,
+        )
+
     # Derived, not generated: a double click, a browser retry and a resubmitted
     # form all produce the same id, so the second attempt is refused as a
     # duplicate with no client-side idempotency token to plumb through. The

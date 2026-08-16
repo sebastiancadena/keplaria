@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{# Shared masthead override for every authenticated review page.
+
+   base.html's default masthead reads "Public · read-only" — correct for
+   console.public, wrong here: this surface is behind Cloud IAP and its
+   Approve/Reject form writes to a live ERP. Every review_*.html template
+   extends this file instead of base.html directly, so the accurate heading
+   lives in exactly one place. #}
+{% block masthead_tagline %}Review console{% endblock %}
+{% block masthead_caption %}Authenticated · decisions write to the ERP{% endblock %}

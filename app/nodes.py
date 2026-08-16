@@ -960,7 +960,12 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
         "last_effective_date": case.get("effective_date"),
         "last_reason": decision.reason,
     }
-    update = {"lifecycle": lifecycle_block}
+    # updated_at alongside lifecycle/certificate, not just phase/policy/etc
+    # in _record_outcome above: a case whose only fresh write on a given pass
+    # is a lifecycle advance (a clock tick with no new routing or policy
+    # verdict) must still sort as recently touched wherever a query orders
+    # on this field — see console/store.py's list_cases.
+    update = {"lifecycle": lifecycle_block, "updated_at": firestore.SERVER_TIMESTAMP}
     if decision.certificate is not None:
         update["certificate"] = decision.certificate
 
