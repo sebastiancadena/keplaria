@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Keplaria{% endblock %}</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/site.webmanifest">
+<meta name="theme-color" content="#0B1020">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="shell">
+<header class="masthead">
+  <div class="masthead__brand">
+    <img src="/static/keplaria-lockup-horizontal-dark.svg" alt="Keplaria" height="28">
+    <p class="tagline">Case console</p>
+  </div>
+  <p class="caption">Public · read-only</p>
+</header>
+<main>{% block content %}{% endblock %}</main>
+</div>
+</body>
+</html>

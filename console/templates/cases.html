@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Cases — Keplaria{% endblock %}
+{% block content %}
+<div class="panel">
+  <div class="panel__header">
+    <h1>Cases</h1>
+    <span class="caption">{{ cases|length }} case(s)</span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Case</th><th>Supplier</th><th>Phase</th>
+          <th>Gate</th><th>Effective</th></tr>
+    </thead>
+    <tbody>
+    {% for case in cases %}
+      <tr>
+        <td class="mono"><a href="/cases/{{ case.case_id }}">{{ case.case_id }}</a></td>
+        <td>{{ case.supplier }}</td>
+        <td>{{ case.phase }}</td>
+        <td class="band--{{ case.gate_band or 'review' }}">{{ case.gate_band }}</td>
+        <td class="band--{{ case.effective_band or 'review' }}">{{ case.effective_band }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
