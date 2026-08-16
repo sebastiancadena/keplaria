@@ -53,10 +53,36 @@ fixture (`policy/supplier_risk.v2.json`) and returns one of three bands.
 match scores at or above the block threshold and never reaches the command
 queue. `app/executor/runner.py`, run from the ingress, re-reads that
 persisted verdict before draining any command and refuses to drain one whose
-case is not `clear` — a backstop at a different identity boundary (the
-Cloud Run ingress runs under a different identity than the Agent Runtime
-graph), explicitly **not** a second independent check: the graph's
-`assess_risk` branch is what actually stops a flagged supplier.
+case is not `clear` — at a different identity boundary, since the Cloud Run
+ingress runs under a different identity than the Agent Runtime graph.
+
+For a `blocked` case that refusal is a backstop rather than a second
+independent check: `quarantine_case` claims nothing, so there is nothing to
+refuse, and the graph's `assess_risk` branch is what actually stops a flagged
+supplier. For a `review` case it is the primary enforcement — see below.
+
+**Human approval.** A parked case claims the commands it would run and
+executes none of them, so a reviewer can see what they are approving rather
+than only that something is waiting. Those commands drain to
+`refused_by_policy` on every pass until a decision arrives.
+`app/state/approvals.py` commits that decision in a single Firestore
+transaction, keyed by an `approval_id` and taken against a specific
+`case_version`. A replayed `approval_id` is rejected as a duplicate; a
+decision taken against a version the case has since passed is rejected as
+stale; and an approval stops applying the moment a later event advances the
+case version, so it can never authorise a write for state the reviewer never
+saw.
+
+The deterministic gate's verdict is never overwritten. The executor combines
+the machine's band with the human's decision and records both, so the outbox
+shows whether policy or a person decided, and a rejection can withhold what
+the gate would have granted. Restrictive actions — a hold — bypass this
+entirely in both directions: refusing to hold a risky supplier because a case
+is under review would invert the gate's purpose.
+
+The approval UI and its authenticated service are not part of this; this is
+the state layer they will call. The composition they will perform — commit,
+then drain — is exercised in `tests/unit/test_approval_release.py`.
 
 Two honest limits. The `review` band is a parked case, not a live pause —
 `RequestInput` is not in this graph, and a later milestone reinstates a real

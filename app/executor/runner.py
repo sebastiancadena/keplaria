@@ -17,15 +17,29 @@ retry loop — and stays `failed` until some unrelated later event for the
 same case triggers another drain, or until a dedicated retry/DLQ path is
 built (not yet).
 
-This module also re-reads the gate's verdict (`cases/{case_id}.policy`) before
-draining and refuses any not-yet-executed PERMISSIVE command whose case is not
-`clear`. That is a backstop, not the primary enforcement: the graph's
-assess_risk branch is what stops a flagged supplier, and in the happy path
-this guard never fires, because the review and blocked terminals claim no
-command. It exists for the anomalous paths — a duplicate-event redelivery
-draining a command queued under older state, or a graph-wiring bug — and it
-matters because this process runs under a different identity (the Cloud Run
-ingress) than the graph.
+This module also re-reads the case before draining and refuses any
+not-yet-executed PERMISSIVE command whose case is not `clear`. The band it
+refuses on is an EFFECTIVE band, computed from two things: the gate's own
+verdict (`cases/{case_id}.policy`) and a human decision
+(`cases/{case_id}.approval`), when one applies. Approved clears, rejected
+blocks, and the gate's own band is never overwritten — both bands are carried
+into every record this module returns, so a reader can tell whether policy or
+a person decided. An approval applies only while the case is still at the
+version it was committed against; once a later event advances the case, the
+approval silently stops applying and its commands go back to being refused.
+
+For a `blocked` case this guard is a backstop rather than the primary
+enforcement: assess_risk routes such a case to quarantine_case, which claims
+nothing, so there is nothing here to refuse. It matters for the anomalous
+paths — a duplicate-event redelivery draining a command queued under older
+state, or a graph-wiring bug — and because this process runs under a different
+identity (the Cloud Run ingress) than the graph.
+
+For a `review` case the guard is the primary enforcement and fires constantly
+by design. park_case claims the commands it parks, so a parked case drains to
+`refused_by_policy` on every pass until a human approves it. That refusal is
+the system working, not an anomaly, and it is what makes a parked case
+releasable at all.
 
 This executor-side guard is deliberately one-directional. It exists to stop
 THIS PROCESS from GRANTING something — creating a supplier, attaching
@@ -38,15 +52,23 @@ bypass this guard; every other known action is permissive and stays gated on
 a `clear` verdict.
 
 That one-directional promise covers only what reaches this module, not the
-graph upstream of it. The graph's own routing is more restrictive still:
-`assess_risk` sends a non-`clear` verdict straight to `quarantine_case`, so
-`commit_commands` never runs and `apply_hold` is never even claimed for a
-case the graph has already deemed non-clear — the graph withholds there,
-today, by construction. What this guard backstops is narrower: a command
-claimed under state that was current when the graph decided, then drained
-later under state that has since changed (a duplicate-event redelivery, or a
-graph-wiring bug) — not a live capability to hold a newly-sanctioned
-supplier the moment screening flags it.
+graph upstream of it, and what reaches it depends on the band:
+
+- `blocked` → `quarantine_case`, which claims nothing. No command exists, so
+  the graph withholds there by construction and `apply_hold` is never claimed
+  for a case already deemed blocked.
+- `review` → `park_case`, which claims what `decide()` names. If that includes
+  `apply_hold`, this module executes it on the next drain, because a hold is
+  RESTRICTIVE and bypasses the band guard. A held-because-overdue supplier
+  whose case is also under review is therefore held now rather than waiting on
+  the approval that gates the permissive commands beside it.
+
+The gap that remains is narrower than it was but still real: a supplier who
+becomes sanctioned scores `blocked`, and a blocked case still claims nothing,
+so there is still no live capability to hold a newly-sanctioned supplier the
+moment screening flags it. Closing that means letting the blocked terminal
+claim restrictive commands, which is a separate decision and is NOT what the
+review terminal's claiming implies.
 """
 
 from __future__ import annotations
