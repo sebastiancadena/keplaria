@@ -5,6 +5,11 @@
 <p><span class="band--{{ 'clear' if committed else 'blocked' }}">
   {{ 'committed' if committed else 'refused' }}</span></p>
 <p>{{ message }}</p>
+{% if not committed and existing_decision %}
+  <p>The recorded decision on this case is:
+     <span class="band--{{ 'clear' if existing_decision == 'approved' else 'blocked' }}">
+       {{ existing_decision }}</span></p>
+{% endif %}
 {% if not committed and case_version %}
   <p>The case is now at version {{ case_version }}.</p>
 {% endif %}

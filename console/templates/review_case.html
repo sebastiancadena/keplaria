@@ -37,9 +37,15 @@
 </ul>
 {% endif %}
 
+{% if decided %}
+<p>This case already has a recorded decision:
+   <span class="band--{{ 'clear' if case.approval.decision == 'approved' else 'blocked' }}">
+     {{ case.approval.decision }}</span></p>
+{% else %}
 <form method="post" action="/review/{{ case.case_id }}/decide">
   <input type="hidden" name="expected_case_version" value="{{ expected_case_version }}">
   <button type="submit" name="decision" value="approved">Approve</button>
   <button type="submit" name="decision" value="rejected">Reject</button>
 </form>
+{% endif %}
 {% endblock %}

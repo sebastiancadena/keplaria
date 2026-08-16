@@ -10,27 +10,38 @@ execute_pending_commands only if that commit returned committed. Draining is
 deliberately not inside commit_approval, which records a decision and grants
 nothing.
 
-CSRF posture, stated rather than assumed: /review/{case_id}/decide is
-POST-only (never reachable by GET), and its authentication is a header IAP
-itself adds after validating the proxy's own session cookie for this domain —
-this code never trusts a client-supplied identity header directly. That still
-leaves a residual forged-submission risk if a signed-in reviewer's browser is
-made to POST to this path from another origin while their IAP session is
-live; nothing here adds an origin check or a per-form anti-CSRF token, and
-that gap is called out as an open concern rather than silently declared
-closed.
+CSRF posture: /review/{case_id}/decide is POST-only (never reachable by
+GET), and its *authentication* is a header IAP itself injects server-side
+after validating the proxy's own session cookie for this domain — this code
+never trusts a client-supplied identity header directly. That authentication
+fact does NOT defend against CSRF, though: IAP adds the header after
+checking a cookie, and a form-encoded POST is a CORS-simple request, so an
+attacker page can make a signed-in reviewer's browser submit
+`decision=approved` against a guessed case id and version with no preflight
+and without ever reading the response — the browser attaches the IAP session
+cookie on its own. `_is_cross_site` below is the mitigation: it refuses when
+`Sec-Fetch-Site` (a header only the browser sets, never page script) says the
+request did not originate same-site, and refuses when a present `Origin`
+header does not match this request's own origin — computed from the request
+itself, deliberately not a new configured-origin environment variable
+(`IAP_AUDIENCE` already showed what a config item that ships unset costs).
+The residual, stated rather than assumed: this defends a browser making the
+request on a tricked page. It does nothing against a scripted caller that
+already holds a stolen IAP session cookie and simply omits both headers —
+that caller was never a browser and had no `Sec-Fetch-Site` to spoof or
+suppress.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.executor.runner import execute_pending_commands
+from app.executor.runner import effective_band, execute_pending_commands
 from app.state.approvals import commit_approval
 from app.state.firestore import get_client
 from console.iap import require_reviewer
@@ -55,6 +66,35 @@ REFUSAL_MESSAGES = {
 }
 
 
+def _is_cross_site(request: Request) -> bool:
+    """True when a browser-set signal says this request did not originate
+    same-site. See the module docstring for exactly what this does and does
+    not defend against.
+    """
+    site = request.headers.get("sec-fetch-site")
+    if site is not None and site not in ("same-origin", "none"):
+        return True
+    origin = request.headers.get("origin")
+    if origin is not None:
+        own_origin = f"{request.url.scheme}://{request.url.netloc}"
+        if origin != own_origin:
+            return True
+    return False
+
+
+def _case_is_decided(case: dict) -> bool:
+    """True when a human decision currently applies to `case`.
+
+    Delegates to app.executor.runner.effective_band, the one place that
+    already knows an approval only applies while the case sits at the
+    version it was committed against — a decision that has gone stale
+    because the case advanced must NOT hide the case from the queue or the
+    Approve/Reject form again, because it still needs a human look.
+    """
+    _, _, approval_id = effective_band(case)
+    return approval_id is not None
+
+
 @api.get("/healthz")
 def healthz(reviewer: str = Depends(require_reviewer)) -> dict:
     return {"status": "ok"}
@@ -63,7 +103,17 @@ def healthz(reviewer: str = Depends(require_reviewer)) -> dict:
 @api.get("/review", response_class=HTMLResponse)
 def review_list(request: Request, reviewer: str = Depends(require_reviewer)):
     db = get_client()
-    parked = [c for c in list_cases(db) if c.get("phase") == AWAITING]
+    # A case whose phase is still AWAITING but whose current-version approval
+    # already applies has been decided; commit_approval never touches phase
+    # (only app.nodes' park_case does), so phase alone cannot tell "parked"
+    # from "decided, awaiting the graph's next pass." Filtering on
+    # _case_is_decided is what keeps a released case off this list instead
+    # of it sitting here forever with a form that can only ever be refused
+    # as a duplicate.
+    parked = [
+        c for c in list_cases(db)
+        if c.get("phase") == AWAITING and not _case_is_decided(c)
+    ]
     return templates.TemplateResponse(
         request=request,
         name="review_list.html",
@@ -95,6 +145,7 @@ def review_case(
             "pending": pending,
             "reviewer": reviewer,
             "expected_case_version": case.get("case_version"),
+            "decided": _case_is_decided(case),
         },
     )
 
@@ -107,6 +158,13 @@ def decide(
     expected_case_version: int = Form(...),
     reviewer: str = Depends(require_reviewer),
 ):
+    if _is_cross_site(request):
+        # A hard refusal, not a rendered review_result.html: this is a
+        # security boundary, not a domain outcome the reviewer needs to read
+        # prose about. See the module docstring for exactly what this does
+        # and does not defend against.
+        raise HTTPException(status_code=403, detail="cross-site request blocked")
+
     db = get_client()
     # Derived, not generated: a double click, a browser retry and a resubmitted
     # form all produce the same id, so the second attempt is refused as a
@@ -121,9 +179,23 @@ def decide(
     executed: list[dict] = []
     if result.committed:
         # Only after a committed decision, and in this order. A rejection
-        # drains too — and correctly executes nothing, because the effective
-        # band is blocked.
+        # drains too: PERMISSIVE commands are correctly refused because the
+        # effective band is blocked, but a RESTRICTIVE command (apply_hold)
+        # bypasses that band guard by design — see
+        # app.executor.runner.execute_pending_commands's docstring — and
+        # still executes here even on a rejected case. "Drains" is not a
+        # synonym for "executes nothing."
         executed = execute_pending_commands(db, case_id)
+
+    # Never re-read as `.actor`: the audit record's actor field is who
+    # decided, not what — this is only ever the decision word, and only
+    # ever surfaced for the case currently being refused, not some other
+    # reviewer's case.
+    existing_decision = None
+    if not result.committed:
+        existing_case, _ = load_case(db, case_id)
+        if existing_case:
+            existing_decision = (existing_case.get("approval") or {}).get("decision")
 
     message = (
         f"Decision recorded: {decision}."
@@ -140,5 +212,6 @@ def decide(
             "message": message,
             "case_version": result.case_version,
             "executed": executed,
+            "existing_decision": existing_decision,
         },
     )
