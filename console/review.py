@@ -22,9 +22,26 @@ and without ever reading the response — the browser attaches the IAP session
 cookie on its own. `_is_cross_site` below is the mitigation: it refuses when
 `Sec-Fetch-Site` (a header only the browser sets, never page script) says the
 request did not originate same-site, and refuses when a present `Origin`
-header does not match this request's own origin — computed from the request
-itself, deliberately not a new configured-origin environment variable
-(`IAP_AUDIENCE` already showed what a config item that ships unset costs).
+header's HOST does not match this request's own host — computed from the
+request itself, deliberately not a new configured-origin environment
+variable (`IAP_AUDIENCE` already showed what a config item that ships unset
+costs).
+
+The host comparison deliberately drops the scheme. Behind Cloud Run and IAP,
+TLS terminates upstream and this container is reached over plain HTTP with
+no `--proxy-headers`/forwarded-proto trust configured (that is deploy
+configuration, out of scope here), so `request.url.scheme` reads `"http"`
+even though the browser's `Origin` always reads `"https"`. Comparing scheme
+would refuse every legitimate decision in production — a same-host,
+different-scheme request is not what an attacker's `Origin` ever looks like
+(their host can never match ours regardless of scheme), so dropping it costs
+no real defence. It also drops the port for the same reason: the port this
+container sees is Cloud Run's internal port, not the public one the browser
+used, so comparing anything but the bare host would fail the same way. The
+residual — a same-host, different-scheme *or* different-port request being
+treated as safe — is exactly the case IAP's forced TLS and its own port
+already make unreachable in this deployment.
+
 The residual, stated rather than assumed: this defends a browser making the
 request on a tricked page. It does nothing against a scripted caller that
 already holds a stolen IAP session cookie and simply omits both headers —
@@ -35,6 +52,7 @@ suppress.
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -76,8 +94,14 @@ def _is_cross_site(request: Request) -> bool:
         return True
     origin = request.headers.get("origin")
     if origin is not None:
-        own_origin = f"{request.url.scheme}://{request.url.netloc}"
-        if origin != own_origin:
+        # Host only — deliberately not scheme or port. See the module
+        # docstring: this container sees "http" and an internal port behind
+        # Cloud Run/IAP regardless of what the browser used, so comparing
+        # either would refuse every legitimate decision in production. An
+        # attacker's Origin carries the attacker's own host and can never
+        # match ours under any scheme or port, so dropping them costs no
+        # real defence.
+        if urlparse(origin).hostname != request.url.hostname:
             return True
     return False
 

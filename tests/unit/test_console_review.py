@@ -158,6 +158,25 @@ def test_a_mismatched_origin_decision_is_refused(db, case_id, client, created):
     assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
 
 
+def test_an_origin_differing_only_by_scheme_is_permitted(db, case_id, client, created):
+    """Regression pin for the scheme-comparison defect: behind Cloud Run and
+    IAP this container is reached over plain HTTP (request.url.scheme ==
+    "http") while every real browser Origin reads "https" — comparing scheme
+    would refuse every legitimate decision in production. Only the host may
+    gate the request; TestClient's own host is "testserver", so an Origin
+    that names that same host under a different scheme must be permitted
+    all the way through to a committed, released decision."""
+    version = _park_a_real_case(db, case_id)
+    response = client.post(
+        f"/review/{case_id}/decide",
+        data={"decision": "approved", "expected_case_version": version},
+        headers={"Origin": "https://testserver"},
+    )
+    assert response.status_code == 200
+    assert created == ["Andes Foods"]
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == DONE
+
+
 def test_an_invalid_decision_is_refused(db, case_id, client, created):
     version = _park_a_real_case(db, case_id)
     response = client.post(
