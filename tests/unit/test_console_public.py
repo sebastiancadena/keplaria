@@ -98,7 +98,19 @@ def test_a_subthreshold_candidate_is_shown(db, case_id, client):
 
 
 def test_an_unknown_case_is_a_404(client):
-    assert client.get("/cases/NOPE-1").status_code == 404
+    """A judge mistyping a case id must land on the rendered not_found.html
+    page, not FastAPI's default `{"detail": ...}` JSON body. Asserting only
+    the status code would keep passing even if the handler were rewritten to
+    `raise HTTPException(404, "no such case")` instead of rendering the
+    template — that response is also a 404. The content-type, the masthead
+    marker only base.html produces, and the absence of "detail" together
+    pin the template, not just the status.
+    """
+    response = client.get("/cases/NOPE-1")
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("text/html")
+    assert "masthead" in response.text
+    assert "detail" not in response.text
 
 
 def test_healthz(client):

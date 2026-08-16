@@ -9,6 +9,7 @@ it and the ERP client stubbed the way the executor tests stub it.
 from __future__ import annotations
 
 import contextlib
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,9 +17,10 @@ from fastapi.testclient import TestClient
 from app.executor import runner as runner_module
 from app.nodes import park_case
 from app.state.commands import DONE, PENDING, get_command
-from app.state.firestore import claim_event
+from app.state.firestore import CASES, claim_event
 from console.iap import require_reviewer
 from console.review import api
+from console.store import list_awaiting_cases, list_cases
 
 
 class _StubContext:
@@ -278,6 +280,41 @@ def test_a_decided_case_drops_off_the_review_queue(db, case_id, client, created)
     response = client.get("/review")
     assert response.status_code == 200
     assert case_id not in response.text
+
+
+def test_a_long_parked_case_still_appears_in_the_review_queue(db, case_id, client):
+    """The shared keplaria-test `cases` collection holds thousands of
+    documents, so a case with an `updated_at` this old is nowhere near the
+    50 most-recently-touched ones. That makes this the case that would
+    silently vanish if the review queue were ever built on `list_cases`
+    (recent-first, capped at 50) instead of `list_awaiting_cases` (every
+    `awaiting_approval` case, no cap). Written directly rather than through
+    `park_case`, because every real writer stamps `updated_at` with
+    `SERVER_TIMESTAMP` — there is no way to make the pipeline itself produce
+    a document this stale.
+    """
+    ancient = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id,
+        "phase": "awaiting_approval",
+        "updated_at": ancient,
+    })
+    try:
+        assert case_id in [c.get("case_id") for c in list_awaiting_cases(db)]
+        assert case_id not in [c.get("case_id") for c in list_cases(db, limit=50)], (
+            "sanity check: this case must be old enough to fall out of the "
+            "50 most-recently-touched documents, or the queue assertion "
+            "below would pass for the wrong reason"
+        )
+
+        response = client.get("/review")
+        assert response.status_code == 200
+        assert case_id in response.text, (
+            "a long-parked case must not vanish from a queue that claims "
+            "to show everything awaiting a decision"
+        )
+    finally:
+        db.collection(CASES).document(case_id).delete()
 
 
 def test_a_decided_case_page_no_longer_offers_a_decision(db, case_id, client, created):
