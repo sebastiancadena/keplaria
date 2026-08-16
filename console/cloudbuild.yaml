@@ -1,0 +1,8 @@
+# Builds the console image from the repo root, so the Dockerfile can COPY app/.
+# .gcloudignore governs what is uploaded — it already excludes the private
+# symlinks, .env, and everything not needed at runtime.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', '${_IMAGE}', '-f', 'console/Dockerfile', '.']
+images:
+  - '${_IMAGE}'

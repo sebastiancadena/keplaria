@@ -215,6 +215,35 @@ retry_backoff=$(gcloud pubsub subscriptions describe keplaria-events-push --proj
   && ok "keplaria-events-push has a retry policy (minimumBackoff=$retry_backoff)" \
   || bad "keplaria-events-push has no retry policy — a 429/503 redelivers near-instantly and can exhaust the engine quota"
 
+echo "== console + review services =="
+console_url=$(gcloud run services describe keplaria-console --region=us-central1 \
+  --format='value(status.url)' --project=keplaria 2>/dev/null)
+if [ -n "$console_url" ]; then
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$console_url/healthz")
+  [ "$code" = "200" ] && ok "public console answers unauthenticated (200)" \
+    || bad "public console returned $code unauthenticated"
+else
+  meh "keplaria-console not deployed yet"
+fi
+
+review_url=$(gcloud run services describe keplaria-review --region=us-central1 \
+  --format='value(status.url)' --project=keplaria 2>/dev/null)
+if [ -n "$review_url" ]; then
+  # The whole point of the service: an unauthenticated caller gets nothing.
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$review_url/review")
+  case "$code" in
+    401|403) ok "review service refuses unauthenticated callers ($code)" ;;
+    *) bad "review service returned $code to an unauthenticated caller" ;;
+  esac
+  aud=$(gcloud run services describe keplaria-review --region=us-central1 \
+    --project=keplaria --format='value(spec.template.spec.containers[0].env)' 2>/dev/null \
+    | grep -c IAP_AUDIENCE)
+  [ "$aud" -ge 1 ] && ok "review service has IAP_AUDIENCE set" \
+    || bad "review service missing IAP_AUDIENCE — it will refuse every decision"
+else
+  meh "keplaria-review not deployed yet"
+fi
+
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
 if command -v uvx >/dev/null; then

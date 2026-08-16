@@ -14,8 +14,14 @@ The agent graph and its adapters run on two different runtimes:
   network attachment and keeps agent execution state in Agent Platform
   Sessions.
 - **Cloud Run** hosts `keplaria-ingress`, the authenticated Pub/Sub push
-  adapter — the only public-facing entry point, and the component that talks
-  to both Firestore and the ERP.
+  adapter and the component that talks to both Firestore and the ERP, plus
+  two more services covering the human side of a parked case:
+  `keplaria-console` (public, read-only case visibility) and
+  `keplaria-review` (the authenticated decision surface). See
+  [Case console and review service](#case-console-and-review-service).
+  `keplaria-ingress` is the only one of the three that can push a state
+  change through the graph; the other two only read and decide on state the
+  graph already produced.
 
 Everything is in `us-central1`.
 
@@ -155,7 +161,10 @@ and is reported rather than retried blindly.
 
 - `scripts/doctor.sh` — 45 read-only checks covering toolchain, auth,
   provisioned infra, and the event-flow wiring (topic, push subscription
-  OIDC, ingress auth, concurrency/maxScale, retry policy).
+  OIDC, ingress auth, concurrency/maxScale, retry policy), plus two warnings
+  for `keplaria-console` / `keplaria-review` that turn into checks once
+  those services exist — see
+  [Case console and review service](#case-console-and-review-service).
 - `spikes/lifecycle/harness.py` — drives the full five-step station-keeping
   lifecycle (onboarding, early renewal check, renewal request, overdue hold,
   renewed evidence and hold release) against the deployed engine and ingress,
@@ -545,6 +554,173 @@ of which also affect the Cloud Run fallback:
 env var, echoing them to stdout** — `FRAPPE_API_KEY` / `FRAPPE_API_SECRET`
 currently ship this way. Move them to `--secrets ENV=SECRET` (Secret Manager)
 when the scoped executor identity is built, and rotate.
+
+## Case console and review service
+
+Two Cloud Run services, built from one image (`console/Dockerfile`, entry
+points `console.public:api` and `console.review:api`), cover the human side
+of a parked case: seeing it, and deciding on it.
+
+- **`keplaria-console`** — public, unauthenticated, read-only. Renders
+  `console/projection.py`'s allowlist view of a case: what it looked like
+  when it was scored, and its current effective band. `console/store.py` is
+  explicit that "no route here calls a write" is a claim about the route
+  table, not about what got imported — `console/projection.py` needs
+  `effective_band` from `app.executor.runner`, and that module's import
+  graph reaches the ERP write path. Nothing in this app's routes calls it,
+  but the actual enforcement boundary is the IAM role this service runs
+  under. That is why its deploy grants `roles/datastore.viewer`, not
+  `roles/datastore.user` — the read-only property is an IAM fact, not a code
+  fact.
+- **`keplaria-review`** — authenticated, behind Cloud IAP. Lists parked
+  cases and commits a decision through the same `commit_approval` /
+  `execute_pending_commands` composition `tests/unit/test_approval_release.py`
+  pins, then drains. It writes the decision and the resulting command state,
+  so it needs `roles/datastore.user`, and because a committed approval can
+  execute a queued ERP write, it also needs Frappe Cloud credentials — a
+  second Cloud Run identity now holds ERP credentials, alongside
+  `keplaria-ingress`.
+
+### One image, two entry points
+
+Both services build from `console/Dockerfile`, whose base image
+(`python:3.13-slim`) is kept in lockstep with `console/pyproject.toml`'s
+`requires-python`, same reasoning as the root Dockerfile (see "The one
+failure mode you will actually hit" above). The image's default command
+serves the public console; the review deploy overrides it:
+
+```bash
+--command uvicorn --args console.review:api,--host,0.0.0.0,--port,8080,--proxy-headers
+```
+
+`--proxy-headers` matters even though nothing here currently depends on it:
+TLS terminates at Cloud Run and the container is reached over plain HTTP, so
+without the flag `request.url.scheme` reads `http` inside the container no
+matter what the browser used. `console/review.py`'s CSRF check was written
+to compare the request `Origin`'s **host** only, deliberately, so it does
+not depend on the scheme being right — but any future code that builds an
+absolute URL or issues a redirect would silently produce an `http://` link
+on a service the browser only ever reaches over `https://`. Setting the flag
+now avoids rediscovering that gap later.
+
+`console/cloudbuild.yaml` builds from the repo root so the Dockerfile can
+`COPY app/`, the same pattern as `ingress/cloudbuild.yaml`. `.gcloudignore`
+governs what gets uploaded either way and needs no change for this build —
+it already excludes the private `strategy` / `.claude` / `CLAUDE.md`
+symlinks regardless of which Dockerfile is building.
+
+### Identity is verified, not asserted
+
+`console/iap.py` never trusts the plaintext email header the proxy forwards;
+it verifies the signed `X-Goog-IAP-JWT-Assertion` against Google's published
+IAP certs and against `IAP_AUDIENCE`, an environment variable this
+deployment must be told explicitly (lookup command in `.env.example`). Two
+failure modes, both closed, and meant to read differently to whoever is
+debugging a stuck approval:
+
+- **`IAP_AUDIENCE` unset → every request gets 503.** The service cannot
+  state who it is, so it cannot check that a token was addressed to it, and
+  refuses everything rather than accept a token minted for something else.
+  This is the single most likely first-deploy mistake — a `keplaria-review`
+  revision that comes up healthy and then 503s on every reviewer.
+- **Any assertion that fails verification → 403.** Missing header, bad
+  signature, expired token, wrong audience — all the same answer, all
+  closed.
+
+### Decisions are final per case version
+
+`console/review.py` derives `approval_id` as
+`{case_id}:v{expected_case_version}` rather than generating one — a double
+click, a browser retry, and a resubmitted form all produce the identical id,
+so the second attempt is refused as a duplicate with no client-side
+idempotency token to plumb through anywhere. The consequence, accepted
+deliberately: a decision is final for the case version it was taken
+against. If the case advances again — a later event bumps `case_version` —
+the approval stops applying and the case needs a fresh look, but the
+original decision itself cannot be redone.
+
+### Honest limit: durable state, not a live pause
+
+**This is a durable-state approval surface, not a live pause.** The graph
+does not suspend mid-run waiting on input — there is no such node in this
+graph — it parks the case (`awaiting_approval`) and returns. Approval acts
+on the Firestore state afterwards: a reviewer reads what was persisted, the
+review service commits a decision against that same state, and the next
+event pass (or a manual drain) is what actually executes on it. No case is
+ever sitting mid-run waiting on this UI.
+
+### Deploying (documented, not yet run)
+
+Neither `keplaria-console@` nor `keplaria-review@` service accounts exist
+yet in this project — this is the order the commands need to run in, for a
+human operator to execute:
+
+```bash
+# 1. Service accounts and their IAM grants (project-level IAM cannot be
+# granted from an agent session — see "Provisioned infrastructure" above).
+gcloud iam service-accounts create keplaria-console \
+  --display-name="Keplaria public console" --project keplaria
+gcloud iam service-accounts create keplaria-review \
+  --display-name="Keplaria review service" --project keplaria
+
+# Read-only for the console; the review service commits decisions and
+# executes queued commands, so it needs write access.
+gcloud projects add-iam-policy-binding keplaria \
+  --member=serviceAccount:keplaria-console@keplaria.iam.gserviceaccount.com \
+  --role=roles/datastore.viewer --condition=None
+gcloud projects add-iam-policy-binding keplaria \
+  --member=serviceAccount:keplaria-review@keplaria.iam.gserviceaccount.com \
+  --role=roles/datastore.user --condition=None
+
+# 2. Build the shared image.
+gcloud builds submit --config console/cloudbuild.yaml \
+  --project keplaria --region=us-central1 \
+  --substitutions=_IMAGE=us-central1-docker.pkg.dev/keplaria/keplaria/console:latest
+# Expected: SUCCESS. Cheaper local equivalent before submitting the build:
+#   uv run python -c "import console.public, console.review; print('both apps import')"
+
+# 3. Deploy the public console.
+gcloud run deploy keplaria-console \
+  --image us-central1-docker.pkg.dev/keplaria/keplaria/console:latest \
+  --region us-central1 --project keplaria \
+  --allow-unauthenticated \
+  --service-account keplaria-console@keplaria.iam.gserviceaccount.com \
+  --set-env-vars FIRESTORE_PROJECT_ID=keplaria,FIRESTORE_DATABASE='(default)'
+
+# 4. Deploy the review service — note --proxy-headers (see "One image, two
+# entry points" above) and secrets rather than plaintext ERP credentials.
+FRAPPE_SECRETS=FRAPPE_API_KEY=frappe-api-key:latest,FRAPPE_API_SECRET=frappe-api-secret:latest
+gcloud run deploy keplaria-review \
+  --image us-central1-docker.pkg.dev/keplaria/keplaria/console:latest \
+  --region us-central1 --project keplaria \
+  --no-allow-unauthenticated \
+  --service-account keplaria-review@keplaria.iam.gserviceaccount.com \
+  --command uvicorn \
+  --args console.review:api,--host,0.0.0.0,--port,8080,--proxy-headers \
+  --set-secrets "$FRAPPE_SECRETS" \
+  --set-env-vars FIRESTORE_PROJECT_ID=keplaria,FIRESTORE_DATABASE='(default)',FRAPPE_SITE=https://andina-foods.v.frappe.cloud
+
+# 5. Human-only from here: enable Cloud IAP on the keplaria-review backend
+# service and grant the reviewing accounts access to it, then read the
+# audience back and set it. Until this lands the service 503s every
+# request — see "Identity is verified, not asserted" above.
+gcloud run services update keplaria-review \
+  --region us-central1 --project keplaria \
+  --update-env-vars IAP_AUDIENCE='<audience read back from the enabled service>'
+
+# 6. Confirm: curl gets refused, a signed-in reviewer's browser does not.
+REVIEW_URL=$(gcloud run services describe keplaria-review \
+  --region=us-central1 --project=keplaria --format='value(status.url)')
+curl -s -o /dev/null -w '%{http_code}\n' "$REVIEW_URL/review"
+# expect 401 or 403
+```
+
+`scripts/doctor.sh` picks both services up once they exist: it checks that
+the console answers `/healthz` unauthenticated, that the review service
+refuses an unauthenticated `/review`, and that `IAP_AUDIENCE` is actually
+set on the review service. Before either service is deployed, both checks
+report `not deployed yet` warnings — that is the expected state, not a
+failure.
 
 ## ERPNext (Frappe Cloud)
 
