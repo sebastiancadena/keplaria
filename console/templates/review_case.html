@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Review {{ case.case_id }} — Keplaria{% endblock %}
+{% block content %}
+<h1 class="mono">{{ case.case_id }}</h1>
+<p>{{ case.supplier }} · {{ case.phase }} · version {{ case.case_version }}</p>
+
+<h2>Verdict</h2>
+<p><span class="band--{{ case.policy.band or 'review' }}">Gate: {{ case.policy.band }}</span>
+  — score {{ case.policy.score }}
+  (policy {{ case.policy.policy_id }} v{{ case.policy.policy_version }})</p>
+{% for factor in case.policy.factors_fired %}
+  <p class="mono">{{ factor }}</p>
+{% endfor %}
+{% for reason in case.policy.reasons %}<p>{{ reason }}</p>{% endfor %}
+
+<h2>Screening</h2>
+<table>
+  <thead><tr><th>Entity</th><th>Score</th><th>Flagged</th></tr></thead>
+  <tbody>
+  {% for candidate in case.screening.candidates %}
+    <tr><td class="mono">{{ candidate.id }}</td>
+        <td class="mono">{{ candidate.score }}</td>
+        <td>{{ 'yes' if candidate.match else 'no' }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>What approving will run</h2>
+{% if not pending %}
+  <p>Nothing is pending on this case.</p>
+{% else %}
+<ul>
+{% for command in pending %}
+  <li class="mono">{{ command.action }} (cycle {{ command.cycle }}) —
+      currently {{ command.status }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<form method="post" action="/review/{{ case.case_id }}/decide">
+  <input type="hidden" name="expected_case_version" value="{{ expected_case_version }}">
+  <button type="submit" name="decision" value="approved">Approve</button>
+  <button type="submit" name="decision" value="rejected">Reject</button>
+</form>
+{% endblock %}

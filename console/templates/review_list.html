@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Awaiting review — Keplaria{% endblock %}
+{% block content %}
+<h1>Awaiting review</h1>
+<p>Signed in as <span class="mono">{{ reviewer }}</span></p>
+{% if not cases %}<p>Nothing is parked for review.</p>{% endif %}
+<ul>
+{% for case in cases %}
+  <li><a class="mono" href="/review/{{ case.case_id }}">{{ case.case_id }}</a>
+      — {{ case.supplier }} (version {{ case.case_version }})</li>
+{% endfor %}
+</ul>
+{% endblock %}

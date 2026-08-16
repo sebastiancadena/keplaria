@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Decision — Keplaria{% endblock %}
+{% block content %}
+<h1 class="mono">{{ case_id }}</h1>
+<p><span class="band--{{ 'clear' if committed else 'blocked' }}">
+  {{ 'committed' if committed else 'refused' }}</span></p>
+<p>{{ message }}</p>
+{% if not committed and case_version %}
+  <p>The case is now at version {{ case_version }}.</p>
+{% endif %}
+{% if executed %}
+<h2>What ran</h2>
+<table>
+  <thead><tr><th>Action</th><th>Result</th></tr></thead>
+  <tbody>
+  {% for command in executed %}
+    <tr><td class="mono">{{ command.action }}</td>
+        <td class="mono"><span class="band--{{ 'clear' if command.status == 'done' else 'blocked' }}">
+            {{ command.status }}</span></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<p><a href="/review">Back to the review queue</a></p>
+{% endblock %}
