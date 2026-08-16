@@ -201,19 +201,35 @@ def push(envelope: Any = Body(...)) -> dict:
         )
         raise HTTPException(status_code=503, detail="command execution failed") from exc
 
-    refused_bands = [r.get("band") for r in command_results if r.get("status") == "refused_by_policy"]
-    if refused_bands:
+    refused = [r for r in command_results if r.get("status") == "refused_by_policy"]
+    if refused:
         # The runner's guard is a silent no-op by design (see
         # app/executor/runner.py): it never raises and never surfaces as
         # `failed`, so without this line a wiring bug that refused every
         # write forever would look identical to "no events arrived". This is
         # observability only — the 200 ack below is unchanged, because a
         # policy refusal is deterministic and retrying it is pointless.
+        #
+        # A refusal is no longer necessarily an anomaly. park_case claims the
+        # commands it parks, so every review-band case refuses on every drain
+        # until a human approves it — that is the system working. The log
+        # therefore carries the gate's own band and the applying approval id
+        # alongside the effective band, because "gate said review, no
+        # approval yet" and "gate said clear but something refused anyway"
+        # are the two readings this line has to keep distinguishable.
         logger.warning(
-            "command execution refused by policy for event %s case %s: bands=%s",
+            "command execution refused by policy for event %s case %s: %s",
             event.event_id,
             event.case_id,
-            refused_bands,
+            [
+                {
+                    "action": r.get("action"),
+                    "band": r.get("band"),
+                    "gate_band": r.get("gate_band"),
+                    "approval_id": r.get("approval_id"),
+                }
+                for r in refused
+            ],
         )
 
     if any(r.get("status") == "failed" for r in command_results):

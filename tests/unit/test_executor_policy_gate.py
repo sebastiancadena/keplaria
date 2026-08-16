@@ -45,6 +45,8 @@ def test_executor_refuses_a_case_whose_verdict_is_not_clear(db, case_id):
             "status": "refused_by_policy",
             "band": "blocked",
             "policy_version": 1,
+            "gate_band": "blocked",
+            "approval_id": None,
         }
     ]
     assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
@@ -167,3 +169,130 @@ def test_an_unknown_action_is_left_untouched(db, case_id, monkeypatch):
     claim_command(db, case_id, "launch_rocket", 1, {})
 
     assert execute_pending_commands(db, case_id) == []
+
+
+def test_an_approval_releases_a_command_the_gate_refused(db, case_id, monkeypatch):
+    """The path that makes a parked case finishable at all. Before this, a
+    review verdict refused the command forever and nothing could release it."""
+    from app.executor import runner as runner_module
+    from app.executor.runner import execute_pending_commands
+    from app.state.approvals import APPROVED, commit_approval
+    from app.state.commands import DONE, claim_command, get_command
+    from app.state.firestore import CASES
+
+    calls = []
+    monkeypatch.setattr(runner_module, "frappe_client", _fake_client)
+    monkeypatch.setattr(
+        runner_module, "create_supplier_if_absent",
+        lambda client, supplier, email_id="": calls.append(supplier)
+        or {"external_id": supplier, "created": True},
+    )
+
+    claim_command(db, case_id, "create_supplier", 1, {"supplier_name": "Acme"})
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 3, "phase": "awaiting_approval",
+        "policy": {"band": "review", "policy_version": 2},
+    }, merge=True)
+    commit_approval(db, case_id, "APR-1", 3, APPROVED, "reviewer@example.com")
+
+    results = execute_pending_commands(db, case_id)
+
+    assert results[0]["status"] == "done"
+    assert calls == ["Acme"]
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == DONE
+
+
+def test_a_superseded_approval_no_longer_releases_anything(db, case_id):
+    """The staleness contract, enforced a second time at read time rather than
+    only at commit time. An approval granted at version 3 must stop applying
+    once a later event advances the case to 4 — otherwise it authorises writes
+    for state the reviewer never saw."""
+    from app.executor.runner import execute_pending_commands
+    from app.state.approvals import APPROVED, commit_approval
+    from app.state.commands import PENDING, claim_command, get_command
+    from app.state.firestore import CASES
+
+    claim_command(db, case_id, "create_supplier", 1, {"supplier_name": "Acme"})
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 3, "phase": "awaiting_approval",
+        "policy": {"band": "review", "policy_version": 2},
+    }, merge=True)
+    commit_approval(db, case_id, "APR-1", 3, APPROVED, "reviewer@example.com")
+    db.collection(CASES).document(case_id).set({"case_version": 4}, merge=True)
+
+    results = execute_pending_commands(db, case_id)
+
+    assert results[0]["status"] == "refused_by_policy"
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
+
+
+def test_a_rejection_refuses_a_command_the_gate_had_cleared(db, case_id):
+    """One-directional in the other direction too: a human may withhold what
+    the machine would have granted."""
+    from app.executor.runner import execute_pending_commands
+    from app.state.approvals import REJECTED, commit_approval
+    from app.state.commands import PENDING, claim_command, get_command
+    from app.state.firestore import CASES
+
+    claim_command(db, case_id, "create_supplier", 1, {"supplier_name": "Acme"})
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 3, "phase": "awaiting_approval",
+        "policy": {"band": "clear", "policy_version": 2},
+    }, merge=True)
+    commit_approval(db, case_id, "APR-1", 3, REJECTED, "reviewer@example.com")
+
+    results = execute_pending_commands(db, case_id)
+
+    assert results[0]["status"] == "refused_by_policy"
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
+
+
+def test_the_refusal_record_names_the_machine_verdict_and_the_approval(db, case_id):
+    """A reader of the outbox must be able to tell 'the gate refused this' from
+    'a human refused this'."""
+    from app.executor.runner import execute_pending_commands
+    from app.state.approvals import REJECTED, commit_approval
+    from app.state.commands import claim_command
+    from app.state.firestore import CASES
+
+    claim_command(db, case_id, "create_supplier", 1, {"supplier_name": "Acme"})
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 3, "phase": "awaiting_approval",
+        "policy": {"band": "clear", "policy_version": 2},
+    }, merge=True)
+    commit_approval(db, case_id, "APR-1", 3, REJECTED, "reviewer@example.com")
+
+    results = execute_pending_commands(db, case_id)
+
+    assert results[0]["gate_band"] == "clear"
+    assert results[0]["band"] == "blocked"
+    assert results[0]["approval_id"] == "APR-1"
+
+
+def test_a_hold_still_executes_regardless_of_any_approval(db, case_id, monkeypatch):
+    """RESTRICTIVE actions bypass the guard entirely, and adding approvals must
+    not quietly make a hold conditional on one."""
+    from app.executor import runner as runner_module
+    from app.executor.runner import execute_pending_commands
+    from app.state.approvals import REJECTED, commit_approval
+    from app.state.commands import claim_command
+    from app.state.firestore import CASES
+
+    held = []
+    monkeypatch.setattr(runner_module, "frappe_client", _fake_client)
+    monkeypatch.setattr(
+        runner_module, "set_supplier_hold",
+        lambda client, supplier, hold_type: held.append(supplier)
+        or {"external_id": supplier, "created": True},
+    )
+
+    claim_command(db, case_id, "apply_hold", 1, {"supplier_name": "Acme", "hold_type": "All"})
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 3, "phase": "awaiting_approval",
+        "policy": {"band": "clear", "policy_version": 2},
+    }, merge=True)
+    commit_approval(db, case_id, "APR-1", 3, REJECTED, "reviewer@example.com")
+
+    execute_pending_commands(db, case_id)
+
+    assert held == ["Acme"]

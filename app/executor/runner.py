@@ -71,7 +71,8 @@ from app.lifecycle import (
     REQUEST_RENEWAL,
     RESTRICTIVE,
 )
-from app.risk import CLEAR
+from app.risk import BLOCKED, CLEAR
+from app.state.approvals import APPROVED, REJECTED
 from app.state.commands import DONE, record_failure, record_success
 from app.state.firestore import CASES, OUTBOX
 
@@ -145,15 +146,75 @@ def _run(action: str, client, payload: dict, cycle: int) -> dict:
     raise FrappeError(f"no handler for action {action!r}")
 
 
-def _policy_band(db, case_id: str) -> tuple[str | None, int | None]:
-    """Read the gate's verdict off the case document.
+def _version(value) -> int | None:
+    """Total coercion of a case_version read out of a schemaless document.
 
-    Returns (None, None) when the case or its policy block is absent — which
-    every graph path now makes an anomaly, and which the caller refuses.
+    A version that arrives as a string or a float must not silently make an
+    approval inapplicable — that failure mode looks exactly like a correctly
+    refused stale approval, and would be near-impossible to diagnose from the
+    outbox. An unparseable value returns None, which never compares equal, so
+    the approval stops applying loudly rather than by accident of typing.
+    """
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _effective_band(case: dict) -> tuple[str | None, str | None, str | None]:
+    """Combine the gate's verdict with a human decision, if one applies.
+
+    Returns (effective_band, gate_band, approval_id).
+
+    An approval applies only while the case is still at the version it was
+    committed against. That check exists here as well as in commit_approval
+    because the two guard different moments: commit_approval refuses a decision
+    taken about stale state, and this refuses a decision that has since GONE
+    stale. Without it, an approval granted at version 4 would keep authorising
+    writes after a later event advanced the case to 5 — approving what the
+    reviewer never saw. A superseded approval simply stops applying, and the
+    commands return to refused_by_policy rather than erroring.
+
+    The gate's own band is returned unchanged alongside, and is never
+    overwritten anywhere: the machine's conclusion is the auditable artefact,
+    and a record that lost it could not answer "did policy or a person decide
+    this?"
+    """
+    policy = case.get("policy") or {}
+    gate_band = policy.get("band")
+
+    approval = case.get("approval") or {}
+    decision = approval.get("decision")
+    approval_id = approval.get("approval_id")
+    approved_at = _version(approval.get("case_version"))
+    current = _version(case.get("case_version"))
+    applies = (
+        decision in (APPROVED, REJECTED)
+        and approved_at is not None
+        and approved_at == current
+    )
+
+    if not applies:
+        return gate_band, gate_band, None
+    if decision == APPROVED:
+        return CLEAR, gate_band, approval_id
+    return BLOCKED, gate_band, approval_id
+
+
+def _policy_band(db, case_id: str) -> tuple[str | None, int | None, str | None, str | None]:
+    """Read the case's effective and gate verdicts off the case document.
+
+    Returns (effective_band, policy_version, gate_band, approval_id), all None
+    when the case or its policy block is absent — which every graph path makes
+    an anomaly, and which the caller refuses.
     """
     snap = db.collection(CASES).document(case_id).get()
-    policy = ((snap.to_dict() or {}) if snap.exists else {}).get("policy") or {}
-    return policy.get("band"), policy.get("policy_version")
+    case = (snap.to_dict() or {}) if snap.exists else {}
+    policy = case.get("policy") or {}
+    effective, gate_band, approval_id = _effective_band(case)
+    return effective, policy.get("policy_version"), gate_band, approval_id
 
 
 def execute_pending_commands(db, case_id: str) -> list[dict]:
@@ -183,7 +244,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     outbox_ref = db.collection(CASES).document(case_id).collection(OUTBOX)
     results: list[dict] = []
 
-    band, policy_version = _policy_band(db, case_id)
+    band, policy_version, gate_band, approval_id = _policy_band(db, case_id)
     refused = band != CLEAR
 
     commands = []
@@ -223,6 +284,8 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
                     "status": "refused_by_policy",
                     "band": band,
                     "policy_version": policy_version,
+                    "gate_band": gate_band,
+                    "approval_id": approval_id,
                 }
             )
             continue
@@ -259,6 +322,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
                 "status": "done",
                 "external_id": result["external_id"],
                 "created": result["created"],
+                "approval_id": approval_id,
             }
         )
 

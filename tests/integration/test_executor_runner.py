@@ -51,6 +51,11 @@ def test_pending_command_executes_and_reaches_done(db, case_id):
             "status": "done",
             "external_id": supplier,
             "created": True,
+            # None, not absent: this case was cleared by the gate with no
+            # human in the loop, and the success record says on whose
+            # authority the write happened. A command released by an approval
+            # carries that approval's id here instead.
+            "approval_id": None,
         }
     ]
     command = get_command(db, case_id, "create_supplier", 1)
