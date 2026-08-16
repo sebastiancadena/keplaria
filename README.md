@@ -688,7 +688,19 @@ gcloud run deploy keplaria-console \
   --service-account keplaria-console@keplaria.iam.gserviceaccount.com \
   --set-env-vars FIRESTORE_PROJECT_ID=keplaria,FIRESTORE_DATABASE='(default)'
 
-# 4. Deploy the review service — note --proxy-headers (see "One image, two
+# 4. Let the review identity read the ERP credentials. Without this the
+# deploy in the next step fails outright — "Permission denied on secret ...
+# The service account used must be granted the 'Secret Manager Secret
+# Accessor' role" — because --set-secrets is resolved at revision creation,
+# not at request time. Bound per secret rather than project-wide, to match
+# the read-only/read-write split above.
+for S in frappe-api-key frappe-api-secret; do
+  gcloud secrets add-iam-policy-binding "$S" \
+    --member=serviceAccount:keplaria-review@keplaria.iam.gserviceaccount.com \
+    --role=roles/secretmanager.secretAccessor --project keplaria
+done
+
+# 5. Deploy the review service — note --proxy-headers (see "One image, two
 # entry points" above) and secrets rather than plaintext ERP credentials.
 FRAPPE_SECRETS=FRAPPE_API_KEY=frappe-api-key:latest,FRAPPE_API_SECRET=frappe-api-secret:latest
 gcloud run deploy keplaria-review \
@@ -701,15 +713,47 @@ gcloud run deploy keplaria-review \
   --set-secrets "$FRAPPE_SECRETS" \
   --set-env-vars FIRESTORE_PROJECT_ID=keplaria,FIRESTORE_DATABASE='(default)',FRAPPE_SITE=https://andina-foods.v.frappe.cloud
 
-# 5. Human-only from here: enable Cloud IAP on the keplaria-review backend
-# service and grant the reviewing accounts access to it, then read the
-# audience back and set it. Until this lands the service 503s every
-# request — see "Identity is verified, not asserted" above.
+# 6. Enable IAP directly on the Cloud Run service. This is the modern path
+# and needs no load balancer or backend service. The service agent does not
+# exist until it is asked for — provision it first, or the invoker binding
+# fails with a member-does-not-exist error.
+gcloud services enable iap.googleapis.com --project keplaria
+gcloud beta services identity create --service=iap.googleapis.com --project keplaria
+gcloud run services add-iam-policy-binding keplaria-review \
+  --region=us-central1 --project keplaria \
+  --role=roles/run.invoker \
+  --member=serviceAccount:service-584548214478@gcp-sa-iap.iam.gserviceaccount.com
+gcloud run services update keplaria-review \
+  --region=us-central1 --project keplaria --iap
+gcloud iap web add-iam-policy-binding \
+  --member=user:REVIEWER@EXAMPLE.COM \
+  --role=roles/iap.httpsResourceAccessor \
+  --region=us-central1 --resource-type=cloud-run --service=keplaria-review \
+  --project=keplaria
+
+# 7. Browser-only, and unavoidable: this project has no organization, so IAP
+# has no OAuth client until one is made by hand, and until then every request
+# 502s at IAP without ever reaching the container. `gcloud iap oauth-brands`
+# cannot help — it rejects no-org projects outright ("Project must belong to
+# an organization"), which is why nothing could verify the consent screen
+# before this point. Configure branding at console.cloud.google.com/auth/branding
+# (audience type External), then enable IAP from the Cloud Run service's
+# Security tab, which creates the Web application client and attaches it.
+# Verify with: gcloud iap settings get --project=keplaria \
+#   --resource-type=cloud-run --region=us-central1 --service=keplaria-review
+# A response naming only the resource, with no client id, means step 7 is
+# not done.
+
+# 8. Set the audience. For IAP enabled DIRECTLY on Cloud Run the format is
+# /projects/PROJECT_NUMBER/locations/REGION/services/SERVICE_NAME — note the
+# region, not "global", and the service name, not a backend-service id (that
+# other shape belongs to the load-balancer integration). A wrong audience is
+# not loud: verification simply fails and every approval returns 403.
 gcloud run services update keplaria-review \
   --region us-central1 --project keplaria \
-  --update-env-vars IAP_AUDIENCE='<audience read back from the enabled service>'
+  --update-env-vars IAP_AUDIENCE=/projects/584548214478/locations/us-central1/services/keplaria-review
 
-# 6. Confirm: curl gets refused, a signed-in reviewer's browser does not.
+# 9. Confirm: curl gets refused, a signed-in reviewer's browser does not.
 REVIEW_URL=$(gcloud run services describe keplaria-review \
   --region=us-central1 --project=keplaria --format='value(status.url)')
 curl -s -o /dev/null -w '%{http_code}\n' "$REVIEW_URL/review"

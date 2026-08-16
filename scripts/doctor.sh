@@ -219,7 +219,14 @@ echo "== console + review services =="
 console_url=$(gcloud run services describe keplaria-console --region=us-central1 \
   --format='value(status.url)' --project=keplaria 2>/dev/null)
 if [ -n "$console_url" ]; then
-  code=$(curl -s -o /dev/null -w '%{http_code}' "$console_url/healthz")
+  # Probes "/", not "/healthz". Observed 2026-08-16: a request to /healthz on a
+  # *.run.app URL comes back 404 with a Google-styled error page, on BOTH this
+  # service and keplaria-ingress, even though each registers the route and the
+  # deployed console's own /openapi.json lists it. Every other path on the same
+  # services reaches the container. Whatever eats it sits in front of Cloud Run,
+  # so a /healthz probe can never pass from outside and says nothing about the
+  # app. "/" is the better check anyway: it is the page a judge actually opens.
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$console_url/")
   [ "$code" = "200" ] && ok "public console answers unauthenticated (200)" \
     || bad "public console returned $code unauthenticated"
 else
