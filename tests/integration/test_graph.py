@@ -79,8 +79,17 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
     screening comes back `reachable=False`. Under the risk gate that fires
     SCREENING_UNAVAILABLE and lands in `review`, which routes to park_case —
     not commit_commands. This pins the deliberate, fail-closed behavior: an
-    unreachable screening service must park the case for a human, not queue
-    an ERP write and not claim any command."""
+    unreachable screening service must park the case for a human and must not
+    produce an ERP write.
+
+    The `command is None` assertion below is NOT evidence that park_case
+    claims nothing — park_case does claim what it parks. It holds because
+    `_event` carries no `effective_date`, so decide() returns
+    BAD_EFFECTIVE_DATE with zero commands for every event this file builds.
+    park_case's claiming behaviour is covered in
+    tests/unit/test_nodes_risk.py, and the guarantee that a parked command is
+    never executed lives in app.executor.runner's band guard, not here.
+    """
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
 
     outputs = await _run(_event(case_id, "new_supplier_packet"))
@@ -98,7 +107,10 @@ async def test_new_supplier_packet_screens_and_queues_the_command():
     assert final["policy"]["band"] == "review"
 
     command = get_command(get_client(), case_id, "create_supplier", 1)
-    assert command is None, "an unreachable screening service must claim no command"
+    assert command is None, (
+        "this event carries no effective_date, so decide() names no command; "
+        "see the docstring — this is not a park_case property"
+    )
 
 
 @pytest.mark.asyncio
@@ -134,10 +146,18 @@ async def test_replayed_case_does_not_reclaim_a_done_command():
     this machine, so every event for this case lands in `review` and parks
     at park_case rather than ever reaching commit_commands — there is no DONE
     command here for a replay to reclaim. What this proves instead is the
-    review branch's own replay idempotency: running the identical event
-    twice for the same case must park it both times and must never claim a
-    command on either run — a graph-wiring bug that let a replay slip past
-    park_case into commit_commands would show up here as a stray command."""
+    review branch's own replay idempotency: running the identical event twice
+    for the same case must park it both times.
+
+    As in the previous test, the `is None` assertions hold because `_event`
+    carries no `effective_date` and decide() therefore names no command — not
+    because park_case claims nothing. Their remaining value is narrow and
+    still real: a graph-wiring bug that let a replay slip past park_case into
+    commit_commands would reach decide() by the same route and still produce
+    nothing, so what these actually pin is that no OTHER path invents a
+    command. What park_case does claim is covered in
+    tests/unit/test_nodes_risk.py.
+    """
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
     db = get_client()
 

@@ -1,7 +1,9 @@
 """Unit tests for the risk gate node and the review terminal.
 
 assess_risk must route on the band and never on model output; park_case must
-be a true terminal that claims no command. Together these close the defect
+be a true terminal that reaches no ERP. It claims the commands it parks — an
+approval needs something to release — but executes none of them, and the
+executor's band guard is what holds them. Together these close the defect
 this branch exists to fix at the graph level: a flagged supplier can no
 longer reach commit_commands.
 """
@@ -15,7 +17,8 @@ from app.state.firestore import CASES
 
 
 class _StubContext:
-    """assess_risk and park_case only read ctx.state — a dict wrapper is enough."""
+    """assess_risk, park_case and quarantine_case only read ctx.state — a dict
+    wrapper is enough."""
 
     def __init__(self, state: dict):
         self.state = state
@@ -129,19 +132,133 @@ def test_certificate_received_with_no_screening_carries_forward_instead_of_clear
 # ctx.state["policy"] is covered by test_park_case_persists_phase_and_verdict.
 
 
-def test_park_case_claims_no_command(db, case_id):
+def _onboarding_case(case_id: str) -> dict:
+    """A new_supplier_packet decide() can actually act on.
+
+    `effective_date` is the load-bearing field: without it decide() returns
+    BAD_EFFECTIVE_DATE with zero commands, and a test asserting anything about
+    what park_case claimed would pass whatever park_case does.
+    """
+    return {
+        "case_id": case_id,
+        "event_type": "new_supplier_packet",
+        "supplier": "Andes Foods",
+        "effective_date": "2026-08-16",
+    }
+
+
+def _review_verdict() -> dict:
+    return {"policy_id": "supplier_risk", "policy_version": 2, "score": 0.25,
+            "band": "review", "factors_fired": [], "reasons": []}
+
+
+def test_park_case_claims_the_commands_it_parks(db, case_id):
+    """Without this, an approval has nothing to release: the review band is the
+    only path to a parked case, and it used to leave the outbox empty."""
     ctx = _StubContext(
         {
-            "case": _case(case_id),
+            "case": _onboarding_case(case_id),
             "screening": _screening(candidates=[{"id": "syn-co-008", "score": 0.526, "match": False}]),
-            "policy": {"policy_id": "supplier_risk", "policy_version": 1, "score": 0.25,
-                       "band": "review", "factors_fired": [], "reasons": []},
+            "policy": _review_verdict(),
         }
     )
 
     result = park_case(None, ctx)
 
     assert result.output["status"] == "awaiting_approval"
+    assert [c["action"] for c in result.output["commands"]] == ["create_supplier"]
+    claimed = get_command(db, case_id, "create_supplier", 1)
+    assert claimed is not None
+    assert claimed["status"] == PENDING
+
+
+def test_park_case_writes_the_lifecycle_block(db, case_id):
+    """The parked case must record which cycle its commands belong to, or a
+    later drain cannot tell cycle 1's create_supplier from cycle 2's."""
+    ctx = _StubContext(
+        {
+            "case": _onboarding_case(case_id),
+            "screening": _screening(),
+            "policy": _review_verdict(),
+        }
+    )
+
+    park_case(None, ctx)
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert stored["lifecycle"]["cycle"] == 1
+    assert stored["lifecycle"]["last_reason"] == "AWAITING_EVIDENCE"
+    assert stored["phase"] == "awaiting_approval"
+
+
+def test_park_case_claims_without_executing(db, case_id):
+    """The invariant that actually matters, and the one this must not weaken.
+    park_case now records what would happen; it still makes it happen never. A
+    claimed-but-unexecuted command is PENDING with nothing the ERP would have
+    given it back."""
+    ctx = _StubContext(
+        {
+            "case": _onboarding_case(case_id),
+            "screening": _screening(),
+            "policy": _review_verdict(),
+        }
+    )
+
+    park_case(None, ctx)
+
+    claimed = get_command(db, case_id, "create_supplier", 1)
+    assert claimed["status"] == PENDING
+    assert claimed.get("external_id") is None
+    assert claimed.get("result") is None
+
+
+def test_the_graph_never_imports_the_erp_executor():
+    """Structural, because the behavioural version cannot fail. No monkeypatch
+    on app.executor can catch park_case reaching the ERP, since the graph does
+    not import that module at all — and THAT is the guarantee. The graph runs
+    on Agent Runtime, whose PSC-I attachment has no public internet egress, so
+    a Frappe call from a node would not fail loudly; it would hang on TCP
+    connect. This test is what keeps the separation checkable.
+
+    Parsed, not grepped: app/nodes.py names app.executor.runner in prose in
+    several docstrings, and a substring check would fail on the documentation
+    that explains the very boundary being asserted.
+    """
+    import ast
+    from pathlib import Path
+
+    import app.nodes
+
+    tree = ast.parse(Path(app.nodes.__file__).read_text())
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+
+    assert not [m for m in imported if m.startswith("app.executor")], (
+        "the graph must never reach the ERP; app.executor.runner does that, "
+        "outside the engine and under a different identity"
+    )
+
+
+def test_quarantine_case_still_claims_nothing(db, case_id):
+    """A blocked case queues nothing, approval or not — no approval can even
+    exist for it, since commit_approval refuses a case that is not parked."""
+    from app.nodes import quarantine_case
+
+    ctx = _StubContext(
+        {
+            "case": _onboarding_case(case_id),
+            "screening": _screening(flagged=[{"id": "syn-co-001", "score": 1.0}]),
+            "policy": {"policy_id": "supplier_risk", "policy_version": 2, "score": 0.95,
+                       "band": "blocked", "factors_fired": [], "reasons": ["SANCTIONS_MATCH"]},
+        }
+    )
+
+    quarantine_case(None, ctx)
+
     assert get_command(db, case_id, "create_supplier", 1) is None
 
 

@@ -550,21 +550,37 @@ def quarantine_case(node_input, ctx: Context) -> Event:
 def park_case(node_input, ctx: Context) -> Event:
     """Terminal node for the `review` band — a case parked for a human.
 
-    Zero writes: no command claim, no ERP call, exactly like quarantine_case.
+    Claims the commands the case would run and executes none of them. The
+    graph never reaches the ERP from any terminal; app.executor.runner does
+    that, outside the engine and under a different identity, and it refuses
+    every permissive command whose case is not `clear`. So these commands sit
+    PENDING and drain to `refused_by_policy` on every pass until an approval
+    applies — which is what makes a parked case releasable at all, and what
+    lets a reviewer see what they are approving rather than only that someone
+    is waiting.
+
+    quarantine_case, by contrast, still claims nothing: a `blocked` case
+    queues no work, and no approval can exist for one.
 
     The phase is `awaiting_approval`: a case parked pending a human decision.
     This is NOT a live pause — RequestInput is not in this graph. A later
-    milestone replaces this node with a real pause on the same branch.
+    milestone replaces this node with a real pause on the same branch, keeping
+    this contract.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
     policy = ctx.state.get("policy")
+    db = get_client()
 
     with tracer.start_as_current_span("park_case") as span:
         span.set_attribute("keplaria.case_id", case_id)
         span.set_attribute("keplaria.parked", True)
+        decision, claimed = _claim_lifecycle_commands(db, case_id, case, ctx)
+        span.set_attribute("keplaria.lifecycle_reason", decision.reason)
+        span.set_attribute("keplaria.cycle", decision.cycle)
+        span.set_attribute("keplaria.commands_parked", [c["action"] for c in claimed])
         _record_outcome(
-            get_client(),
+            db,
             case_id,
             "awaiting_approval",
             ctx.state.get("routing"),
@@ -580,6 +596,7 @@ def park_case(node_input, ctx: Context) -> Event:
             "case_id": case_id,
             "policy": policy,
             "routing": ctx.state.get("routing"),
+            "commands": claimed,
         }
     )
 
@@ -887,16 +904,76 @@ def assess_risk(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"policy": payload}, route=verdict.band)
 
 
+def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tuple:
+    """Run decide() and claim every command it names; persist lifecycle state.
+
+    Shared by commit_commands and park_case, which differ only in what they
+    then record and return. decide() is the single source of truth for what a
+    case does next, and a second hand-rolled claim loop in the other terminal
+    is exactly the drift that building _DRAIN_ORDER from app.lifecycle's
+    constants was meant to prevent.
+
+    Claiming is not executing. Nothing here reaches the ERP: claim_command
+    writes an outbox row, and app.executor.runner decides — under a different
+    identity, outside the graph — whether that row ever becomes a write. That
+    separation is what lets park_case record a case's intended work without
+    performing any of it.
+
+    Returns (decision, claimed) where `claimed` is one dict per command with
+    its action, cycle, queued/already_done status, and any external_id a
+    previous completed claim recorded.
+    """
+    case_state = ctx.state.get("case_state") or {}
+
+    decision = decide(
+        case_state=case_state or {"supplier": case.get("supplier")},
+        event=case,
+        evidence=ctx.state.get("evidence"),
+        timing=lifecycle_timing(),
+    )
+
+    claimed: list[dict] = []
+    for command in decision.commands:
+        claim = claim_command(
+            db, case_id, command.action, decision.cycle, command.payload
+        )
+        claimed.append({
+            "action": command.action,
+            "cycle": decision.cycle,
+            "status": "already_done" if (not claim.acquired and claim.status == DONE)
+            else "queued",
+            "external_id": claim.external_id,
+        })
+
+    lifecycle_block = {
+        "state": decision.state,
+        "cycle": decision.cycle,
+        "last_effective_date": case.get("effective_date"),
+        "last_reason": decision.reason,
+    }
+    update = {"lifecycle": lifecycle_block}
+    if decision.certificate is not None:
+        update["certificate"] = decision.certificate
+
+    db.collection(CASES).document(case_id).set(update, merge=True)
+    return decision, claimed
+
+
 def commit_commands(node_input, ctx: Context) -> Event:
-    """The single write terminal. Claims commands; never calls the ERP.
+    """The `clear` terminal. Claims commands; never calls the ERP.
 
     Every path that may write converges here — onboarding and every clock
     branch alike — so there is one place that decides what a case does next
     and one audit record of why. Reached only via the assess_risk gate's
     `clear` branch, so by the time this node runs the case already carries a
-    policy verdict that permits a write. A flagged or near-match supplier
-    terminates at quarantine_case or park_case instead and never arrives
-    here.
+    policy verdict that permits a write. A flagged supplier terminates at
+    quarantine_case and claims nothing at all.
+
+    park_case shares the claim step (see _claim_lifecycle_commands) but not
+    the verdict: a near-match supplier parks with its commands queued and
+    unreleased, and only an approval lets the executor drain them. So this is
+    no longer the only terminal that claims — it is the only one that claims
+    against a verdict already permitting execution.
 
     The graph still never calls the ERP itself. The Agent Runtime engine's
     PSC-I network attachment routes egress through keplaria-vpc, whose Cloud
@@ -922,50 +999,19 @@ def commit_commands(node_input, ctx: Context) -> Event:
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
-    case_state = ctx.state.get("case_state") or {}
-
-    decision = decide(
-        case_state=case_state or {"supplier": case.get("supplier")},
-        event=case,
-        evidence=ctx.state.get("evidence"),
-        timing=lifecycle_timing(),
-    )
 
     db = get_client()
-    claimed: list[dict] = []
 
     with tracer.start_as_current_span("commit_commands") as span:
         span.set_attribute("keplaria.case_id", case_id)
+        decision, claimed = _claim_lifecycle_commands(db, case_id, case, ctx)
         span.set_attribute("keplaria.lifecycle_reason", decision.reason)
         span.set_attribute("keplaria.lifecycle_state", decision.state)
         span.set_attribute("keplaria.cycle", decision.cycle)
         span.set_attribute(
-            "keplaria.commands", [c.action for c in decision.commands]
+            "keplaria.commands", [c["action"] for c in claimed]
         )
 
-        for command in decision.commands:
-            claim = claim_command(
-                db, case_id, command.action, decision.cycle, command.payload
-            )
-            claimed.append({
-                "action": command.action,
-                "cycle": decision.cycle,
-                "status": "already_done" if (not claim.acquired and claim.status == DONE)
-                else "queued",
-                "external_id": claim.external_id,
-            })
-
-        lifecycle_block = {
-            "state": decision.state,
-            "cycle": decision.cycle,
-            "last_effective_date": case.get("effective_date"),
-            "last_reason": decision.reason,
-        }
-        update = {"lifecycle": lifecycle_block}
-        if decision.certificate is not None:
-            update["certificate"] = decision.certificate
-
-        db.collection(CASES).document(case_id).set(update, merge=True)
         _record_outcome(
             db,
             case_id,
