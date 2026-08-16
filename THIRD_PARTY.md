@@ -36,8 +36,19 @@ notices retained on files derived from the Google scaffold.
 
 ## Assets
 
-No third-party fonts, icons, images, or audio are vendored in this repository.
-Update this section before submission if the demo site or video introduces any.
+### Fonts
+
+| Face | Licence | Notice |
+|---|---|---|
+| Space Grotesk | SIL Open Font License 1.1 | `console/static/fonts/OFL.txt` |
+| Inter | SIL Open Font License 1.1 | `console/static/fonts/Inter-OFL.txt` |
+| JetBrains Mono | SIL Open Font License 1.1 | `console/static/fonts/JetBrainsMono-OFL.txt` |
+
+Self-hosted; no external font service is contacted at page load.
+
+Marks, lockups and favicons under `console/static/` are the project's own
+brand assets, built in the sibling `keplaria-assets` repository and copied in
+(never symlinked); they are not third-party material.
 
 ## Tooling disclosure
 

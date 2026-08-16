@@ -1,0 +1,27 @@
+{
+  "background_color": "#0B1020",
+  "display": "standalone",
+  "icons": [
+    {
+      "purpose": "any",
+      "sizes": "192x192",
+      "src": "/static/android-chrome-192.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
+      "sizes": "512x512",
+      "src": "/static/android-chrome-512.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "maskable",
+      "sizes": "512x512",
+      "src": "/static/maskable-512.png",
+      "type": "image/png"
+    }
+  ],
+  "name": "Keplaria",
+  "short_name": "Keplaria",
+  "theme_color": "#0B1020"
+}

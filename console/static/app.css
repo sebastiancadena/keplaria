@@ -1,0 +1,283 @@
+/*
+  Keplaria console — shared stylesheet for the public case console and the
+  authenticated review service.
+
+  Design note: the brand mark reads an orbit literally — a closed ellipse
+  with its focus off-centre, because that is where Kepler's first law puts
+  the primary body. The one deliberate motif borrowed into this UI is that
+  same asymmetry: dividers do not centre their accent, they place it at the
+  mark's eccentricity (0.643 along the rule) instead of at the midpoint.
+  Everything else in this sheet is quiet on purpose so that one idea reads.
+*/
+
+/* Palette: exact values from the design system. Amber is legal as text only
+   because this surface is Void; on a light ground it is 2.1:1 and would be a
+   graphic accent only. Muted is 3.98:1 here — rules, borders and large text
+   only, never small body copy. This sheet keeps Muted off text entirely and
+   reserves it for borders and dividers, so that rule can never be violated
+   by accident later. */
+:root {
+  --void: #0B1020;
+  --ink: #111827;
+  --amber: #F59E0B;
+  --amber-bright: #FBBF24;
+  --star: #F8FAFC;
+  --muted: #64748B;
+  --clear: #34D399;
+  --blocked: #F87171;
+
+  /* Derived, non-brand tokens: layout only, safe to retune without touching
+     the palette above. */
+  --border-soft: rgb(100 116 139 / 0.32);
+  --border-hair: rgb(100 116 139 / 0.16);
+  --surface-shadow: rgb(11 16 32 / 0.55);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  /* Eccentricity of the mark's ellipse — reused as the off-centre stop for
+     every divider in the console, not just the logo. */
+  --focus-stop: 64%;
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/static/fonts/SpaceGrotesk.ttf") format("truetype");
+  font-weight: 500 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/static/fonts/Inter.ttf") format("truetype");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/static/fonts/JetBrainsMono.ttf") format("truetype");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+/* --- Reset -------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--star);
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+img, svg { max-width: 100%; display: block; }
+
+a {
+  color: var(--amber);
+  text-decoration-line: underline;
+  text-decoration-color: rgb(245 158 11 / 0.45);
+  text-underline-offset: 0.2em;
+}
+a:hover { color: var(--amber-bright); text-decoration-color: currentColor; }
+
+:focus-visible {
+  outline: 2px solid var(--amber-bright);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Type scale ----------------------------------------------------------
+   Space Grotesk never sits below 18px; Inter never rises above 32px. */
+
+h1, h2, h3 { font-family: "Space Grotesk", system-ui, sans-serif; margin: 0 0 var(--space-3); }
+h1 { font-size: 32px; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em; }
+h2 { font-size: 24px; line-height: 1.3; font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 18px; line-height: 1.4; font-weight: 600; }
+
+.display {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 48px;
+  line-height: 1.10;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-4);
+}
+
+p { margin: 0 0 var(--space-4); }
+p:last-child { margin-bottom: 0; }
+
+.body-small { font-size: 14px; line-height: 1.55; }
+
+.caption {
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; }
+
+/* --- Layout --------------------------------------------------------------
+   Wide enough for a case list and a detail panel side by side; a single
+   column below the breakpoint. */
+
+.shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-8);
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.masthead__brand { display: flex; align-items: center; gap: var(--space-3); }
+.masthead__brand img { height: 28px; width: auto; }
+
+.tagline {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--star);
+  margin: 0;
+}
+
+/* --- Surfaces --------------------------------------------------------------
+   Void is the ground; Ink sits one step above it as a raised surface, the
+   same relationship the two tokens hold in the mark (Void behind, Ink for
+   the mark itself on light grounds — inverted here for a dark UI). */
+
+.panel {
+  background: var(--ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: 0 20px 40px -24px var(--surface-shadow);
+}
+
+.panel + .panel { margin-top: var(--space-5); }
+
+.panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* --- Dividers --------------------------------------------------------------
+   The signature move: no divider on this page is a plain centred line. The
+   accent dot sits at the mark's own eccentricity, not the midpoint, because
+   that asymmetry is the one idea this identity is built on. */
+
+hr, .rule {
+  border: none;
+  border-top: 1px solid var(--muted);
+  margin: var(--space-5) 0;
+}
+
+.rule--focus {
+  position: relative;
+  height: 1px;
+  background: var(--border-soft);
+  margin: var(--space-6) 0;
+  overflow: visible;
+}
+
+.rule--focus::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--focus-stop);
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgb(245 158 11 / 0.16);
+}
+
+/* --- Status bands ----------------------------------------------------------
+   Status is never colour alone: the word itself always renders, and the
+   marker in front of it is a small filled dot rather than a coloured block,
+   echoing the mark's own focus disc instead of inventing a new shape. */
+
+.band--clear, .band--review, .band--blocked {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.band--clear::before, .band--review::before, .band--blocked::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.band--clear   { color: var(--clear); }
+.band--review  { color: var(--amber-bright); }
+.band--blocked { color: var(--blocked); }
+
+/* --- Tables ----------------------------------------------------------------
+   Case listings. Ids and paths are mono; everything else is prose. Header
+   labels stay full-contrast Star, never Muted — see the palette note above. */
+
+table { width: 100%; border-collapse: collapse; }
+
+th {
+  text-align: left;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--star);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+  vertical-align: middle;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+
+/* --- Motion & small screens ------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+@media (max-width: 640px) {
+  .shell { padding: var(--space-5) var(--space-4) var(--space-7); }
+  .masthead { flex-direction: column; align-items: flex-start; }
+  .panel__header { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+}
