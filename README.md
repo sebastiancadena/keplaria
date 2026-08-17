@@ -168,6 +168,18 @@ and is reported rather than retried blindly.
   databases) — see
   [Case console and review service](#case-console-and-review-service) and
   [Failure handling](#failure-handling).
+- `spikes/core_contracts/harness.py` — the one artifact that answers "is
+  everything this system claims still proven?". It does not re-run the closed
+  loop; it re-executes the pytest node ids and re-reads the spike evidence
+  that back each contract (duplicate and out-of-order events, provenance
+  failure, injection refusal, stale and double approval, forbidden
+  agent→tool edges, one ERP write after retry, cataloging, the graded eval
+  suite), plus one read-only live check against deployed Firestore and the
+  ERP. **Deliberately self-checking rather than a hand-maintained list:** a
+  test that is deleted, renamed, or red demotes its criterion instead of
+  continuing to look green. Exits non-zero if any contract is unproven, and
+  writes `spikes/core_contracts/evidence.json`. Needs `--env-file .env` for
+  the live check.
 - `spikes/dlq/harness.py` — proves bounded retry and durable dead-lettering
   against deployed resources: a command driven to `dead` through five real
   ERP refusals and not re-driven a sixth time, the deployed `POST /admin/sweep`
@@ -327,6 +339,15 @@ Vertex AI API under its current name, not a separate product.
   indexed dataset. Bulk-data rights for this entry are confirmed in writing by
   OpenSanctions; indexing the fixture is a deliberate choice, not a licensing
   limit.
+- **Failure-handling infrastructure:** Pub/Sub topic `keplaria-events-dead`
+  with push subscription `keplaria-events-dead-push`, where an event the
+  ingress rejects on every delivery lands instead of expiring silently at the
+  7-day retention boundary; and Cloud Scheduler job `keplaria-command-sweep`
+  (`*/15 * * * *`), which calls `POST /admin/sweep` so a failed command is
+  re-driven unattended rather than waiting for the next event on its case.
+  Both are load-bearing and both fail silently when misconfigured — see
+  [Failure handling](#failure-handling) for the two IAM bindings whose absence
+  produces no error, only lost events.
 - **Billing guardrails:** budget `keplaria-build` alerts at $100/$130; budget
   `keplaria-killswitch` ($200) publishes to Pub/Sub topic `billing-killswitch`,
   where the Cloud Function in [`infra/billing-killswitch/`](infra/billing-killswitch/)
