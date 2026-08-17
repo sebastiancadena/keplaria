@@ -44,7 +44,17 @@ notices retained on files derived from the Google scaffold.
 | Inter | SIL Open Font License 1.1 | `console/static/fonts/Inter-OFL.txt` |
 | JetBrains Mono | SIL Open Font License 1.1 | `console/static/fonts/JetBrainsMono-OFL.txt` |
 
-Self-hosted; no external font service is contacted at page load.
+Self-hosted; no external font service is contacted at page load. Subsets of
+the same three faces (ASCII plus a few punctuation glyphs, produced with
+`fonttools`) are embedded as data URIs in the architecture diagram; the
+subset files and their OFL notices live in `docs/architecture/assets/`.
+
+### Architecture diagram
+
+| Component | Origin | License / terms | How it is used |
+|---|---|---|---|
+| Google Cloud product icons | Google LLC, official icon set ([cloud.google.com/icons](https://cloud.google.com/icons)) | Google's icon terms — provided for use in architecture diagrams | Nine product icons inlined into `docs/architecture/architecture.svg` (sources in `docs/architecture/assets/`) |
+| Keplaria lockup | Own brand asset, built in the sibling `keplaria-assets` repository | Project's own | Embedded verbatim in the diagram header |
 
 Marks, lockups and favicons under `console/static/` are the project's own
 brand assets, built in the sibling `keplaria-assets` repository and copied in

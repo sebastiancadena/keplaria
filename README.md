@@ -6,6 +6,14 @@ for Python, targeting the
 
 ## Architecture
 
+![Keplaria system architecture](docs/architecture/architecture.svg)
+
+The diagram is generated, not drawn: `uv run python docs/architecture/build.py`
+rebuilds `docs/architecture/architecture.svg` from the committed sources under
+`docs/architecture/assets/` (a PNG export for form uploads sits alongside it).
+Update the build script whenever a component is added or moved — the diagram
+is part of the submission and must match the deployed system.
+
 The agent graph and its adapters run on two different runtimes:
 
 - **Agent Runtime** hosts the ADK graph — reasoning engine `keplaria`
