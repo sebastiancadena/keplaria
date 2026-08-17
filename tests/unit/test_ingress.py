@@ -145,9 +145,11 @@ def test_both_new_fields_are_optional():
     assert event.document_ref is None
 
 
-def test_a_dead_command_is_acked_not_retried(client, case_id, monkeypatch):
+def test_a_dead_command_is_acked_not_retried(client, case_id, monkeypatch, caplog):
     """The cap inverts if this 503s: Pub/Sub would redeliver forever on the
     one command the system deliberately gave up on."""
+    import logging
+
     import ingress.main as main
 
     monkeypatch.setattr(
@@ -158,10 +160,15 @@ def test_a_dead_command_is_acked_not_retried(client, case_id, monkeypatch):
         ],
     )
 
-    response = client.post("/pubsub/push", json=_push(_event(case_id)))
+    with caplog.at_level(logging.ERROR, logger="keplaria.ingress"):
+        response = client.post("/pubsub/push", json=_push(_event(case_id)))
 
     assert response.status_code == 200
     assert response.json()["status"] == "claimed"
+    # The dead block must execute and log at error level; without it, this
+    # assertion fails, pinning the production code.
+    assert "command execution is dead" in caplog.text
+    assert "create_supplier" in caplog.text
 
 
 def test_a_failed_command_still_returns_503(client, case_id, monkeypatch):
@@ -173,6 +180,25 @@ def test_a_failed_command_still_returns_503(client, case_id, monkeypatch):
         "execute_pending_commands",
         lambda db, cid: [
             {"action": "create_supplier", "status": "failed", "error": "HTTP 503"}
+        ],
+    )
+
+    response = client.post("/pubsub/push", json=_push(_event(case_id)))
+
+    assert response.status_code == 503
+
+
+def test_a_dead_command_beside_a_failed_one_still_returns_503(client, case_id, monkeypatch):
+    """If a result list has both dead and failed, the failed one still has
+    retries left and the whole response must return 503 so Pub/Sub redelivers."""
+    import ingress.main as main
+
+    monkeypatch.setattr(
+        main,
+        "execute_pending_commands",
+        lambda db, cid: [
+            {"action": "archive_case", "status": "dead", "error": "Max retries reached"},
+            {"action": "create_supplier", "status": "failed", "error": "HTTP 503"},
         ],
     )
 
