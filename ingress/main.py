@@ -56,7 +56,7 @@ import httpx
 from fastapi import Body, FastAPI, HTTPException
 from pydantic import ValidationError
 
-from app.executor.runner import execute_pending_commands
+from app.executor.runner import REFUSED_BY_POLICY, execute_pending_commands
 from app.executor.sweep import sweep_failed_commands
 from app.schemas import CanonicalEvent
 from app.state.commands import DEAD
@@ -128,11 +128,13 @@ def push(envelope: Any = Body(...)) -> dict:
             # This is a bounded, one-shot attempt, not a standing guarantee:
             # errors are logged, not raised, and this exact message is always
             # acked below regardless of the outcome, so Pub/Sub will never
-            # redeliver *this* message again to retry the drain. A command
-            # that keeps failing here stays `failed` until some other,
-            # unrelated event for the same case happens to arrive and
-            # triggers another drain — there is no dedicated retry/DLQ path
-            # for it yet. See app/executor/runner.py's module docstring.
+            # redeliver *this* message again to retry the drain. That is no
+            # longer the only second chance a command gets, though: a command
+            # that keeps failing here stays `failed` and is re-driven by the
+            # Cloud Scheduler sweep (POST /admin/sweep, every 15 minutes),
+            # bounded by MAX_EXECUTION_ATTEMPTS — after which it parks as
+            # `dead` and is never retried again, here or anywhere else. See
+            # app/executor/runner.py's module docstring.
             try:
                 execute_pending_commands(db, event.case_id)
             except Exception as exc:
@@ -207,7 +209,7 @@ def push(envelope: Any = Body(...)) -> dict:
         )
         raise HTTPException(status_code=503, detail="command execution failed") from exc
 
-    refused = [r for r in command_results if r.get("status") == "refused_by_policy"]
+    refused = [r for r in command_results if r.get("status") == REFUSED_BY_POLICY]
     if refused:
         # The runner's guard is a silent no-op by design (see
         # app/executor/runner.py): it never raises and never surfaces as
@@ -301,7 +303,67 @@ def admin_sweep() -> dict:
             summary["commands_dead"],
             summary["case_ids"],
         )
+    if summary["commands_refused"]:
+        # A refusal during a sweep is a narrower thing than a refusal on the
+        # push path: the sweep only visits cases holding a `failed` command,
+        # so this means a command that failed while its case was `clear` is
+        # now sitting in a case that no longer is. It cannot progress and it
+        # cannot die — the drain never calls the ERP, so execution_attempts
+        # never increments — and the sweep will find it again every run. That
+        # is accepted (see app/executor/sweep.py), which is exactly why it has
+        # to be said out loud once per sweep rather than counted as work.
+        logger.warning(
+            "sweep refused %s command(s) still awaiting a human decision "
+            "across cases %s",
+            summary["commands_refused"],
+            summary["case_ids"],
+        )
     return summary
+
+
+# The attribute Pub/Sub stamps on every message it forwards to a dead-letter
+# topic, holding the number of deliveries the SOURCE subscription made before
+# giving up. It is a string, like every Pub/Sub message attribute.
+_DELIVERY_COUNT_ATTRIBUTE = "CloudPubSubDeadLetterSourceDeliveryCount"
+
+
+def _delivery_count(message: dict) -> int:
+    """How many times the source subscription delivered before dead-lettering.
+
+    The attribute is read FIRST and the envelope's `deliveryAttempt` field is
+    only a fallback, which is the opposite of what it looks like it should be.
+    Pub/Sub populates `deliveryAttempt` only on subscriptions that themselves
+    carry a dead-letter policy, and infra/events/setup.sh deliberately creates
+    keplaria-events-dead-push without one — a dead letter has nowhere further
+    to escalate to. On this endpoint that field is therefore always absent, so
+    reading it alone would record `delivery_attempt: 0` on every dead-lettered
+    event, and /review/failures would show 0 in a Deliveries column sitting
+    beside prose saying the event was rejected five times. Do not "simplify"
+    this back to the field.
+
+    Parsed defensively because the attribute is a string arriving from an
+    external system and this handler is contractually obliged to always return
+    200: an unreadable count degrades to 0 rather than taking down the only
+    path that records the event at all.
+    """
+    attributes = message.get("attributes")
+    raw = (
+        attributes.get(_DELIVERY_COUNT_ATTRIBUTE)
+        if isinstance(attributes, dict)
+        else None
+    )
+    if raw is None:
+        raw = message.get("deliveryAttempt")
+    if raw is None:
+        return 0
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "dead-letter delivery count is not an integer (%s); recording 0",
+            str(raw)[:50],
+        )
+        return 0
 
 
 @api.post("/pubsub/dead")
@@ -323,7 +385,7 @@ def dead_letter(envelope: Any = Body(...)) -> dict:
         logger.error("dead-letter push with no message envelope; acking anyway")
         return {"status": "acked", "recorded": False}
 
-    delivery_attempt = int(message.get("deliveryAttempt") or 0)
+    delivery_attempt = _delivery_count(message)
     event_id = None
     case_id = None
     payload: dict = {}

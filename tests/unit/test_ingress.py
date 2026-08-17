@@ -216,6 +216,7 @@ def test_admin_sweep_returns_the_summary(client, monkeypatch):
         lambda db: {
             "cases_swept": 2,
             "commands_driven": 3,
+            "commands_refused": 4,
             "commands_dead": 1,
             "cases_skipped": 0,
             "case_ids": ["A", "B"],
@@ -227,6 +228,10 @@ def test_admin_sweep_returns_the_summary(client, monkeypatch):
     assert response.status_code == 200
     assert response.json()["cases_swept"] == 2
     assert response.json()["commands_dead"] == 1
+    # The endpoint must pass the refused count through rather than fold it
+    # into commands_driven: a backlog of cases waiting on a human decision is
+    # the one thing a sweep summary must not report as work done.
+    assert response.json()["commands_refused"] == 4
 
 
 def test_admin_sweep_reports_a_failure_as_503(client, monkeypatch):
@@ -257,6 +262,51 @@ def test_dead_letter_push_records_the_event(client, case_id, db):
     stored = db.collection(DEAD_EVENTS).document(event["event_id"]).get().to_dict()
     assert stored["case_id"] == case_id
     assert stored["delivery_attempt"] == 5
+
+
+def test_dead_letter_push_records_the_source_delivery_count(client, case_id, db):
+    """The count comes from the attribute, not the `deliveryAttempt` field.
+
+    Pub/Sub sets `deliveryAttempt` only on a subscription that itself has a
+    dead-letter policy, and keplaria-events-dead-push deliberately has none —
+    so on this endpoint that field is absent, exactly as it is here, and the
+    real count arrives as CloudPubSubDeadLetterSourceDeliveryCount. Reading
+    the field alone records 0 on every dead letter, next to a page saying the
+    event was rejected five times.
+    """
+    from app.state.dead_events import DEAD_EVENTS
+
+    event = _event(case_id)
+    envelope = _push(event)
+    envelope["message"]["attributes"] = {
+        "CloudPubSubDeadLetterSourceDeliveryCount": "5"
+    }
+
+    response = client.post("/pubsub/dead", json=envelope)
+
+    assert response.status_code == 200
+    stored = db.collection(DEAD_EVENTS).document(event["event_id"]).get().to_dict()
+    assert stored["delivery_attempt"] == 5
+
+
+def test_dead_letter_push_survives_a_non_numeric_delivery_count(client, case_id, db):
+    """The attribute is a string from an external system, and this handler is
+    contractually obliged to always return 200. A count it cannot parse
+    degrades to 0 rather than raising out of the only path that records the
+    event at all."""
+    from app.state.dead_events import DEAD_EVENTS
+
+    event = _event(case_id)
+    envelope = _push(event)
+    envelope["message"]["attributes"] = {
+        "CloudPubSubDeadLetterSourceDeliveryCount": "five"
+    }
+
+    response = client.post("/pubsub/dead", json=envelope)
+
+    assert response.status_code == 200
+    stored = db.collection(DEAD_EVENTS).document(event["event_id"]).get().to_dict()
+    assert stored["delivery_attempt"] == 0
 
 
 def test_dead_letter_push_acks_even_when_the_write_fails(client, monkeypatch, case_id):

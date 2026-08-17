@@ -102,6 +102,13 @@ from app.state.approvals import APPROVED, REJECTED
 from app.state.commands import DEAD, DONE, record_failure, record_success
 from app.state.firestore import CASES, OUTBOX
 
+# The status this module reports for a command the band guard would not let
+# it execute. A named constant rather than a bare literal because callers
+# (app/executor/sweep.py, ingress/main.py) have to tell a refusal apart from
+# work that actually ran, and two spellings of one status string is the drift
+# that would quietly make those counts wrong again.
+REFUSED_BY_POLICY = "refused_by_policy"
+
 # Drain order, not merely a lookup: attach_evidence must land before
 # clear_hold, so the ERP never shows a released supplier whose evidence is
 # still missing. outbox_ref.stream() guarantees no ordering of its own.
@@ -320,7 +327,7 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
             results.append(
                 {
                     "action": action,
-                    "status": "refused_by_policy",
+                    "status": REFUSED_BY_POLICY,
                     "band": band,
                     "policy_version": policy_version,
                     "gate_band": gate_band,

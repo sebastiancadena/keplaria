@@ -33,11 +33,18 @@ import logging
 
 from google.cloud import firestore
 
-from app.executor.runner import execute_pending_commands
-from app.state.commands import DEAD, FAILED
+from app.executor.runner import REFUSED_BY_POLICY, execute_pending_commands
+from app.state.commands import DEAD, DONE, FAILED
 from app.state.firestore import OUTBOX
 
 logger = logging.getLogger("keplaria.sweep")
+
+# The result statuses that mean the ERP call was actually attempted. A
+# refusal never reached the destination, and a `dead` result is either a
+# command skipped as terminal or one that died on this run — both are
+# reported under commands_dead, and neither is work this sweep can claim to
+# have driven.
+_EXECUTED = (DONE, FAILED)
 
 # One run's worth of work. Chosen to stay well inside a Cloud Run request
 # while the ingress runs --concurrency=1 --max-instances=1, so a sweep never
@@ -56,6 +63,20 @@ def find_stuck_case_ids(
     policy (a review-band case refuses on every drain by design, and
     sweeping those would be a busy loop over cases correctly waiting for a
     human), and DEAD commands are terminal.
+
+    Known, and accepted rather than fixed: a case holding a FAILED permissive
+    command whose case has since moved into the review band is re-found by
+    this query on every run, forever. The drain refuses that command instead
+    of executing it, so `execution_attempts` never increments and it can
+    never reach DEAD and drop out of here. Teaching this query about policy
+    bands is deliberately NOT the fix — it would put the executor's
+    authorization logic in a second place, which is precisely what routing
+    every write through execute_pending_commands exists to avoid, and the
+    two copies would then have to be kept in agreement forever. The cost is
+    one Firestore read and one refused drain per run, and the condition is
+    not invisible: it shows up as `commands_refused` in the sweep summary,
+    where a backlog of cases waiting on a human reads as exactly that
+    instead of as work being done.
 
     Returns (case_ids, skipped) rather than truncating quietly — a silent cap
     reads as "everything was covered" to whoever reads the summary.
@@ -93,6 +114,7 @@ def sweep_failed_commands(
 
     swept = 0
     driven = 0
+    refused = 0
     dead = 0
     for case_id in case_ids:
         try:
@@ -111,12 +133,20 @@ def sweep_failed_commands(
             continue
 
         swept += 1
-        driven += len(results)
+        # Not len(results): a refused or already-dead command produces a
+        # result without the ERP ever being called, so counting the whole
+        # list reported a sweep across 25 permanently-refused cases as 25
+        # commands driven — work that never happened. Each outcome is counted
+        # under its own key instead, so a backlog that cannot progress is
+        # visible as a backlog rather than disguised as progress.
+        driven += sum(1 for r in results if r.get("status") in _EXECUTED)
+        refused += sum(1 for r in results if r.get("status") == REFUSED_BY_POLICY)
         dead += sum(1 for r in results if r.get("status") == DEAD)
 
     summary = {
         "cases_swept": swept,
         "commands_driven": driven,
+        "commands_refused": refused,
         "commands_dead": dead,
         "cases_skipped": skipped,
         "case_ids": case_ids,

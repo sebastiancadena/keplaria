@@ -929,7 +929,7 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
     performing any of it.
 
     Returns (decision, claimed) where `claimed` is one dict per command with
-    its action, cycle, queued/already_done status, and any external_id a
+    its action, cycle, queued/already_done/dead status, and any external_id a
     previous completed claim recorded.
     """
     case_state = ctx.state.get("case_state") or {}
@@ -946,11 +946,25 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
         claim = claim_command(
             db, case_id, command.action, decision.cycle, command.payload
         )
+        # A refused claim has more than one meaning, and reporting them all as
+        # `queued` states something false in the very record built to make
+        # stuck work visible. claim_command refuses a DEAD command instead of
+        # resetting it to PENDING (see app/state/commands.py), and a
+        # review-band case re-claims on every later event, so a command the
+        # executor gave up on would otherwise be reported as freshly queued
+        # for the rest of the case's life. Only an acquired claim is queued;
+        # anything else reports the status the ledger actually holds, so a
+        # future refusal reason cannot silently read as fresh work either.
+        if claim.acquired:
+            status = "queued"
+        elif claim.status == DONE:
+            status = "already_done"
+        else:
+            status = claim.status
         claimed.append({
             "action": command.action,
             "cycle": decision.cycle,
-            "status": "already_done" if (not claim.acquired and claim.status == DONE)
-            else "queued",
+            "status": status,
             "external_id": claim.external_id,
         })
 

@@ -149,6 +149,70 @@ def test_the_sweep_counts_a_command_that_dies_on_its_watch(db, case_id, monkeypa
     assert command["status"] == DEAD
 
 
+def test_a_refused_command_is_not_counted_as_driven(db, case_id, monkeypatch):
+    """`commands_driven` must mean "the ERP call was attempted".
+
+    A review-band case whose command failed while the case was still clear is
+    refused on every sweep and never executes anything. Counting the result
+    list wholesale reported a sweep across 25 such cases as 25 commands
+    driven — a permanently stuck backlog disguised as work. The refusals get
+    their own key so the condition stays visible instead.
+
+    execute_pending_commands is stubbed rather than driven for real because
+    the `db` fixture is a SHARED database: the sweep also visits whatever
+    failed commands other tests left behind, and only a stub that refuses
+    everything makes `commands_driven == 0` an exact assertion rather than a
+    hopeful one.
+    """
+    from app.executor.sweep import sweep_failed_commands
+
+    claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+    record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    monkeypatch.setattr(
+        "app.executor.sweep.execute_pending_commands",
+        lambda _db, cid: [
+            {"action": "create_supplier", "status": "refused_by_policy",
+             "band": "review", "gate_band": "review", "approval_id": None}
+        ],
+    )
+
+    summary = sweep_failed_commands(db, limit=1000)
+
+    assert summary["cases_swept"] >= 1
+    assert summary["commands_driven"] == 0, (
+        "a refused command never reached the ERP and must not read as work"
+    )
+    assert summary["commands_refused"] == summary["cases_swept"]
+
+
+def test_an_executed_command_is_still_counted_as_driven(db, case_id, monkeypatch):
+    """The other half of the same claim: excluding refusals must not quietly
+    stop counting the commands that did run."""
+    from app.executor.sweep import sweep_failed_commands
+
+    claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+    record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    monkeypatch.setattr(
+        "app.executor.sweep.execute_pending_commands",
+        lambda _db, cid: [
+            {"action": "create_supplier", "status": "done", "external_id": "S1"},
+            {"action": "attach_evidence", "status": "failed", "error": "HTTP 503"},
+            {"action": "clear_hold", "status": "refused_by_policy", "band": "review"},
+        ],
+    )
+
+    summary = sweep_failed_commands(db, limit=1000)
+
+    swept = summary["cases_swept"]
+    assert swept >= 1
+    assert summary["commands_driven"] == 2 * swept, (
+        "a completed and a failed command both reached the ERP"
+    )
+    assert summary["commands_refused"] == swept
+
+
 def test_one_broken_case_does_not_abort_the_sweep(db, monkeypatch):
     """The sweep runs unattended; one poisonous case must not stop the rest."""
     import uuid

@@ -212,6 +212,43 @@ def test_park_case_claims_without_executing(db, case_id):
     assert claimed.get("result") is None
 
 
+def test_park_case_reports_a_dead_command_as_dead(db, case_id, monkeypatch):
+    """A command the executor gave up on must not be reported as `queued`.
+
+    claim_command refuses a DEAD command instead of resetting it to PENDING,
+    and a review-band case re-parks on every later event — so a terminal
+    record that only distinguishes DONE restates a dead command as fresh work
+    for the rest of the case's life. That is a false statement in the very
+    record built to make stuck work visible.
+    """
+    from app.state.commands import (
+        DEAD,
+        MAX_EXECUTION_ATTEMPTS,
+        claim_command,
+        record_failure,
+    )
+
+    monkeypatch.setattr(nodes_module, "get_client", lambda: db)
+    claim_command(db, case_id, "create_supplier", 1, {"supplier_name": "Andes Foods"})
+    for _ in range(MAX_EXECUTION_ATTEMPTS):
+        record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    ctx = _StubContext(
+        {
+            "case": _onboarding_case(case_id),
+            "screening": _screening(),
+            "policy": _review_verdict(),
+        }
+    )
+
+    result = park_case(None, ctx)
+
+    assert [c["status"] for c in result.output["commands"]] == [DEAD]
+    # And the claim did not resurrect it, which is the other half of the
+    # guarantee the honest status is reporting.
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == DEAD
+
+
 def test_the_graph_never_imports_the_erp_executor():
     """Structural, because the behavioural version cannot fail. No monkeypatch
     on app.executor can catch park_case reaching the ERP, since the graph does
