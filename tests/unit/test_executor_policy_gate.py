@@ -296,3 +296,57 @@ def test_a_hold_still_executes_regardless_of_any_approval(db, case_id, monkeypat
     execute_pending_commands(db, case_id)
 
     assert held == ["Acme"]
+
+
+def test_a_rejected_review_case_keeps_its_hold_and_loses_everything_else(
+    db, case_id, monkeypatch
+):
+    """The parked-case shape, which the tests above never build.
+
+    Every other rejection test here sets the gate band to `clear` and lets the
+    rejection supply the refusal. That is the duplicate-redelivery anomaly, not
+    the path a human actually meets: a real reviewer only ever sees a `review`
+    case, whose permissive commands were ALREADY refused before they arrived,
+    and whose restrictive command has ALREADY executed. What the rejection
+    changes is not whether the permissive commands run — they never could —
+    but who is on record for refusing them.
+
+    Both halves matter and they pull in opposite directions, which is why they
+    are asserted together: a change that made RESTRICTIVE respect the human
+    decision would still pass every other test in this file.
+    """
+    from app.executor import runner as runner_module
+    from app.executor.runner import execute_pending_commands
+    from app.state.approvals import REJECTED, commit_approval
+    from app.state.commands import PENDING, claim_command, get_command
+    from app.state.firestore import CASES
+
+    held = []
+    monkeypatch.setattr(runner_module, "frappe_client", _fake_client)
+    monkeypatch.setattr(
+        runner_module, "set_supplier_hold",
+        lambda client, supplier, hold_type: held.append(supplier)
+        or {"external_id": supplier, "created": True},
+    )
+
+    claim_command(db, case_id, "create_supplier", 1, {"supplier_name": "Acme"})
+    claim_command(db, case_id, "apply_hold", 1, {"supplier_name": "Acme", "hold_type": "All"})
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id, "case_version": 3, "phase": "awaiting_approval",
+        "policy": {"band": "review", "policy_version": 2},
+    }, merge=True)
+    commit_approval(db, case_id, "APR-1", 3, REJECTED, "reviewer@example.com")
+
+    results = execute_pending_commands(db, case_id)
+    by_action = {r["action"]: r for r in results}
+
+    # The restriction ran despite the rejection...
+    assert held == ["Acme"]
+    # ...and the permissive command is refused with the human named, not
+    # merely refused. gate_band survives so the record can still answer "what
+    # did the machine think?" next to "what did the person decide?".
+    assert by_action["create_supplier"]["status"] == "refused_by_policy"
+    assert by_action["create_supplier"]["gate_band"] == "review"
+    assert by_action["create_supplier"]["band"] == "blocked"
+    assert by_action["create_supplier"]["approval_id"] == "APR-1"
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == PENDING
