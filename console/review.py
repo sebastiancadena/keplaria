@@ -65,9 +65,16 @@ from fastapi.templating import Jinja2Templates
 
 from app.executor.runner import effective_band, execute_pending_commands
 from app.state.approvals import commit_approval
+from app.state.commands import MAX_EXECUTION_ATTEMPTS
+from app.state.dead_events import list_dead_events
 from app.state.firestore import get_client
 from console.iap import require_reviewer
-from console.store import case_id_is_addressable, list_awaiting_cases, load_case
+from console.store import (
+    case_id_is_addressable,
+    list_awaiting_cases,
+    list_failed_commands,
+    load_case,
+)
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -148,6 +155,31 @@ def review_list(request: Request, reviewer: str = Depends(require_reviewer)):
         request=request,
         name="review_list.html",
         context={"cases": parked, "reviewer": reviewer},
+    )
+
+
+# DECLARED BEFORE /review/{case_id} ON PURPOSE. FastAPI matches routes in
+# declaration order, so moving this below the parameterised route makes
+# "failures" bind as a case_id and this page disappears behind a
+# case-not-found render.
+@api.get("/review/failures", response_class=HTMLResponse)
+def review_failures(request: Request, reviewer: str = Depends(require_reviewer)):
+    """Commands the executor could not complete, and events never processed.
+
+    Behind require_reviewer, like every other route here, because
+    record_failure stores the destination's raw error text. The public
+    console shows none of this.
+    """
+    db = get_client()
+    return templates.TemplateResponse(
+        request=request,
+        name="review_failures.html",
+        context={
+            "reviewer": reviewer,
+            "commands": list_failed_commands(db),
+            "dead_events": list_dead_events(db),
+            "max_attempts": MAX_EXECUTION_ATTEMPTS,
+        },
     )
 
 

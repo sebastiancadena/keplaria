@@ -349,3 +349,73 @@ def test_an_unknown_case_is_refused(db, client, created):
     assert response.status_code == 200
     assert "no such case" in response.text.lower()
     assert created == []
+
+
+def test_failures_page_requires_a_reviewer(anonymous_client, monkeypatch):
+    """Raw destination error strings must stay behind IAP.
+
+    IAP_AUDIENCE must be set and the assertion must pin 403 exactly. Unset,
+    the request lands in _audience()'s 503 branch before verify_token is ever
+    reached, and the test would keep passing with require_reviewer's entire
+    verification body deleted — the same trap the sibling anonymous tests in
+    this file document.
+    """
+    monkeypatch.setenv("IAP_AUDIENCE", "/projects/1/locations/us-central1/services/x")
+
+    response = anonymous_client.get("/review/failures")
+
+    assert response.status_code == 403
+
+
+def test_failures_page_is_not_swallowed_by_the_case_route(client, monkeypatch):
+    """/review/{case_id} is declared in this same app. If `failures` is read as
+    a case ID it does NOT 404 — review_case renders review_result.html with
+    status 200 and `<h1>{{ case_id }}</h1>` showing the literal string
+    "failures", which would satisfy a status-200-and-"failures"-in-body
+    assertion for the wrong reason. The "no such case" phrase is that
+    fallback page's tell and appears nowhere on review_failures.html, so
+    its absence is what actually proves this page rendered rather than the
+    case route's not-found fallback.
+    """
+    import console.review as review
+
+    monkeypatch.setattr(review, "list_failed_commands", lambda db, limit=50: [])
+    monkeypatch.setattr(review, "list_dead_events", lambda db, limit=50: [])
+
+    response = client.get("/review/failures")
+
+    assert response.status_code == 200
+    assert "failures" in response.text.lower()
+    assert "no such case" not in response.text.lower()
+
+
+def test_failures_page_shows_a_dead_command_and_a_dead_event(client, monkeypatch):
+    import console.review as review
+
+    monkeypatch.setattr(
+        review,
+        "list_failed_commands",
+        lambda db, limit=50: [
+            {
+                "case_id": "CASE-STUCK",
+                "action": "create_supplier",
+                "status": "dead",
+                "execution_attempts": 5,
+                "error": "FrappeError: ERP down",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        review,
+        "list_dead_events",
+        lambda db, limit=50: [
+            {"event_id": "evt-1", "case_id": "CASE-LOST", "delivery_attempt": 5}
+        ],
+    )
+
+    response = client.get("/review/failures")
+
+    assert response.status_code == 200
+    assert "CASE-STUCK" in response.text
+    assert "CASE-LOST" in response.text
+    assert "ERP down" in response.text

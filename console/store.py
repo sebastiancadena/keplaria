@@ -123,3 +123,37 @@ def list_awaiting_cases(db: firestore.Client) -> list[dict]:
     cases = [doc.to_dict() or {} for doc in query.stream()]
     cases.sort(key=lambda c: str(c.get("case_id") or ""))
     return cases
+
+
+def list_failed_commands(db: firestore.Client, limit: int = 50) -> list[dict]:
+    """Every command in a FAILED or DEAD state, across all cases.
+
+    Two `in`-filtered collection-group queries would need a composite index
+    apiece; this runs one equality query per status instead and merges in
+    Python. At the scale this system operates — a handful of stuck commands
+    is already an incident — that is the cheaper trade, and it keeps the
+    index requirement to the single collection-group index the sweep already
+    needs.
+
+    Sorted newest-touched first in Python rather than with `order_by`:
+    combining an equality filter on `status` with an ordering on
+    `updated_at` requires a composite index, and an `order_by` on a field
+    some older documents lack would FILTER them out rather than merely
+    sorting them.
+    """
+    from app.state.commands import DEAD, FAILED
+
+    rows: list[dict] = []
+    for status in (FAILED, DEAD):
+        query = (
+            db.collection_group(OUTBOX)
+            .where(filter=firestore.FieldFilter("status", "==", status))
+            .limit(limit)
+        )
+        rows.extend(snap.to_dict() or {} for snap in query.stream())
+
+    rows.sort(
+        key=lambda r: r.get("updated_at") or r.get("created_at") or 0,
+        reverse=True,
+    )
+    return rows[:limit]

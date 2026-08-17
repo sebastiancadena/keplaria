@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Awaiting review</h1>
 <p>Signed in as <span class="mono">{{ reviewer }}</span></p>
+<p><a href="/review/failures">Failures &rarr;</a></p>
 {% if not cases %}<p>Nothing is parked for review.</p>{% endif %}
 <ul>
 {% for case in cases %}

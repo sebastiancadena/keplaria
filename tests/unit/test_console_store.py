@@ -34,3 +34,35 @@ def test_loading_an_unaddressable_case_id_is_refused_not_a_crash(db):
     case, commands = load_case(db, "FOO/BAR")
     assert case is None
     assert commands == []
+
+
+def test_failed_and_dead_commands_are_both_listed(db):
+    """Both states are operational work: `failed` will be retried, `dead` will
+    not, and a reviewer needs to see each for different reasons."""
+    import uuid
+
+    from app.state.commands import (
+        DEAD,
+        FAILED,
+        MAX_EXECUTION_ATTEMPTS,
+        claim_command,
+        record_failure,
+    )
+    from console.store import list_failed_commands
+
+    failing = f"FAIL-{uuid.uuid4().hex[:12]}"
+    dying = f"DEAD-{uuid.uuid4().hex[:12]}"
+
+    claim_command(db, failing, "create_supplier", 1, {"supplier_name": "A"})
+    record_failure(db, failing, "create_supplier", 1, "HTTP 503")
+
+    claim_command(db, dying, "create_supplier", 1, {"supplier_name": "B"})
+    for _ in range(MAX_EXECUTION_ATTEMPTS):
+        record_failure(db, dying, "create_supplier", 1, "HTTP 500")
+
+    listed = list_failed_commands(db, limit=1000)
+    by_case = {c["case_id"]: c for c in listed}
+
+    assert by_case[failing]["status"] == FAILED
+    assert by_case[dying]["status"] == DEAD
+    assert by_case[dying]["execution_attempts"] == MAX_EXECUTION_ATTEMPTS
