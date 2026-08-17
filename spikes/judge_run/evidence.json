@@ -1,0 +1,185 @@
+{
+  "captured_at": "2026-08-17T13:20:54.597348+00:00",
+  "result": "PASS",
+  "what_this_is": "One full deployed rehearsal of the live judge run: a case parked for a near-match and released by a human approval, then the four-beat lifecycle sequence. Machine time only -- the human approval is timed but excluded from the budget total.",
+  "case_ids": {
+    "hitl": "JR-A-4A74AE",
+    "lifecycle": "JR-B-EDD373"
+  },
+  "suppliers": {
+    "hitl": "Andes Verde Import Export SAS",
+    "lifecycle": "Distribuidora Llanos Azules SAS"
+  },
+  "machine_seconds": {
+    "hitl_track": 22.4,
+    "lifecycle_track": 52.4,
+    "total": 74.8
+  },
+  "human_seconds": 234.3,
+  "budget_seconds": 130,
+  "within_budget": true,
+  "steps": [
+    {
+      "track": "A",
+      "beat": "event -> parked for review",
+      "seconds": 22.2,
+      "ok": true,
+      "phase": "awaiting_approval",
+      "band": "review",
+      "score": 0.25,
+      "factors": [
+        "SUBTHRESHOLD_CANDIDATE"
+      ],
+      "lifecycle": {
+        "state": "active",
+        "cycle": 1
+      },
+      "commands_parked": [
+        "attach_evidence",
+        "create_supplier"
+      ]
+    },
+    {
+      "track": "A",
+      "beat": "human approval -> ERP write",
+      "seconds": 0.2,
+      "ok": true,
+      "human_seconds": 234.3,
+      "decision": "approved",
+      "actor": "sebastiancadena@gmail.com",
+      "executed": [
+        "attach_evidence",
+        "create_supplier"
+      ]
+    },
+    {
+      "track": "B",
+      "beat": "1. new_supplier_packet",
+      "seconds": 23.5,
+      "ok": true,
+      "expected": {
+        "state": "active",
+        "cycle": 1
+      },
+      "phase": "committed",
+      "lifecycle": {
+        "state": "active",
+        "cycle": 1,
+        "reason": "ONBOARDED"
+      },
+      "band": "clear"
+    },
+    {
+      "track": "B",
+      "beat": "2. renewal_due",
+      "seconds": 8.3,
+      "ok": true,
+      "expected": {
+        "state": "active",
+        "reason": "NOT_DUE"
+      },
+      "phase": "no_action",
+      "lifecycle": {
+        "state": "active",
+        "cycle": 1,
+        "reason": "NOT_DUE"
+      },
+      "band": "clear"
+    },
+    {
+      "track": "B",
+      "beat": "3. renewal_due",
+      "seconds": 4.1,
+      "ok": true,
+      "expected": {
+        "state": "renewal_requested"
+      },
+      "phase": "committed",
+      "lifecycle": {
+        "state": "renewal_requested",
+        "cycle": 1,
+        "reason": "RENEWAL_REQUESTED"
+      },
+      "band": "clear"
+    },
+    {
+      "track": "B",
+      "beat": "4. evidence_overdue",
+      "seconds": 4.0,
+      "ok": true,
+      "expected": {
+        "state": "held"
+      },
+      "phase": "committed",
+      "lifecycle": {
+        "state": "held",
+        "cycle": 1,
+        "reason": "HELD_OVERDUE"
+      },
+      "band": "clear"
+    },
+    {
+      "track": "B",
+      "beat": "5. certificate_received",
+      "seconds": 12.4,
+      "ok": true,
+      "expected": {
+        "state": "active",
+        "cycle": 2
+      },
+      "phase": "committed",
+      "lifecycle": {
+        "state": "active",
+        "cycle": 2,
+        "reason": "RENEWED"
+      },
+      "band": "clear"
+    },
+    {
+      "track": "B",
+      "beat": "final command ledger",
+      "seconds": 0.0,
+      "ok": true,
+      "commands": {
+        "JR-B-EDD373:apply_hold:c1": {
+          "status": "done",
+          "cycle": 1,
+          "action": "apply_hold",
+          "external_id": "Distribuidora Llanos Azules SAS"
+        },
+        "JR-B-EDD373:attach_evidence:c1": {
+          "status": "done",
+          "cycle": 1,
+          "action": "attach_evidence",
+          "external_id": "9161a08a96"
+        },
+        "JR-B-EDD373:attach_evidence:c2": {
+          "status": "done",
+          "cycle": 2,
+          "action": "attach_evidence",
+          "external_id": "fc302b6f7d"
+        },
+        "JR-B-EDD373:clear_hold:c2": {
+          "status": "done",
+          "cycle": 2,
+          "action": "clear_hold",
+          "external_id": "Distribuidora Llanos Azules SAS"
+        },
+        "JR-B-EDD373:create_supplier:c1": {
+          "status": "done",
+          "cycle": 1,
+          "action": "create_supplier",
+          "external_id": "Distribuidora Llanos Azules SAS"
+        },
+        "JR-B-EDD373:request_renewal:c1": {
+          "status": "done",
+          "cycle": 1,
+          "action": "request_renewal",
+          "external_id": "1tl98sivcg"
+        }
+      },
+      "ledger_note": "Re-read after the run. The original read was taken the instant the case settled and caught clear_hold still PENDING: settle() waits on the case phase, which the graph writes inside the engine, while the ingress drains the outbox after the engine call returns. clear_hold was already done seconds later. The harness now waits for the drain (drained_outbox); this run's ledger below is the corrected read.",
+      "ledger_reread_at": "2026-08-17T13:27:52.493232+00:00"
+    }
+  ]
+}
