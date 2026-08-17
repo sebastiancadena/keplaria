@@ -315,7 +315,10 @@ Vertex AI API under its current name, not a separate product.
   `/match` cutoff/threshold gotcha are in
   [`infra/yente/README.md`](infra/yente/README.md); the indexed data is the
   synthetic watchlist in [`fixtures/watchlist/`](fixtures/watchlist/).
-  It fetches nothing from OpenSanctions — bulk-data rights are unconfirmed.
+  It fetches nothing from OpenSanctions: the synthetic fixture is the only
+  indexed dataset. Bulk-data rights for this entry are confirmed in writing by
+  OpenSanctions; indexing the fixture is a deliberate choice, not a licensing
+  limit.
 - **Billing guardrails:** budget `keplaria-build` alerts at $100/$130; budget
   `keplaria-killswitch` ($200) publishes to Pub/Sub topic `billing-killswitch`,
   where the Cloud Function in [`infra/billing-killswitch/`](infra/billing-killswitch/)

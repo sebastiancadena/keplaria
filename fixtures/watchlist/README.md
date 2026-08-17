@@ -15,21 +15,31 @@ It is indexed by the self-hosted `yente` screening service on the private
 | Licence | Same licence as this repository. |
 | OpenSanctions data | **Not used.** See below. |
 
-## Why not OpenSanctions data
+## Why this fixture and not OpenSanctions data
 
 yente's shipped manifests pull the OpenSanctions catalog — `civic.yml` from
 `data.opensanctions.org`, `commercial.yml` from `delivery.opensanctions.com`
-behind an `OPENSANCTIONS_DELIVERY_TOKEN`. A written data-rights confirmation
-has been requested and has **not** been received.
+behind an `OPENSANCTIONS_DELIVERY_TOKEN`.
 
-Until it is, this deployment runs on this fixture alone:
+Data rights are **not** the reason this fixture exists. OpenSanctions confirmed
+in writing that bulk-data use by this entry is covered by the data's CC BY-NC
+4.0 terms. The fixture is indexed because a synthetic watchlist is small,
+reproducible, and safe to publish, and because it can be shaped to exercise the
+screening path deterministically — a real dataset can do none of those things.
+
+This deployment therefore runs on this fixture alone:
 
 - `infra/yente/manifest.yml` declares `catalogs: []` — no remote catalog.
 - `YENTE_AUTO_REINDEX=false` — no scheduled fetch from any OpenSanctions host.
 
-Do not describe the deployment as screening against the live OpenSanctions
-dataset, and do not make source-count claims. The accurate claim is: *a
-self-hosted yente instance screening against a synthetic watchlist fixture.*
+While that is true, do not describe the deployment as screening against the
+live OpenSanctions dataset, and do not make source-count claims. The accurate
+claim is: *a self-hosted yente instance screening against a synthetic watchlist
+fixture.* The claim depends on what is indexed, not on what is licensed.
+
+If the real collection is ever indexed, two obligations attach: the data files
+and any export derived from them stay out of this repository, and the README
+carries the attribution OpenSanctions specifies.
 
 ## Contents
 
