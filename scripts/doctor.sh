@@ -240,6 +240,18 @@ if [ -n "$review_url" ]; then
   code=$(curl -s -o /dev/null -w '%{http_code}' "$review_url/review")
   case "$code" in
     401|403) ok "review service refuses unauthenticated callers ($code)" ;;
+    302|303|307)
+      # IAP fronts a browser surface, so it bounces an anonymous caller to
+      # Google sign-in instead of refusing flatly. That is still "gets
+      # nothing" — but only if the bounce goes to Google. A redirect
+      # anywhere else would mean something other than IAP answered.
+      loc=$(curl -sI "$review_url/review" | tr -d '\r' | sed -n 's/^[Ll]ocation: //p')
+      case "$loc" in
+        https://accounts.google.com/*)
+          ok "review service bounces anonymous callers to Google sign-in ($code)" ;;
+        *)
+          bad "review service redirected ($code) somewhere other than Google sign-in: ${loc:-<none>}" ;;
+      esac ;;
     *) bad "review service returned $code to an unauthenticated caller" ;;
   esac
   aud=$(gcloud run services describe keplaria-review --region=us-central1 \
