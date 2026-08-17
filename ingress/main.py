@@ -57,6 +57,7 @@ from fastapi import Body, FastAPI, HTTPException
 from pydantic import ValidationError
 
 from app.executor.runner import execute_pending_commands
+from app.executor.sweep import sweep_failed_commands
 from app.schemas import CanonicalEvent
 from app.state.commands import DEAD
 from app.state.firestore import claim_event, get_client, mark_dispatched
@@ -265,3 +266,38 @@ def push(envelope: Any = Body(...)) -> dict:
         "case_version": claim.case_version,
         "session_id": result.get("session_id"),
     }
+
+
+@api.post("/admin/sweep")
+def admin_sweep() -> dict:
+    """Re-drive outbox commands that failed and were never retried.
+
+    Called by the keplaria-command-sweep Cloud Scheduler job every 15
+    minutes. Authorization is Cloud Run IAM — the caller needs an OIDC token
+    from a service account holding roles/run.invoker on this service, the
+    same mechanism that protects /pubsub/push. There is deliberately no
+    application-level check here to go stale beside it.
+
+    Never invokes the engine, so it costs none of the Agent Runtime query
+    quota; it only reads Firestore and writes to the ERP.
+    """
+    db = get_client()
+    try:
+        summary = sweep_failed_commands(db)
+    except Exception as exc:
+        # A sweep that could not run at all is worth retrying, so Scheduler
+        # should see a non-2xx. This is not the same judgement as an
+        # individual dead command, which is acked precisely so it is NOT
+        # retried.
+        logger.warning(
+            "sweep failed: %s: %s", type(exc).__name__, str(exc)[:200]
+        )
+        raise HTTPException(status_code=503, detail="sweep failed") from exc
+
+    if summary["commands_dead"]:
+        logger.error(
+            "sweep parked %s command(s) as dead across cases %s",
+            summary["commands_dead"],
+            summary["case_ids"],
+        )
+    return summary

@@ -205,3 +205,40 @@ def test_a_dead_command_beside_a_failed_one_still_returns_503(client, case_id, m
     response = client.post("/pubsub/push", json=_push(_event(case_id)))
 
     assert response.status_code == 503
+
+
+def test_admin_sweep_returns_the_summary(client, monkeypatch):
+    import ingress.main as main
+
+    monkeypatch.setattr(
+        main,
+        "sweep_failed_commands",
+        lambda db: {
+            "cases_swept": 2,
+            "commands_driven": 3,
+            "commands_dead": 1,
+            "cases_skipped": 0,
+            "case_ids": ["A", "B"],
+        },
+    )
+
+    response = client.post("/admin/sweep")
+
+    assert response.status_code == 200
+    assert response.json()["cases_swept"] == 2
+    assert response.json()["commands_dead"] == 1
+
+
+def test_admin_sweep_reports_a_failure_as_503(client, monkeypatch):
+    """Cloud Scheduler retries on non-2xx, and a sweep that could not run at
+    all is worth retrying — unlike an individual dead command."""
+    import ingress.main as main
+
+    def _boom(db):
+        raise RuntimeError("firestore unreachable")
+
+    monkeypatch.setattr(main, "sweep_failed_commands", _boom)
+
+    response = client.post("/admin/sweep")
+
+    assert response.status_code == 503
