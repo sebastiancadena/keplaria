@@ -42,7 +42,7 @@ echo "== judge-visibility (private planning layer must not leak) =="
 # from strategy/ carry risk IDs, plan-step labels and private filenames into
 # code and commit messages when copied verbatim. Caught in app/risk.py and in a
 # commit message on 2026-08-14. This grep is the automated backstop.
-# 'Ground Control' was removed from this pattern on 2026-08-18: it is PUBLIC
+# 'Ground Control' was removed from this pattern on 2026-08-17: it is PUBLIC
 # vocabulary (demo-and-video.md caps public terms at five and lists it), and
 # the architecture diagram is its sanctioned use. The internal-only terms
 # (Launch, Constellation, Docking, Debris shield, Splashdown) never appeared
