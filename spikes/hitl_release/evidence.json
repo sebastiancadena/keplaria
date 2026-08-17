@@ -1,0 +1,86 @@
+{
+  "captured_at": "2026-08-17T12:55:46.661535+00:00",
+  "result": "PASS",
+  "what_this_proves": "A case parked because a near-match needed adjudication, a human signed in through IAP and approved it, and that decision -- bound to the exact case version it was shown -- released the parked command into a real ERP write. Not proven here: anything about a rejection path, or about a decision made against a stale version.",
+  "case_id": "HITL-71936DC5",
+  "supplier": "Andes Verde Import Export SAS",
+  "parked": {
+    "at": "2026-08-17T12:52:46.150652+00:00",
+    "case_version": 1,
+    "policy": {
+      "policy_version": 2,
+      "policy_id": "supplier_risk",
+      "score": 0.25,
+      "factors_fired": [
+        {
+          "weight": 0.25,
+          "value": "syn-co-008 @ 0.672",
+          "id": "SUBTHRESHOLD_CANDIDATE"
+        }
+      ],
+      "band": "review",
+      "reasons": []
+    },
+    "screening": {
+      "reachable": true,
+      "endpoint": "http://10.10.0.2:8000",
+      "error": null,
+      "candidate_count": 3,
+      "top_candidate": {
+        "match": false,
+        "score": 0.6716417910447763,
+        "id": "syn-co-008"
+      },
+      "flagged": []
+    }
+  },
+  "approval": {
+    "case_version": 1,
+    "decision": "approved",
+    "approval_id": "HITL-71936DC5:v1",
+    "committed_at": "2026-08-17 12:54:37.139000+00:00",
+    "actor": "sebastiancadena@gmail.com"
+  },
+  "approvals_subcollection": [
+    {
+      "actor": "sebastiancadena@gmail.com",
+      "case_version": 1,
+      "approval_id": "HITL-71936DC5:v1",
+      "committed_at": "2026-08-17 12:54:37.139000+00:00",
+      "decision": "approved"
+    }
+  ],
+  "commands": [
+    {
+      "attempts": 1,
+      "case_id": "HITL-71936DC5",
+      "action": "create_supplier",
+      "status": "done",
+      "payload": {
+        "supplier_name": "Andes Verde Import Export SAS",
+        "country": "Colombia",
+        "email_id": "andes-verde-import-export-sas@example.com"
+      },
+      "error": null,
+      "created_at": "2026-08-17 12:52:41.301000+00:00",
+      "cycle": 1,
+      "command_id": "HITL-71936DC5:create_supplier:c1",
+      "external_id": "Andes Verde Import Export SAS",
+      "result": {
+        "external_id": "Andes Verde Import Export SAS",
+        "created": true
+      },
+      "updated_at": "2026-08-17 12:54:38.268000+00:00"
+    }
+  ],
+  "checks": {
+    "case_parked_for_a_near_match": true,
+    "human_decision_recorded": true,
+    "decision_is_approve": true,
+    "decided_by_a_verified_reviewer": true,
+    "approval_bound_to_the_parked_version": true,
+    "create_supplier_executed": true
+  },
+  "final_phase": "awaiting_approval",
+  "final_case_version": 1
+}
