@@ -306,10 +306,24 @@ SWEEP_STATE=$(gcloud scheduler jobs describe keplaria-command-sweep \
 
 # The emulator does not enforce collection-group indexes, so the sweep's unit
 # tests pass locally whether or not this exists in production.
-gcloud firestore indexes composite list --project=keplaria --format=json 2>/dev/null \
-  | grep -q '"collectionGroup": "outbox"' \
-  && ok "outbox collection-group index present (the sweep's query needs it)" \
-  || meh "no outbox collection-group index found — confirm the sweep query works against the real database, not just the emulator"
+#
+# Checked in BOTH databases, and named individually when one is missing. The
+# index is needed in "(default)" for the deployed sweep and /review/failures,
+# and in "keplaria-test" because that is the database `uv run pytest` uses
+# whenever FIRESTORE_EMULATOR_HOST is unset (see tests/conftest.py) — and
+# `gcloud firestore indexes composite list` without --database inspects only
+# "(default)", so a check written that way reports green while the repo's own
+# default test run fails on a missing index in the other database, with
+# nothing anywhere surfacing the gap.
+missing_index=""
+for fsdb in "(default)" "keplaria-test"; do
+  gcloud firestore indexes composite list --database="$fsdb" --project=keplaria \
+    --format=json 2>/dev/null | grep -q '"collectionGroup": "outbox"' \
+    || missing_index="${missing_index}${fsdb} "
+done
+[ -z "$missing_index" ] \
+  && ok "outbox collection-group index present in (default) and keplaria-test (the sweep's query needs it)" \
+  || meh "no outbox collection-group index in: ${missing_index}— the sweep query and /review/failures fail there; the emulator hides this because it auto-indexes"
 
 echo
 printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
