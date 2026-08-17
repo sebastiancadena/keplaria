@@ -10,12 +10,16 @@ redelivery.
 That redelivery path is a bounded repair attempt, not a standing
 self-healing guarantee: the ingress always acks a duplicate_event with 200
 regardless of whether the drain here succeeds (see ingress/main.py), so
-Pub/Sub never redelivers that specific message again over a failed drain. A
-persistently failing command (bad credentials, an ERP outage) gets exactly
-one bonus attempt per delivery that happens to arrive — not an ongoing
-retry loop — and stays `failed` until some unrelated later event for the
-same case triggers another drain, or until a dedicated retry/DLQ path is
-built (not yet).
+Pub/Sub never redelivers that specific message again over a failed drain.
+
+What closes that gap is not this module but two things beside it: a Cloud
+Scheduler sweep (app/executor/sweep.py) that re-drives any case holding a
+`failed` command, and a cap. A command gets MAX_EXECUTION_ATTEMPTS
+execution attempts in total, across every drain from every trigger; the
+last failure parks it as `dead`, after which this module skips it forever
+and reports it as `dead` so it stays visible. Retry is bounded and the
+resting place is durable — this is not self-healing, and a persistently
+broken destination still needs a human.
 
 This module also re-reads the case before draining and refuses any
 not-yet-executed PERMISSIVE command whose case is not `clear`. The band it
@@ -95,7 +99,7 @@ from app.lifecycle import (
 )
 from app.risk import BLOCKED, CLEAR
 from app.state.approvals import APPROVED, REJECTED
-from app.state.commands import DONE, record_failure, record_success
+from app.state.commands import DEAD, DONE, record_failure, record_success
 from app.state.firestore import CASES, OUTBOX
 
 # Drain order, not merely a lookup: attach_evidence must land before
@@ -270,9 +274,18 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
     refused = band != CLEAR
 
     commands = []
+    dead: list[dict] = []
     for snap in outbox_ref.stream():
         command = snap.to_dict() or {}
         if command.get("status") == DONE:
+            continue
+        if command.get("status") == DEAD:
+            # Terminal: the executor exhausted MAX_EXECUTION_ATTEMPTS on this
+            # command. Skipped rather than retried, but still reported — a
+            # dead command dropped from the report would be indistinguishable
+            # from a case with no work, which is exactly the invisibility
+            # this whole change exists to remove.
+            dead.append(command)
             continue
         if command.get("action") not in _DRAIN_ORDER:
             # An action this executor does not know is left untouched
@@ -282,6 +295,10 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
 
     # Deterministic drain order, not stream() order: see _DRAIN_ORDER above.
     commands.sort(key=lambda c: _DRAIN_ORDER.index(c["action"]))
+    # stream() has no ordering of its own, so sort the dead by action too —
+    # otherwise the returned list varies run to run and the tests that read it
+    # become flaky for no reason.
+    dead.sort(key=lambda c: str(c.get("action")))
 
     for command in commands:
         action = command["action"]
@@ -319,8 +336,8 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
                 result = _run(action, client, payload, cycle)
         except (FrappeError, httpx.HTTPError) as exc:
             error = f"{type(exc).__name__}: {exc}"
-            record_failure(db, case_id, action, cycle, error)
-            results.append({"action": action, "status": "failed", "error": error})
+            status = record_failure(db, case_id, action, cycle, error)
+            results.append({"action": action, "status": status, "error": error})
             continue
         except Exception as exc:
             # Not FrappeError/httpx.HTTPError — e.g. a malformed Frappe
@@ -333,8 +350,8 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
             # draining the rest of the outbox rather than aborting on the
             # first unexpected error.
             error = f"{type(exc).__name__}: {exc}"[:300]
-            record_failure(db, case_id, action, cycle, error)
-            results.append({"action": action, "status": "failed", "error": error})
+            status = record_failure(db, case_id, action, cycle, error)
+            results.append({"action": action, "status": status, "error": error})
             continue
 
         record_success(db, case_id, action, cycle, result["external_id"], result)
@@ -347,5 +364,14 @@ def execute_pending_commands(db, case_id: str) -> list[dict]:
                 "approval_id": approval_id,
             }
         )
+
+    results.extend(
+        {
+            "action": command.get("action"),
+            "status": DEAD,
+            "error": command.get("error"),
+        }
+        for command in dead
+    )
 
     return results
