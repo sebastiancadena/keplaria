@@ -42,10 +42,18 @@ echo "== judge-visibility (private planning layer must not leak) =="
 # from strategy/ carry risk IDs, plan-step labels and private filenames into
 # code and commit messages when copied verbatim. Caught in app/risk.py and in a
 # commit message on 2026-08-14. This grep is the automated backstop.
-LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|Ground Control|\bR[1-9][0-9]?\b'
+# 'Ground Control' was removed from this pattern on 2026-08-18: it is PUBLIC
+# vocabulary (demo-and-video.md caps public terms at five and lists it), and
+# the architecture diagram is its sanctioned use. The internal-only terms
+# (Launch, Constellation, Docking, Debris shield, Splashdown) never appeared
+# here because they never leaked; add one only if it does.
+LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|\bR[1-9][0-9]?\b'
 # -I skips binary files; the risk-id alternative can match arbitrary bytes in
 # vendored binaries. We only care about text leaks from our own writing.
-leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' 2>/dev/null)
+# The generated architecture.svg is excluded because its base64 font payloads
+# false-positive the risk-id pattern; every human-readable string in it comes
+# from docs/architecture/build.py, which IS grepped.
+leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' 2>/dev/null)
 [ -z "$leak_files" ] \
   && ok "no private planning vocabulary in the tracked tree" \
   || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
@@ -65,6 +73,20 @@ if [ -d .venv ]; then
   live=$(uv run pytest -m live --collect-only -q 2>/dev/null | grep -oE '^[0-9]+/[0-9]+ tests collected|[0-9]+ tests collected' | head -1)
   [ -n "$sel" ] && ok "default suite selection: $sel (live-only: ${live:-unknown})" \
     || meh "could not determine test selection split"
+fi
+
+# The architecture diagram is generated and scored: a submitted diagram that
+# no longer matches build.py is a stale artifact describing a system that does
+# not exist. The build is deterministic, so a byte-compare is a real check.
+if [ -d .venv ] && [ -f docs/architecture/build.py ]; then
+  tmp_svg=$(mktemp)
+  if KEPLARIA_DIAGRAM_OUT="$tmp_svg" uv run python docs/architecture/build.py >/dev/null 2>&1 \
+     && cmp -s "$tmp_svg" docs/architecture/architecture.svg; then
+    ok "architecture.svg matches build.py output (diagram not stale)"
+  else
+    bad "architecture.svg does NOT match build.py — regenerate: uv run python docs/architecture/build.py (and re-export the PNG)"
+  fi
+  rm -f "$tmp_svg"
 fi
 
 echo "== cloud infra (read-only) =="

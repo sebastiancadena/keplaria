@@ -21,12 +21,15 @@ JetBrains Mono for identifiers, lockup geometry untouched.
 from __future__ import annotations
 
 import base64
+import os
 import re
 from pathlib import Path
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "assets"
-OUT = HERE / "architecture.svg"
+# KEPLARIA_DIAGRAM_OUT lets doctor.sh rebuild to a temp path and byte-compare
+# against the committed SVG without touching the working tree.
+OUT = Path(os.environ.get("KEPLARIA_DIAGRAM_OUT", HERE / "architecture.svg"))
 
 # ---------------------------------------------------------------- palette
 VOID = "#0B1020"
@@ -73,7 +76,7 @@ def load_icon(slug: str) -> str:
     body = re.sub(r"</svg>\s*$", "", body)
     safe = re.sub(r"[^a-z0-9]", "", slug)
     body = body.replace("cls-", f"{safe}-c-")
-    for m in set(re.findall(r'id="([^"]+)"', body)):
+    for m in sorted(set(re.findall(r'id="([^"]+)"', body))):
         body = body.replace(f'id="{m}"', f'id="{safe}-{m}"')
         body = body.replace(f"url(#{m})", f"url(#{safe}-{m})")
         body = body.replace(f'href="#{m}"', f'href="#{safe}-{m}"')
@@ -388,8 +391,8 @@ S.append(text(1047, 188, "undeliverable", 10, INTER, 400, MUTED, "middle", halo=
 # spine down to the ingress + sweep line
 S.append(edge([(885, 240), (885, 268), (380, 268), (380, 312)], AMBER, 2.4, marker="amber"))
 S.append(text(630, 262, "authenticated push", 10.5, INTER, 500, AMBER_BRIGHT, "middle", halo=True))
-S.append(edge([(90, 254), (90, 268), (32, 268), (32, 340), (36, 340)], MUTED, 1.6))
-S.append(text(98, 265, "/admin/sweep · */15", 10, MONO, 400, MUTED, halo=True))
+S.append(edge([(56, 176), (32, 176), (32, 340), (38, 340)], MUTED, 1.6))
+S.append(text(40, 271, "/admin/sweep · */15", 10, MONO, 400, MUTED, halo=True))
 
 # ===================================================== MISSION EXECUTION
 S.append(
@@ -679,19 +682,19 @@ for i, line in enumerate(
     S.append(text(SX + 20, 728 + i * 19, line, 11.5, INTER, 400, STAR))
 
 S.append(sidebox(SX, 834, SW_, 132, "Legend"))
-ly = 886
+ly = 880
 S.append(edge([(SX + 24, ly), (SX + 64, ly)], AMBER, 2.4, marker="amber"))
 S.append(text(SX + 76, ly + 4, "the case's path — events and decisions", 11, INTER, 400, MUTED))
-ly += 20
+ly += 18
 S.append(edge([(SX + 24, ly), (SX + 64, ly)], MUTED, 1.6))
 S.append(text(SX + 76, ly + 4, "data read / write", 11, INTER, 400, MUTED))
-ly += 20
+ly += 18
 S.append(edge([(SX + 24, ly), (SX + 64, ly)], STAR, 1.6, dash="6 4", marker="star"))
 S.append(text(SX + 76, ly + 4, "private PSC-I connection — no public path", 11, INTER, 400, MUTED))
-ly += 20
+ly += 18
 S.append(rrect(SX + 24, ly - 7, 40, 14, r=4, fill="rgba(251,191,36,0.05)", stroke=AMBER_BRIGHT, sw=1.2, dash="4 3"))
 S.append(text(SX + 76, ly + 4, "model-exposure boundary (spark = calls Gemini)", 11, INTER, 400, MUTED))
-ly += 20
+ly += 18
 S.append(badge(SX + 44, ly, 5))
 S.append(text(SX + 76, ly + 4, "enforcement point — see the numbered list", 11, INTER, 400, MUTED))
 
