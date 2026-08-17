@@ -125,6 +125,36 @@ def list_awaiting_cases(db: firestore.Client) -> list[dict]:
     return cases
 
 
+def _touched_at(row: dict) -> tuple[int, float]:
+    """A total, type-safe newest-first sort key for an outbox row.
+
+    Outbox documents are schemaless, and the two timestamp fields are not
+    guaranteed to be there: `updated_at` and `created_at` are written as
+    server timestamps, so a document read back mid-write, one written by an
+    older version of this code, or one hand-repaired by an operator can hold
+    neither. The obvious key — `updated_at or created_at or 0` — then mixes
+    `DatetimeWithNanoseconds` with `int` inside one `sort()`, which raises
+    `TypeError` and turns /review/failures into a 500 at exactly the moment
+    someone is trying to look at a broken command.
+
+    Everything is therefore reduced to one comparable type before sorting,
+    and rows with no usable timestamp sort last under `reverse=True` (the
+    leading 0) rather than being compared against a real one.
+    """
+    for field in ("updated_at", "created_at"):
+        value = row.get(field)
+        to_timestamp = getattr(value, "timestamp", None)
+        if callable(to_timestamp):
+            try:
+                return (1, float(to_timestamp()))
+            except (TypeError, ValueError, OSError, OverflowError):
+                continue
+        # bool is an int subclass; a stray True must not read as 1970.
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return (1, float(value))
+    return (0, 0.0)
+
+
 def list_failed_commands(db: firestore.Client, limit: int = 50) -> list[dict]:
     """Every command in a FAILED or DEAD state, across all cases.
 
@@ -140,20 +170,31 @@ def list_failed_commands(db: firestore.Client, limit: int = 50) -> list[dict]:
     `updated_at` requires a composite index, and an `order_by` on a field
     some older documents lack would FILTER them out rather than merely
     sorting them.
+
+    DEAD rows claim their share of `limit` FIRST, and only the remainder is
+    filled with FAILED ones. Merging both and truncating afterwards let 50
+    failed commands push every dead command off the page — and a dead
+    command is the one that will never be retried and therefore the one that
+    actually needs a human, while a failed one is still being re-driven by
+    the sweep. The page must not be able to hide the worse state behind the
+    recoverable one.
     """
     from app.state.commands import DEAD, FAILED
 
-    rows: list[dict] = []
-    for status in (FAILED, DEAD):
+    by_status: dict[str, list[dict]] = {}
+    for status in (DEAD, FAILED):
         query = (
             db.collection_group(OUTBOX)
             .where(filter=firestore.FieldFilter("status", "==", status))
             .limit(limit)
         )
-        rows.extend(snap.to_dict() or {} for snap in query.stream())
+        by_status[status] = sorted(
+            (snap.to_dict() or {} for snap in query.stream()),
+            key=_touched_at,
+            reverse=True,
+        )
 
-    rows.sort(
-        key=lambda r: r.get("updated_at") or r.get("created_at") or 0,
-        reverse=True,
-    )
-    return rows[:limit]
+    rows = by_status[DEAD][:limit]
+    rows.extend(by_status[FAILED][: max(0, limit - len(rows))])
+    rows.sort(key=_touched_at, reverse=True)
+    return rows
