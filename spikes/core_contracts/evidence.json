@@ -1,0 +1,174 @@
+{
+  "spike": "core_contracts",
+  "scope": "core contracts",
+  "captured_at": "2026-08-17T18:06:03.038271+00:00",
+  "result": "PASS",
+  "unproven": [],
+  "what_this_proves": "Every criterion listed here was re-verified at capture time: cited tests were re-executed in this run, and cited spike evidence was re-read and its verdict re-checked. This is a verification pass over work already done, not a fresh end-to-end execution.",
+  "not_proven_here": [
+    "The closed loop is not re-executed by this harness; spikes/judge_run owns that and its run is cited, not repeated.",
+    "The rejection path and apply_hold-on-reject remain unexercised through the deployed UI; only approval-and-release is proven.",
+    "Injection detection is a fixture heuristic, not a general defence; only the enforcement consequence is exact.",
+    "A green run here says the named proofs hold. It says nothing about contracts this list does not name."
+  ],
+  "criteria": [
+    {
+      "id": "closed_loop",
+      "requirement": "One harness-driven closed loop: event to ERP, renewal request, overdue hold, renewed evidence, hold release",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "spike",
+          "ok": true,
+          "detail": "result=PASS",
+          "evidence": "spikes/judge_run/evidence.json"
+        }
+      ],
+      "note": "Two suppliers, not one: a review-band supplier carries the approval beat and a clear-band supplier carries the lifecycle, because assess_risk carries a stored band forward and a parked case re-parks on every later event. spikes/lifecycle holds the earlier five-step deployed run of the same loop."
+    },
+    {
+      "id": "duplicate_and_out_of_order_events",
+      "requirement": "Duplicate and out-of-order events are refused",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "tests",
+          "ok": true,
+          "detail": "2 passed in 8.25s",
+          "node_ids": [
+            "tests/unit/test_inbox.py::test_duplicate_event_is_rejected_and_does_not_bump_version",
+            "tests/unit/test_inbox.py::test_stale_event_is_rejected"
+          ]
+        }
+      ],
+      "note": "Also proven on deployed resources: the thin-vertical replay left attempts=1 and case_version=1."
+    },
+    {
+      "id": "provenance_failure",
+      "requirement": "An extraction that is not grounded in the document is refused",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "tests",
+          "ok": true,
+          "detail": "5 passed, 5 warnings in 0.49s",
+          "node_ids": [
+            "tests/unit/test_grounding.py::test_a_mismatched_checksum_is_rejected",
+            "tests/unit/test_grounding.py::test_a_span_absent_from_the_document_is_rejected",
+            "tests/unit/test_grounding.py::test_a_page_out_of_range_is_rejected",
+            "tests/unit/test_grounding.py::test_a_schema_valid_but_unsupported_expiry_is_rejected",
+            "tests/unit/test_graph_wiring.py::test_ungrounded_evidence_retries_once_then_quarantines"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "injection_refusal",
+      "requirement": "A tainted document cannot produce an ERP write",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "tests",
+          "ok": true,
+          "detail": "3 passed in 0.04s",
+          "node_ids": [
+            "tests/unit/test_injection.py::test_the_planted_fixture_is_tainted",
+            "tests/unit/test_injection.py::test_a_clean_certificate_is_not_tainted",
+            "tests/unit/test_grounding.py::test_grounding_accepts_an_injection_obedient_extraction"
+          ]
+        }
+      ],
+      "note": "Detection is a heuristic over a representative fixture, NOT a general prompt-injection defence; a rephrased payload passes. Enforcement is the exact claim: a tainted document never reaches an agent-resolvable state key and DOCUMENT_INJECTION forces the deterministic gate to blocked. The grounding test pins that grounding is deliberately NOT the injection control."
+    },
+    {
+      "id": "stale_and_double_approval",
+      "requirement": "A stale or replayed human approval is refused",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "tests",
+          "ok": true,
+          "detail": "4 passed, 4 warnings in 17.23s",
+          "node_ids": [
+            "tests/unit/test_approvals.py::test_replaying_the_same_approval_is_rejected_as_a_duplicate",
+            "tests/unit/test_approvals.py::test_an_approval_against_an_older_version_is_rejected_as_stale",
+            "tests/unit/test_approvals.py::test_a_replay_is_reported_as_duplicate_even_after_the_case_moved_on",
+            "tests/unit/test_approval_release.py::test_the_approval_is_replayable_without_a_second_erp_write"
+          ]
+        }
+      ],
+      "note": "The release path is also proven on deployed resources by spikes/hitl_release: a signed-in reviewer released a parked case through IAP into a real ERP write."
+    },
+    {
+      "id": "forbidden_agent_tool_edges",
+      "requirement": "An agent cannot reach a tool policy did not permit",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "tests",
+          "ok": true,
+          "detail": "5 passed, 5 warnings in 0.50s",
+          "node_ids": [
+            "tests/unit/test_graph_wiring.py::test_the_evidence_agent_holds_no_operational_tools",
+            "tests/unit/test_graph_wiring.py::test_the_compliance_agent_holds_no_operational_tools",
+            "tests/unit/test_nodes_routing.py::test_unknown_agent_name_is_blocked_not_skipped",
+            "tests/unit/test_nodes_routing.py::test_unknown_event_type_is_blocked",
+            "tests/unit/test_graph_wiring.py::test_a_clock_event_never_reaches_an_llm_agent"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "one_erp_write_after_retry",
+      "requirement": "A retried command leaves exactly one ERP record",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "tests",
+          "ok": true,
+          "detail": "3 passed in 8.66s",
+          "node_ids": [
+            "tests/unit/test_commands.py::test_claim_after_success_is_refused_and_returns_the_external_id",
+            "tests/unit/test_commands.py::test_claim_after_failure_is_reacquired_and_counts_attempts",
+            "tests/unit/test_commands.py::test_execution_attempts_are_counted_separately_from_claims"
+          ]
+        },
+        {
+          "kind": "live",
+          "ok": true,
+          "detail": "failed 1x then done; exactly 1 ERP record, hold cleared",
+          "check": "retried_erp_write_is_singular"
+        }
+      ],
+      "note": "The deployed half is the DLQ sweep probe: its clear_hold command failed once (execution_attempts is written only by record_failure), was re-driven by the deployed sweep, and reached done six seconds later. It is the ONLY command among 48 ever written that failed and then succeeded \u2014 every other failure ran to the cap and parked dead, which is the bounded-retry contract working, not a second example. spikes/retry_503 is deliberately NOT cited here: its single downstream write is a redacted derivative, not an ERP write."
+    },
+    {
+      "id": "category_proof_visible",
+      "requirement": "Agent cataloging is externally observable",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "spike",
+          "ok": true,
+          "detail": "verdict=PASS",
+          "evidence": "spikes/agent_runtime/evidence.json"
+        }
+      ],
+      "note": "Fleet. Agent Registry auto-registration observed at deploy time with no publish step (criterion 3 of the runtime spike). The versioned first-party catalog is retained as the documented fallback and is independently submission-eligible under the organizer ruling on forum 44797."
+    },
+    {
+      "id": "eval_cases",
+      "requirement": "The graded domain eval suite runs and passes",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "spike",
+          "ok": true,
+          "detail": "8 cases, mean_score=1.0",
+          "evidence": "spikes/domain_evals/evidence.json"
+        }
+      ],
+      "note": "Deterministic domain_case_pass metric graded by agents-cli eval grade."
+    }
+  ]
+}
