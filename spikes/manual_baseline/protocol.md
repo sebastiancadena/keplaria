@@ -4,6 +4,11 @@ The denominator for "manual steps eliminated". One person doing by hand,
 against the same inputs, what the deployed system does end to end for a
 single supplier through one full lifecycle cycle.
 
+**You do not need to know ERPNext.** Every step below gives the exact URL or
+the exact click path. Verified against this site on 2026-08-17 (ERPNext
+16.32.0 / Frappe 16.31.0) by reading the live Supplier form definition, not
+from memory of some other ERPNext.
+
 ## What this baseline is, stated the way it must always be stated
 
 **Author-timed, not practitioner-reviewed.** No procurement or compliance
@@ -14,68 +19,207 @@ from it travels with that qualifier attached — `app/metrics.py` carries it
 in `baseline_validation` for exactly that reason, so the label cannot be
 separated from the figure downstream.
 
-The rule this satisfies: anonymous or self-collected feedback is acceptable,
-invented validation is not. A timed walkthrough is a measurement. A guess
-would not have been.
+The rule this satisfies: self-collected measurement is acceptable, invented
+validation is not. A timed walkthrough is a measurement. A guess would not
+have been.
 
-## Rules
+## Before you start
 
-1. **Use the same inputs the judge run uses** — the same certificate
-   fixture, the same supplier details, the same watchlist.
-2. **Do the work, do not mime it.** Read the document to find each value.
-   Type it. Click through the real ERP forms.
-3. **Two steps stop short of their side effect**, and are marked
-   `timed_only` in the evidence: sending the renewal email, and uploading
-   the certificate attachment. Both create ERP rows (`Communication`,
-   `File`) that `scripts/erp.py` cannot see or purge, and a `File` linked to
-   a Supplier can refuse the Supplier delete outright. Compose the message
-   and select the file, stop at the send/upload button, and record the time
-   up to that point. The typing is the manual work; the network call is not.
-4. **One supplier only.** Use a name that is not in the ERP and not one of
-   the judge-run suppliers, so the record can be purged afterwards.
-5. **Do not rush and do not pad.** A baseline you have an interest in is
-   only worth recording if you record it honestly. If a step takes four
-   seconds because you already know the answer, four seconds is the number.
-6. If you get interrupted, press `s` to skip the step and note it. A skipped
-   step is excluded from the elapsed total and still counted in the step
-   count — better a hole you can see than a number you invented.
+**1. Open the ERP and sign in.**
+<https://andina-foods.v.frappe.cloud/app/supplier>
 
-## The steps
+You should see a Supplier list. If you land on a desk home instead, that URL
+still works — paste it again once signed in.
 
-Each mirrors work the deployed system performs. The mapping to the system's
-own actions is in `record.py`'s `STEPS`, so the two cannot drift silently.
+**2. Use this supplier name, exactly:**
 
-**Onboarding (mirrors `new_supplier_packet`)**
+```text
+Empaques Sabana Norte SAS
+```
 
-1. Open the certificate and read it end to end
-2. Enter the supplier name in the ERP
-3. Choose the supplier group
-4. Choose the supplier type
-5. Enter the country
-6. Enter the contact email address
-7. Save the supplier record
-8. Find and copy the certificate expiry date
-9. Open the sanctions screening tool and search the supplier name
-10. Read the candidate list and judge each near-match
-11. Record the screening decision somewhere durable
-12. Attach the certificate to the supplier record *(timed_only — stop at upload)*
-13. Diarise the renewal date
+Checked 2026-08-17: not currently in the ERP, and not one of the two
+judge-run suppliers. Using a judge-run name would corrupt a demo record;
+using an existing name means the create step silently does nothing.
 
-**Renewal (mirrors `renewal_due` → `evidence_overdue` → `certificate_received`)**
+**3. Keep a second tab open** on the public sanctions search you will use in
+step 9: <https://www.opensanctions.org/search/>
 
-14. Notice the renewal is due and find the supplier again
-15. Compose the renewal request email *(timed_only — stop at send)*
-16. Notice the evidence is overdue
-17. Put the supplier on hold and choose the hold type
-18. Read the replacement certificate and find the new expiry
-19. Attach the replacement certificate *(timed_only — stop at upload)*
-20. Release the hold
+**4. The certificate.** This is the document you are "receiving". Read it
+from here — there is no PDF to open:
 
-## Running it
+```text
+CERTIFICADO DE EXISTENCIA Y REPRESENTACION LEGAL
+Comercializadora Andes Verde SAS
+NIT: 900.123.456-7
+Expiry: 2027-01-01
+Issued by: Camara de Comercio (fictional test fixture)
+```
+
+And the replacement certificate, for step 18:
+
+```text
+CERTIFICADO DE EXISTENCIA Y REPRESENTACION LEGAL
+Comercializadora Andes Verde SAS
+NIT: 900.123.456-7
+Expiry: 2028-01-01
+Issued by: Camara de Comercio (fictional test fixture)
+```
+
+**5. Start the recorder** in a terminal, and follow its prompts. It shows one
+step at a time and times each one:
 
 ```bash
 uv run --env-file .env python spikes/manual_baseline/record.py
 ```
 
-Writes `spikes/manual_baseline/evidence.json`. Commit it — this is gate
-evidence and belongs in the repo, never in a scratchpad.
+## Rules
+
+1. **Do the work, do not mime it.** Read the document to find each value.
+   Type it. Click through the real forms.
+2. **Three steps stop short of their side effect** (marked `timed_only` in
+   the evidence): the two certificate uploads and the renewal send. Each
+   creates ERP rows — `Communication`, `File` — that `scripts/erp.py` cannot
+   see or purge, and a `File` linked to a Supplier can refuse the Supplier
+   delete outright. Fill the form, stop at the final button, cancel. The
+   typing is the manual work; the network call is not.
+3. **Do not rush and do not pad.** A baseline you have an interest in is only
+   worth recording if you record it honestly. If a step takes four seconds
+   because you already know the answer, four seconds is the number.
+4. If you get interrupted, press `s` to skip. A skipped step is excluded from
+   the elapsed total and still counted in the step count — better a hole you
+   can see than a number you invented.
+5. Do the cleanup at the end. It is three deletes.
+
+## The steps
+
+The recorder prompts these in order. Each mirrors work the deployed system
+performs; the mapping to the system's own actions is in `record.py`'s
+`STEPS`, so the two cannot drift silently.
+
+### Onboarding — mirrors a `new_supplier_packet` event
+
+**1. Read the certificate.** Read the first block in "Before you start"
+above, end to end, as if it had just arrived.
+
+**2–5. Create the supplier record.** Go to:
+<https://andina-foods.v.frappe.cloud/app/supplier/new>
+
+You land on the **Details** tab. Fill these four, which are four separate
+timed steps — the recorder will prompt you one at a time:
+
+| Step | Field | Value |
+|---|---|---|
+| 2 | Supplier Name | `Empaques Sabana Norte SAS` |
+| 3 | Supplier Group | `Distributor` |
+| 4 | Supplier Type | `Company` |
+| 5 | Country | `Colombia` |
+
+Supplier Group and Country are link fields — start typing and pick from the
+dropdown. Supplier Type is a dropdown with three options.
+
+**6. Create the primary contact and set the email.** This is the step that
+looks like one field and is not. **Email ID on the Supplier form is a
+fetched, non-editable field** — it displays whatever the linked primary
+contact has, so you cannot type into it.
+
+- Save the supplier first: `Ctrl+S`.
+- Go to the **Address & Contact** tab.
+- Find the **Primary Address and Contact** section → **Supplier Primary
+  Contact** field.
+- Type `Sabana Norte` — the dropdown offers **Create a new Contact**. Click it.
+- In the dialog, fill **First Name** `Sabana Norte` and **Email Address**
+  `empaques-sabana-norte-sas@example.com`, then save the dialog.
+- `Ctrl+S` on the supplier. Email ID now shows the address.
+
+**7. Save the supplier record.** `Ctrl+S`. (If you already saved during step
+6, re-save after the contact is linked — that is the save being timed.)
+
+**8. Find and copy the certificate expiry date.** From the certificate text,
+locate the expiry and copy it: `2027-01-01`.
+
+**9. Screen the supplier name.** In your second tab, search
+`Empaques Sabana Norte SAS` at <https://www.opensanctions.org/search/>.
+
+> **Read this before recording the time.** The system screens against a
+> private synthetic 16-entity watchlist that has no public browser interface
+> — the VM has no external IP and serves a JSON API only. So this step is
+> timed against the *public* OpenSanctions index instead. The **task** is
+> identical (type a name, get candidates, read them); the **dataset** is not.
+> That difference is recorded in the evidence and affects this step's time
+> only. Do not describe the manual screening as having used the same index.
+
+**10. Read the candidates and judge each near-match.** Open the results and
+decide, for each one, whether it plausibly refers to your supplier. Record
+the time it actually takes, including when the answer is "no hits" — a clean
+supplier being fast to clear is a real property of the work.
+
+**11. Record the screening decision somewhere durable.** On the Supplier
+record, scroll to the bottom timeline, click **Comment**, and write what you
+decided and why. Save the comment.
+
+**12. Attach the certificate — `timed_only`.** In the Supplier form's right
+sidebar, find **Attachments** and click **Add file** / the paperclip. Get as
+far as the file-selection dialog, then **Cancel**. Do not upload.
+
+**13. Diarise the renewal.** Go to
+<https://andina-foods.v.frappe.cloud/app/todo/new>, set the **Due Date** to
+`2027-01-01` and write a description naming the supplier and the renewal.
+Save.
+
+### Renewal — mirrors `renewal_due` → `evidence_overdue` → `certificate_received`
+
+**14. Notice the renewal is due and find the supplier again.** Go to
+<https://andina-foods.v.frappe.cloud/app/supplier>, and find
+`Empaques Sabana Norte SAS` in the list. Open it.
+
+**15. Compose the renewal request — `timed_only`.** At the bottom of the
+Supplier form, in the timeline, click **New Email**. Fill in the recipient,
+a subject, and a message asking for the renewed certificate before the
+expiry date. Then **close or discard the dialog. Do not send.**
+
+**16. Notice the evidence is overdue.** Check your ToDo from step 13 against
+the expiry date and register that nothing has arrived.
+
+**17. Put the supplier on hold.** On the Supplier form, go to the
+**Settings** tab → **Block Supplier** section:
+
+- Tick **Block Supplier** (this is the `on_hold` field — it is *not* labelled
+  "On Hold")
+- Set **Hold Type** to `All` (options are All / Invoices / Payments)
+- Leave **Release Date** empty
+- `Ctrl+S`
+
+**18. Read the replacement certificate and find the new expiry.** Read the
+second certificate block in "Before you start". The new expiry is
+`2028-01-01`.
+
+**19. Attach the replacement certificate — `timed_only`.** Same as step 12:
+sidebar → Attachments → Add file → reach the dialog → **Cancel**.
+
+**20. Release the hold.** Settings tab → Block Supplier section → untick
+**Block Supplier** → `Ctrl+S`.
+
+## Cleanup
+
+The recorder writes `evidence.json` and stops. Then remove what you created,
+so the ERP stays clean for recording:
+
+1. **The ToDo** — <https://andina-foods.v.frappe.cloud/app/todo>, open the one
+   from step 13, menu (⋯) → Delete.
+2. **The Supplier** — open `Empaques Sabana Norte SAS`, menu (⋯) → Delete.
+   If it refuses because of a linked Contact, delete the Contact first.
+3. **The Contact** — <https://andina-foods.v.frappe.cloud/app/contact>, find
+   `Sabana Norte`, menu (⋯) → Delete.
+
+The comment from step 11 goes with the Supplier. Nothing else was created,
+because steps 12, 15 and 19 stopped before their side effect — which is the
+whole reason they stop there.
+
+## Then
+
+Commit the evidence — this is gate evidence and belongs in the repo, never in
+a scratchpad:
+
+```bash
+git add spikes/manual_baseline/evidence.json && git commit -m "test(baseline): record the author-timed manual walkthrough"
+```
