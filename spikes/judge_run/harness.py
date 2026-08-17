@@ -53,6 +53,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from google.cloud import pubsub_v1  # noqa: E402
 
 from app.executor.runner import effective_band  # noqa: E402
+from app.metrics import scoreboard  # noqa: E402
 from app.state.commands import DONE  # noqa: E402
 from app.state.firestore import CASES, OUTBOX, get_client  # noqa: E402
 
@@ -85,6 +86,57 @@ LIFECYCLE = [
 ]
 
 EVIDENCE = Path(__file__).resolve().parent / "evidence.json"
+BASELINE = Path(__file__).resolve().parent.parent / "manual_baseline" / "evidence.json"
+
+
+def load_baseline() -> dict | None:
+    """The author-timed manual baseline, or None if it has not been recorded.
+
+    None rather than a default: app.metrics reports `manual_steps_eliminated`
+    as None without it, which is the honest reading. A default here would
+    silently manufacture the one metric on this scoreboard that no amount of
+    reading Firestore can produce.
+    """
+    if not BASELINE.exists():
+        return None
+    return json.loads(BASELINE.read_text())
+
+
+def suite_counts() -> dict:
+    """Re-execute the contract suite for its pass count and denominator.
+
+    Executed, not quoted. A pass count copied from a previous run is a claim
+    about the repo; running the suite makes it a measurement, and this
+    project has already shipped tests that passed while proving nothing.
+    Deliberately run AFTER the timed tracks -- it costs minutes and is not
+    part of what the 2:10 live-run budget covers.
+    """
+    proc = subprocess.run(
+        ["uv", "run", "pytest", "-q", "--no-header"],
+        capture_output=True, text=True,
+    )
+    tail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
+    passed = failed = deselected = None
+    # Parse "N passed, M deselected, K warnings in T s" positionally: each
+    # count is the token immediately before its label.
+    words = tail.replace(",", "").split()
+    for index, word in enumerate(words):
+        if index == 0:
+            continue
+        if word == "passed":
+            passed = int(words[index - 1])
+        elif word == "failed":
+            failed = int(words[index - 1])
+        elif word == "deselected":
+            deselected = int(words[index - 1])
+    return {
+        "passed": passed,
+        "failed": failed or 0,
+        "deselected": deselected,
+        "denominator": (passed or 0) + (failed or 0),
+        "summary_line": tail,
+        "note": "re-executed by this harness, not quoted from a previous run",
+    }
 
 
 def log(msg: str) -> None:
@@ -290,6 +342,53 @@ def lifecycle_track(db, steps: list) -> tuple[str, float]:
     return case_id, total
 
 
+def collect(db, case_ids: list[str]) -> tuple[list[dict], list[dict]]:
+    """Case documents and a flat command ledger for the scoreboard.
+
+    `case_id` is stamped onto each command because app.metrics keys a write
+    by (subject, action, cycle) and the ledger documents themselves do not
+    carry the case -- two cases running the same action in the same cycle
+    would otherwise collapse into one key and report a phantom duplicate.
+    """
+    cases, commands = [], []
+    for case_id in case_ids:
+        if not case_id:
+            continue
+        snap = db.collection(CASES).document(case_id).get()
+        if snap.exists:
+            cases.append(snap.to_dict() or {})
+        for doc_id, command in outbox(db, case_id).items():
+            commands.append({**command, "case_id": case_id, "command_id": doc_id})
+    return cases, commands
+
+
+def build_timeline(case_a: str | None, case_b: str | None, steps: list) -> list[dict]:
+    """The events this run published, in order, with their effective dates.
+
+    The dates are the run's INPUT, not stored state: no case document keeps
+    the effective date of an event two steps back, and the hold window needs
+    both ends. Taking them from the same constants the run published from is
+    what keeps the timeline and the run in step.
+    """
+    beat_ok = {step.get("beat"): step.get("ok") for step in steps}
+    timeline = [{
+        "event_type": "new_supplier_packet",
+        "effective_date": "2026-01-05",
+        "case_id": case_a,
+        "ok": beat_ok.get("event -> parked for review", False),
+    }] if case_a else []
+
+    if case_b:
+        for index, (event_type, effective, _ref, _expected) in enumerate(LIFECYCLE, start=1):
+            timeline.append({
+                "event_type": event_type,
+                "effective_date": effective,
+                "case_id": case_b,
+                "ok": beat_ok.get(f"{index}. {event_type}", False),
+            })
+    return timeline
+
+
 def main() -> int:
     db = get_client()
     steps: list = []
@@ -330,6 +429,25 @@ def main() -> int:
         "within_budget": within,
         "steps": steps,
     }
+
+    # Scored metrics. Computed after the timed tracks and deliberately outside
+    # the budget: the gate times the RUN, and re-executing the suite for an
+    # honest denominator costs minutes.
+    baseline = load_baseline()
+    cases, commands = collect(db, [case_a, case_b])
+    timeline = build_timeline(case_a, case_b, steps)
+    board = scoreboard(cases=cases, commands=commands, timeline=timeline,
+                       baseline=baseline)
+    board["automation_seconds"] = round(machine_total, 1)
+    board["human_seconds"] = round(human_s, 1)
+    board["contract_suite"] = suite_counts()
+    if baseline is None:
+        board["manual_steps_eliminated_note"] = (
+            "No manual baseline recorded. Run spikes/manual_baseline/record.py; "
+            "this metric stays None until it exists, deliberately."
+        )
+    evidence["scoreboard"] = board
+
     if failure:
         evidence["failure"] = failure
     EVIDENCE.write_text(json.dumps(evidence, indent=2, default=str) + "\n")
@@ -340,6 +458,18 @@ def main() -> int:
     log(f"budget {BUDGET_SECONDS}s -> {'WITHIN' if within else 'OVER'} "
         f"by {abs(machine_total - BUDGET_SECONDS):.1f}s")
     log(f"human approval took {human_s:.0f}s (excluded from the total)")
+    log("")
+    log("scoreboard:")
+    for key in ("workflow_steps_completed", "workflow_steps_total",
+                "policy_required_interventions", "fields_without_rekeying",
+                "simulated_business_days", "enforced_hold_days",
+                "commands_retried_then_succeeded", "duplicate_writes_after_retry",
+                "manual_steps_eliminated"):
+        value = board.get(key)
+        log(f"  {key:34} {value if value is not None else '-- (no baseline)'}")
+    log(f"  {'contract_suite':34} {board['contract_suite']['summary_line']}")
+    if board.get("baseline_validation"):
+        log(f"  baseline: {board['baseline_validation']}")
     log(f"evidence -> {EVIDENCE}")
     return 0 if (failure is None and within) else 1
 
