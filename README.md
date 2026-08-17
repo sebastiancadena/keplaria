@@ -159,12 +159,20 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 45 read-only checks covering toolchain, auth,
-  provisioned infra, and the event-flow wiring (topic, push subscription
-  OIDC, ingress auth, concurrency/maxScale, retry policy), plus two warnings
-  for `keplaria-console` / `keplaria-review` that turn into checks once
-  those services exist — see
-  [Case console and review service](#case-console-and-review-service).
+- `scripts/doctor.sh` — 54 read-only checks covering toolchain, auth,
+  provisioned infra, the event-flow wiring (topic, push subscription
+  OIDC, ingress auth, concurrency/maxScale, retry policy), the console and
+  review services, and the failure-handling infrastructure (dead-letter
+  topic, `maxDeliveryAttempts`, both Pub/Sub service-agent bindings, the
+  sweep schedule, and the `outbox` collection-group index in both Firestore
+  databases) — see
+  [Case console and review service](#case-console-and-review-service) and
+  [Failure handling](#failure-handling).
+- `spikes/dlq/harness.py` — proves bounded retry and durable dead-lettering
+  against deployed resources: a command driven to `dead` through five real
+  ERP refusals and not re-driven a sixth time, the deployed `POST /admin/sweep`
+  finding and driving a stuck case, and an event actually landing in
+  `dead_events`. Writes `spikes/dlq/evidence.json`.
 - `spikes/lifecycle/harness.py` — drives the full five-step station-keeping
   lifecycle (onboarding, early renewal check, renewal request, overdue hold,
   renewed evidence and hold release) against the deployed engine and ingress,
@@ -330,6 +338,58 @@ Vertex AI API under its current name, not a separate product.
 Provisioning note: project-level IAM bindings and billing-account IAM cannot be
 granted from an agent session (permission classifier); run those as the human
 via `!`-prefixed commands.
+
+### Firestore indexes: the `outbox` collection-group index
+
+The sweep (`app/executor/sweep.py`) and `/review/failures` run a **collection
+group** query that filters `outbox` documents on the single field `status`.
+Firestore serves that from a **single-field index whose `queryScope` is
+`COLLECTION_GROUP`** — not from a composite index. Two dead ends, both hit for
+real on 2026-08-17:
+
+- `gcloud firestore indexes composite create --collection-group=outbox
+  --field-config=field-path=status,order=ascending` is **rejected**:
+  `INVALID_ARGUMENT: this index is not necessary, configure using single field
+  index controls`. A one-field filter is never a composite.
+- `gcloud firestore indexes fields update` cannot express query scope at all —
+  its `--index` flag accepts only `order` / `array-config`, so every index it
+  creates is `COLLECTION`-scoped and the collection-group query still fails.
+
+The only route that works is the REST API. Run it once per database — the
+deployed sweep and `/review/failures` use `(default)`, and `uv run pytest` uses
+`keplaria-test` whenever `FIRESTORE_EMULATOR_HOST` is unset:
+
+```bash
+cat > /tmp/idx.json <<'EOF'
+{"indexConfig":{"indexes":[
+{"queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"}]},
+{"queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"DESCENDING"}]},
+{"queryScope":"COLLECTION_GROUP","fields":[{"fieldPath":"status","order":"ASCENDING"}]}
+]}}
+EOF
+TOKEN=$(gcloud auth print-access-token)
+for DB in 'keplaria-test' '(default)'; do
+  curl -s -X PATCH -d @/tmp/idx.json \
+    -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+    "https://firestore.googleapis.com/v1/projects/keplaria/databases/${DB}/collectionGroups/outbox/fields/status?updateMask=indexConfig"
+done
+```
+
+Check state with
+`gcloud firestore indexes fields list --database=<db> --project=keplaria --format=json`;
+the indexes sit at `CREATING` for a few minutes before they are `READY`, and the
+query keeps returning `FailedPrecondition` until then.
+
+**Side effect, stated honestly:** the PATCH body *replaces* the field's whole
+`indexConfig`, so it also removed the default `array-contains` index on
+`status`. That is harmless here because `status` is always a string and no query
+uses `array-contains` on it — but a PATCH on a field that does hold arrays would
+break those queries silently.
+
+`scripts/doctor.sh` checks this with `gcloud firestore indexes fields list` in
+both databases and names whichever one is missing it. Do not "fix" that check by
+pointing it back at `indexes composite list`: that command will never list this
+index, so the check could only ever fail.
 
 ## Configuration
 
@@ -769,6 +829,131 @@ refuses an unauthenticated `/review`, and that `IAP_AUDIENCE` is actually
 set on the review service. Before either service is deployed, both checks
 report `not deployed yet` warnings — that is the expected state, not a
 failure.
+
+## Failure handling
+
+The claim this system makes, exactly: **retry is bounded and dead-lettering is
+durable.** A failed command gets at most five execution attempts and then parks
+inspectably; a stuck event parks in a dead-letter topic and is recorded after
+five deliveries, instead of expiring silently at the 7-day retention boundary.
+
+It is **not** self-healing. The sweep re-drives transient failures. It does not
+diagnose a persistently broken destination, and after five attempts it stops
+trying on purpose.
+
+### Two failure classes, two mechanisms
+
+They read alike in a log line and are fixed by different machinery, which is
+why one "add a DLQ" would not have covered both.
+
+| | **A — the event is never processed** | **B — the command is never executed** |
+|---|---|---|
+| What happens | `invoke_engine` raises, the ingress 503s, and the claim stays un-dispatched so Pub/Sub retries the case | The engine queued an ERP command, the ingress drained it, and the ERP call failed |
+| Was silently lost by | redelivery until the 7-day retention window expired, with nothing recording the event had ever existed | `mark_dispatched` having already run, so the redelivery is a `duplicate_event` — a branch that always acks 200 regardless of whether its drain worked |
+| Now bounded by | `deadLetterPolicy` on `keplaria-events-push`, `maxDeliveryAttempts: 5` | `MAX_EXECUTION_ATTEMPTS = 5` in `app/state/commands.py` |
+| Now recorded in | `dead_events/{event_id}` in Firestore | the outbox command itself: `status: dead`, `died_at`, and the destination's last error |
+
+A Pub/Sub dead-letter topic does not help with class B: the message that would
+be dead-lettered represents the *event*, and reprocessing it cannot re-run the
+engine — by then it is a duplicate by definition.
+
+### `MAX_EXECUTION_ATTEMPTS = 5`, and what "dead" means
+
+`record_failure` increments `execution_attempts` transactionally and, on the
+fifth failure, writes `status: dead` plus `died_at` instead of `failed`.
+
+- **A `dead` command is never retried** — not by the drain, not by a duplicate
+  delivery, not by the sweep. `execute_pending_commands` skips it, and
+  `claim_command` refuses it rather than resetting it to `PENDING`. Both halves
+  are required: without the second, a review-band case re-parks on every later
+  event and would resurrect the command the executor had given up on.
+- **A `dead` command is not resurrectable, by design.** A persistently broken
+  destination is fixed by a human, and the next cycle issues new commands.
+  Nothing stalls in the meantime: `command_id` is cycle-scoped, so cycle 2
+  claims a fresh command with a fresh identity.
+- **A `dead` result must not make the ingress return 503.** Retrying is
+  precisely what the cap exists to stop; it is logged at error level and acked.
+- `execution_attempts` (executor attempts) is a different quantity from
+  `attempts` (graph-side claims) and the two must not be conflated — `attempts`
+  grows every time an event re-enters the graph, with no ERP call necessarily
+  having been tried.
+
+### The 15-minute sweep
+
+Cloud Scheduler job `keplaria-command-sweep` (`*/15 * * * *`) calls
+`POST /admin/sweep` on the ingress as `keplaria-sweeper@`, which holds
+`roles/run.invoker`. Authorization is Cloud Run IAM only — the same mechanism
+that protects `/pubsub/push`, with no application-level check beside it to go
+stale.
+
+**What it does:** a Firestore collection-group query over `outbox` for
+`status == failed`, reduced to distinct case IDs, each handed to the same
+`execute_pending_commands` the ingress uses. It adds no second execution path
+and no second copy of the policy gate — only the trigger the pipeline lacked.
+
+**What it does not do:**
+
+- It does not diagnose anything. It re-drives, and the attempt cap stops it.
+- It does not touch `pending` or `dead` commands — only `failed`.
+- It never invokes the engine, so it costs none of the Agent Runtime query
+  quota; it reads Firestore and writes to the ERP.
+- It is bounded at **25 cases per run** and *logs* the remainder rather than
+  truncating quietly, because a silent cap reads as "everything was covered".
+- A command that failed while its case was `clear`, whose case has since moved
+  into the review band, is re-found on every run forever: the drain refuses it,
+  so `execution_attempts` never increments and it can never reach `dead`. This
+  is accepted rather than fixed — teaching the query about policy bands would
+  put authorization logic in a second place. It shows up honestly as
+  `commands_refused` in the summary, not as work done.
+
+The ingress runs `--concurrency=1 --max-instances=1`, so a sweep briefly
+occupies the only request slot. Acceptable because the sweep is bounded and
+never calls the engine; a push arriving during one is absorbed by the
+subscription's existing 60s–600s backoff.
+
+### The dead-letter path, and the two bindings whose absence is silent
+
+Topic `keplaria-events-dead`; push subscription `keplaria-events-dead-push`
+targets `POST /pubsub/dead`, which writes `dead_events/{event_id}` and
+**always returns 200** — including on a write failure, which it logs. There is
+nowhere left to retry to, and a non-2xx would only make the dead-letter
+subscription redeliver the dead letter.
+
+**The two IAM bindings that make dead-lettering work, and whose absence
+reports nothing anywhere:**
+
+- `roles/pubsub.publisher` for the Pub/Sub service agent on
+  `keplaria-events-dead`
+- `roles/pubsub.subscriber` for the same agent on `keplaria-events-push`
+
+Without both, the `deadLetterPolicy` is present and looks correct, dead-
+lettering simply does not happen, and no error surfaces. `infra/events/setup.sh`
+grants them and `scripts/doctor.sh` checks them separately from the policy for
+exactly that reason.
+
+One non-obvious detail in the handler, deliberately not "simplified": the
+delivery count is read from the message **attribute**
+`CloudPubSubDeadLetterSourceDeliveryCount`, and the envelope's `deliveryAttempt`
+field is only a fallback. Pub/Sub populates that field only on subscriptions
+that themselves carry a dead-letter policy, and `keplaria-events-dead-push`
+deliberately has none — so reading the field alone would record
+`delivery_attempt: 0` on every dead-lettered event. Verified in production:
+`spikes/dlq/evidence.json` records a real dead-lettered event at
+`delivery_attempt: 5`.
+
+### Where to look
+
+`/review/failures` on the review service, behind IAP — it lists dead-lettered
+events and `failed` / `dead` commands with their error strings and attempt
+counts. It is behind IAP rather than on the public console because
+`record_failure` stores the destination's raw error text, and the data-handling
+contract permits case identifiers and masked values in logs, not arbitrary
+upstream error bodies. The public console is unchanged.
+
+Evidence for all of the above is in
+[`spikes/dlq/evidence.json`](spikes/dlq/evidence.json), produced by
+`uv run --env-file .env python spikes/dlq/harness.py` against deployed
+resources.
 
 ## ERPNext (Frappe Cloud)
 

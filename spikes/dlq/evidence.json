@@ -1,0 +1,133 @@
+{
+  "captured_at": "2026-08-17T17:11:15.739312+00:00",
+  "result": "PASS",
+  "what_this_proves": "Retry is bounded and dead-lettering is durable, observed against deployed resources. A command whose ERP call cannot succeed was driven to the terminal `dead` state by five real Frappe refusals and was not re-driven a sixth time; the deployed POST /admin/sweep found a stuck case by its own collection-group query and drove its command to done; an event the ingress rejected on every delivery was recorded in dead_events with the delivery count Pub/Sub actually reported. Not proven here: that the sweep diagnoses a persistently broken destination (it does not), that a dead command can be resurrected (it cannot, by design), or anything about the Cloud Scheduler trigger's own 15-minute cadence beyond the job existing and being ENABLED.",
+  "environment": {
+    "firestore_database": "(default)",
+    "ingress_url": "https://keplaria-ingress-584548214478.us-central1.run.app",
+    "topic": "keplaria-events",
+    "max_execution_attempts": 5
+  },
+  "case_ids": {
+    "dead": "DLQ-DEAD-43CDC293",
+    "sweep": "DLQ-SWEEP-43CDC293"
+  },
+  "suppliers": {
+    "dead_probe": "DLQ Dead Command Probe SAS",
+    "sweep_probe": "DLQ Sweep Probe SAS"
+  },
+  "checks": {
+    "command_reaches_dead": true,
+    "dead_command_not_re_driven": true,
+    "sweep_finds_and_drives": true,
+    "new_cycle_unblocked": true,
+    "dead_letter_records_event": true
+  },
+  "observations": {
+    "command_reaches_dead": {
+      "case_id": "DLQ-DEAD-43CDC293",
+      "command_id": "DLQ-DEAD-43CDC293:apply_hold:c1",
+      "claim_acquired": true,
+      "drains": [
+        {
+          "drain": 1,
+          "status": "failed",
+          "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\"
+        },
+        {
+          "drain": 2,
+          "status": "failed",
+          "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\"
+        },
+        {
+          "drain": 3,
+          "status": "failed",
+          "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\"
+        },
+        {
+          "drain": 4,
+          "status": "failed",
+          "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\"
+        },
+        {
+          "drain": 5,
+          "status": "dead",
+          "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\"
+        }
+      ],
+      "status": "dead",
+      "execution_attempts": 5,
+      "died_at": "2026-08-17 17:02:58.903000+00:00",
+      "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\\\\"Message\\\\\\\",\\\\\\\"indicator\\\\\\\":\\\\\\\"red\\\\\\\",\\\\\\\"raise_exception\\\\\\\":1,\\\\\\\"__frappe_exc_id\\\\\\\":\\\\\\\"bb",
+      "attempts": 1
+    },
+    "dead_command_not_re_driven": {
+      "sixth_drain_result": {
+        "action": "apply_hold",
+        "status": "dead",
+        "error": "FrappeError: hold failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Dead Command Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\\\\"Message\\\\\\\",\\\\\\\"indicator\\\\\\\":\\\\\\\"red\\\\\\\",\\\\\\\"raise_exception\\\\\\\":1,\\\\\\\"__frappe_exc_id\\\\\\\":\\\\\\\"bbec2a570c8c5f8c8ebbd18bcd6050ea9d01c"
+      },
+      "execution_attempts_before": 5,
+      "execution_attempts_after": 5,
+      "updated_at_before": "2026-08-17 17:02:58.903000+00:00",
+      "updated_at_after": "2026-08-17 17:02:58.903000+00:00",
+      "status_after": "dead"
+    },
+    "sweep_finds_and_drives": {
+      "case_id": "DLQ-SWEEP-43CDC293",
+      "first_drain": [
+        {
+          "action": "clear_hold",
+          "status": "failed",
+          "error": "FrappeError: hold release failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Sweep Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\\\\"Message\\\\\\\",\\\\\\\"indicator\\\\\\\":\\\\\\\"red\\\\\\\",\\\\\\\"raise_exception\\\\\\\":1,\\\\\\\"__frappe_exc_id\\\\\\\":\\\\\\\"d581b688a665faa01fa16af02e297118e66f121fd948"
+        }
+      ],
+      "status_after_first_drain": "failed",
+      "execution_attempts_after_first_drain": 1,
+      "supplier_created_out_of_band": {
+        "external_id": "DLQ Sweep Probe SAS",
+        "created": true
+      },
+      "sweep_http_status": 200,
+      "sweep_summary": {
+        "cases_swept": 7,
+        "commands_driven": 3,
+        "commands_refused": 4,
+        "commands_dead": 0,
+        "cases_skipped": 0,
+        "case_ids": [
+          "DEMO-1d817bc0",
+          "DEMO-3f5bcc5b",
+          "DEMO-7da557c6",
+          "DEMO-880464d0",
+          "DEMO-d9e58462",
+          "DEMO-e64a2c24",
+          "DLQ-SWEEP-43CDC293"
+        ]
+      },
+      "status_after_sweep": "done",
+      "external_id": "DLQ Sweep Probe SAS"
+    },
+    "new_cycle_unblocked": {
+      "cycle2_claim_acquired": true,
+      "cycle2_claim_status": "pending",
+      "cycle2_command_id": "DLQ-DEAD-43CDC293:apply_hold:c2",
+      "cycle1_status_unchanged": "dead",
+      "cycle2_status": "pending"
+    },
+    "dead_letter_records_event": {
+      "event_id": "DLQ-POISON-DB251273",
+      "pubsub_message_id": "21050404170611528",
+      "published_at": "2026-08-17T17:02:47.397178+00:00",
+      "elapsed_seconds": 508.3,
+      "deadline_seconds": 2400,
+      "timed_out": false,
+      "recorded": true,
+      "delivery_attempt": 5,
+      "case_id": "DLQ-POISON/UNWRITABLE",
+      "first_seen": "2026-08-17 17:11:10.298000+00:00",
+      "last_seen": "2026-08-17 17:11:10.298000+00:00",
+      "delivery_attempt_source": "CloudPubSubDeadLetterSourceDeliveryCount attribute"
+    }
+  }
+}

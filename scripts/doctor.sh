@@ -307,23 +307,46 @@ SWEEP_STATE=$(gcloud scheduler jobs describe keplaria-command-sweep \
 # The emulator does not enforce collection-group indexes, so the sweep's unit
 # tests pass locally whether or not this exists in production.
 #
+# The sweep's query filters a collection GROUP on ONE field (status), which
+# Firestore serves from a SINGLE-FIELD index whose queryScope is
+# COLLECTION_GROUP — not from a composite. `gcloud firestore indexes composite
+# list` therefore never lists it no matter how long you wait, so a check
+# written against that command can only ever report missing. The right command
+# is `gcloud firestore indexes fields list`; see README "Firestore indexes" for
+# how the index itself is created (REST PATCH — no gcloud verb can express
+# query scope).
+#
 # Checked in BOTH databases, and named individually when one is missing. The
 # index is needed in "(default)" for the deployed sweep and /review/failures,
 # and in "keplaria-test" because that is the database `uv run pytest` uses
-# whenever FIRESTORE_EMULATOR_HOST is unset (see tests/conftest.py) — and
-# `gcloud firestore indexes composite list` without --database inspects only
-# "(default)", so a check written that way reports green while the repo's own
-# default test run fails on a missing index in the other database, with
-# nothing anywhere surfacing the gap.
+# whenever FIRESTORE_EMULATOR_HOST is unset (see tests/conftest.py). A check
+# that inspects only "(default)" reports green while the repo's own default
+# test run fails on a missing index in the other database.
 missing_index=""
 for fsdb in "(default)" "keplaria-test"; do
-  gcloud firestore indexes composite list --database="$fsdb" --project=keplaria \
-    --format=json 2>/dev/null | grep -q '"collectionGroup": "outbox"' \
+  gcloud firestore indexes fields list --database="$fsdb" --project=keplaria \
+    --format=json 2>/dev/null \
+    | FSDB="$fsdb" python3 -c '
+import json, os, sys
+try:
+    fields = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for f in fields:
+    if not f.get("name", "").endswith("/collectionGroups/outbox/fields/status"):
+        continue
+    for idx in f.get("indexConfig", {}).get("indexes", []):
+        scoped = idx.get("queryScope") == "COLLECTION_GROUP"
+        on_status = [x.get("fieldPath") for x in idx.get("fields", [])] == ["status"]
+        if scoped and on_status and idx.get("state") == "READY":
+            sys.exit(0)
+sys.exit(1)
+' 2>/dev/null \
     || missing_index="${missing_index}${fsdb} "
 done
 [ -z "$missing_index" ] \
-  && ok "outbox collection-group index present in (default) and keplaria-test (the sweep's query needs it)" \
-  || meh "no outbox collection-group index in: ${missing_index}— the sweep query and /review/failures fail there; the emulator hides this because it auto-indexes"
+  && ok "outbox/status COLLECTION_GROUP index READY in (default) and keplaria-test (the sweep's query needs it)" \
+  || bad "no READY outbox/status COLLECTION_GROUP index in: ${missing_index}— the sweep query and /review/failures FailedPrecondition there; the emulator hides this because it auto-indexes"
 
 echo
 printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
