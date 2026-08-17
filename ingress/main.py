@@ -25,20 +25,23 @@ broken Pub/Sub push payload — fix the producer) or a transient engine
 failure or failed command execution (both worth retrying), and exactly what
 we don't want for an unparseable event (a well-formed envelope whose inner
 event data fails schema validation — no retry can fix that, so it is acked
-immediately instead). A persistently failing engine call will eventually be
-dropped once retention expires rather than retried indefinitely; building a
-dead-letter path for that case is still open work. A duplicate is always
-acked too, deliberately,
+immediately instead). A persistently failing engine call is dead-lettered
+rather than dropped: the subscription carries a deadLetterPolicy with
+maxDeliveryAttempts 5, and the dead-letter topic pushes to POST /pubsub/dead
+below, which records the event in Firestore so it survives and can be
+inspected. A duplicate is always acked too, deliberately,
 *regardless of whether draining the outbox there succeeds* — the alternative
 (503 on a failed drain) would make Pub/Sub redeliver the duplicate itself,
 recreating the redelivery storm this project already had once. This means
 the duplicate-path drain is a bounded, best-effort repair, not a standing
 self-healing guarantee: it only ever gets one attempt per duplicate delivery
 that happens to arrive, and a persistently failing command (bad credentials,
-an ERP outage) stays `failed` until some unrelated later event for the case
-triggers another drain, or until a dedicated retry/DLQ path exists (not
-built yet). See app/executor/runner.py's module docstring for the same point
-in more detail.
+an ERP outage) stays `failed` until some other, unrelated event for the same
+case happens to arrive and triggers another drain, or until the Cloud
+Scheduler sweep (POST /admin/sweep) re-drives it. That sweep is what makes
+the duplicate-path drain no longer the only second chance a command gets, and
+the MAX_EXECUTION_ATTEMPTS cap is what stops it retrying forever. See
+app/executor/runner.py's module docstring for the same point in more detail.
 """
 
 from __future__ import annotations
@@ -55,6 +58,7 @@ from pydantic import ValidationError
 
 from app.executor.runner import execute_pending_commands
 from app.schemas import CanonicalEvent
+from app.state.commands import DEAD
 from app.state.firestore import claim_event, get_client, mark_dispatched
 from ingress.engine_client import invoke_engine
 
@@ -230,6 +234,21 @@ def push(envelope: Any = Body(...)) -> dict:
                 }
                 for r in refused
             ],
+        )
+
+    dead = [r for r in command_results if r.get("status") == DEAD]
+    if dead:
+        # Deliberately NOT a 503. A dead command has exhausted
+        # MAX_EXECUTION_ATTEMPTS, and making Pub/Sub redeliver over it would
+        # turn the cap into an infinite retry on the one command the system
+        # decided to stop retrying. Logged at error level because a dead
+        # command is a real operational event needing a human, unlike a
+        # policy refusal.
+        logger.error(
+            "command execution is dead for event %s case %s: %s",
+            event.event_id,
+            event.case_id,
+            [{"action": r.get("action"), "error": r.get("error")} for r in dead],
         )
 
     if any(r.get("status") == "failed" for r in command_results):

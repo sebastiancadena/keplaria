@@ -143,3 +143,39 @@ def test_both_new_fields_are_optional():
 
     assert event.effective_date is None
     assert event.document_ref is None
+
+
+def test_a_dead_command_is_acked_not_retried(client, case_id, monkeypatch):
+    """The cap inverts if this 503s: Pub/Sub would redeliver forever on the
+    one command the system deliberately gave up on."""
+    import ingress.main as main
+
+    monkeypatch.setattr(
+        main,
+        "execute_pending_commands",
+        lambda db, cid: [
+            {"action": "create_supplier", "status": "dead", "error": "HTTP 503"}
+        ],
+    )
+
+    response = client.post("/pubsub/push", json=_push(_event(case_id)))
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "claimed"
+
+
+def test_a_failed_command_still_returns_503(client, case_id, monkeypatch):
+    """Below the cap, retrying is still the right answer."""
+    import ingress.main as main
+
+    monkeypatch.setattr(
+        main,
+        "execute_pending_commands",
+        lambda db, cid: [
+            {"action": "create_supplier", "status": "failed", "error": "HTTP 503"}
+        ],
+    )
+
+    response = client.post("/pubsub/push", json=_push(_event(case_id)))
+
+    assert response.status_code == 503
