@@ -92,3 +92,74 @@ def test_record_success_persists_the_external_id(db, case_id):
 
 def test_get_command_returns_none_when_absent(db, case_id):
     assert get_command(db, case_id, "create_supplier", 1) is None
+
+
+def test_execution_attempts_are_counted_separately_from_claims(db, case_id):
+    """`attempts` counts graph-side claims; `execution_attempts` counts executor
+    runs. Conflating them would cap retries on the wrong quantity."""
+    claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+    record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    stored = get_command(db, case_id, "create_supplier", 1)
+    assert stored["attempts"] == 1
+    assert stored["execution_attempts"] == 1
+
+
+def test_a_failure_below_the_cap_stays_failed(db, case_id):
+    from app.state.commands import FAILED, MAX_EXECUTION_ATTEMPTS
+
+    claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+    for _ in range(MAX_EXECUTION_ATTEMPTS - 1):
+        status = record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    assert status == FAILED
+    stored = get_command(db, case_id, "create_supplier", 1)
+    assert stored["status"] == FAILED
+    assert stored["execution_attempts"] == MAX_EXECUTION_ATTEMPTS - 1
+    assert stored.get("died_at") is None
+
+
+def test_the_capped_failure_is_dead_not_failed(db, case_id):
+    from app.state.commands import DEAD, MAX_EXECUTION_ATTEMPTS
+
+    claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+    for _ in range(MAX_EXECUTION_ATTEMPTS):
+        status = record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    assert status == DEAD
+    stored = get_command(db, case_id, "create_supplier", 1)
+    assert stored["status"] == DEAD
+    assert stored["died_at"] is not None
+    assert stored["error"] == "HTTP 503", "the last error must survive the cap"
+
+
+def test_a_dead_command_is_never_reclaimed(db, case_id):
+    """The graph re-claims on every event, and a review-band case re-parks on
+    every later event. Without this refusal a dead command would be reset to
+    PENDING and resurrected forever, making the cap meaningless."""
+    from app.state.commands import DEAD, MAX_EXECUTION_ATTEMPTS
+
+    claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+    for _ in range(MAX_EXECUTION_ATTEMPTS):
+        record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
+
+    claim = claim_command(db, case_id, "create_supplier", 1, PAYLOAD)
+
+    assert claim.acquired is False
+    assert claim.status == DEAD
+    assert get_command(db, case_id, "create_supplier", 1)["status"] == DEAD
+
+
+def test_a_new_cycle_is_unaffected_by_a_dead_earlier_cycle(db, case_id):
+    """`command_id` is cycle-scoped, so a dead command never blocks the next
+    lifecycle turn. This is why resurrection is unnecessary."""
+    from app.state.commands import MAX_EXECUTION_ATTEMPTS
+
+    claim_command(db, case_id, "request_renewal", 1, PAYLOAD)
+    for _ in range(MAX_EXECUTION_ATTEMPTS):
+        record_failure(db, case_id, "request_renewal", 1, "HTTP 503")
+
+    claim = claim_command(db, case_id, "request_renewal", 2, PAYLOAD)
+
+    assert claim.acquired is True
+    assert claim.status == PENDING
