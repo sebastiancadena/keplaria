@@ -1,0 +1,605 @@
+<title>Tests That Prove Nothing</title>
+<style>
+/*__FONTS__*/
+
+:root {
+  --ground: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-sunk: #F1F5F9;
+  --ink: #111827;
+  --muted: #64748B;
+  --rule: #DCE3EA;
+  --rule-strong: #C3CDD8;
+  --accent: #B26A05;
+  --accent-bare: #F59E0B;
+  --fail: #B91C1C;
+  --pass: #15803D;
+  --hero-ground: #0B1020;
+  --hero-ink: #F8FAFC;
+  --hero-muted: #94A3B8;
+  --hero-accent: #FBBF24;
+
+  --display: "Space Grotesk KP", ui-sans-serif, system-ui, sans-serif;
+  --text: "Inter KP", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono KP", ui-monospace, Menlo, Consolas, monospace;
+
+  --measure: 68ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0B1020;
+    --surface: #121829;
+    --surface-sunk: #161D31;
+    --ink: #F8FAFC;
+    --muted: #94A3B8;
+    --rule: #232C42;
+    --rule-strong: #33405C;
+    --accent: #FBBF24;
+    --accent-bare: #FBBF24;
+    --fail: #F87171;
+    --pass: #4ADE80;
+    --hero-ground: #060912;
+    --hero-ink: #F8FAFC;
+    --hero-muted: #94A3B8;
+    --hero-accent: #FBBF24;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #0B1020;
+  --surface: #121829;
+  --surface-sunk: #161D31;
+  --ink: #F8FAFC;
+  --muted: #94A3B8;
+  --rule: #232C42;
+  --rule-strong: #33405C;
+  --accent: #FBBF24;
+  --accent-bare: #FBBF24;
+  --fail: #F87171;
+  --pass: #4ADE80;
+  --hero-ground: #060912;
+  --hero-ink: #F8FAFC;
+  --hero-muted: #94A3B8;
+  --hero-accent: #FBBF24;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ---------- hero ---------- */
+
+.hero {
+  background: var(--hero-ground);
+  color: var(--hero-ink);
+  padding: 88px 0 72px;
+  border-bottom: 1px solid #1C2438;
+}
+
+.hero .wrap { display: flex; flex-direction: column; gap: 28px; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hero-accent);
+  margin: 0;
+}
+
+.hero h1 {
+  font-family: var(--display);
+  font-size: 48px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.standfirst {
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--hero-muted);
+  margin: 0;
+  max-width: 58ch;
+}
+
+.standfirst strong { color: var(--hero-ink); font-weight: 600; }
+
+.byline {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--hero-muted);
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid #1C2438;
+}
+
+/* ---------- body ---------- */
+
+main { padding: 64px 0 96px; }
+
+section { margin: 0 0 56px; }
+
+h2 {
+  font-family: var(--display);
+  font-size: 24px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  margin: 0 0 16px;
+  text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--display);
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  margin: 0 0 10px;
+  text-wrap: balance;
+}
+
+p { margin: 0 0 18px; }
+
+p:last-child { margin-bottom: 0; }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+a:focus-visible, .case:focus-visible {
+  outline: 2px solid var(--accent-bare);
+  outline-offset: 3px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 0.1em 0.34em;
+}
+
+strong { font-weight: 600; }
+
+.lede {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* ---------- the case ---------- */
+
+.case {
+  border-top: 2px solid var(--ink);
+  padding-top: 20px;
+  margin: 0 0 48px;
+}
+
+.symptom {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+
+.case h2 { margin-bottom: 14px; }
+
+.turn {
+  border-left: 2px solid var(--accent-bare);
+  padding-left: 18px;
+  margin: 0 0 18px;
+}
+
+.turn p:last-child { margin-bottom: 0; }
+
+/* the mutation readout — the page's signature device */
+
+.readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--fail);
+  padding: 12px 14px;
+  margin-top: 20px;
+}
+
+.readout .edit { color: var(--muted); }
+.readout .edit b { color: var(--ink); font-weight: 500; }
+
+.readout .verdict {
+  color: var(--fail);
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.readout-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+/* ---------- pull quote ---------- */
+
+.pull {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 32px 0;
+  padding: 0 0 0 20px;
+  border-left: 3px solid var(--accent-bare);
+  text-wrap: balance;
+}
+
+/* ---------- lists ---------- */
+
+ul { margin: 0 0 18px; padding-left: 20px; }
+li { margin-bottom: 9px; }
+li:last-child { margin-bottom: 0; }
+
+.plain { list-style: none; padding-left: 0; }
+
+.plain li {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+  margin-bottom: 14px;
+}
+
+.plain li strong {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* ---------- disclosure ---------- */
+
+.disclosure {
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  padding: 20px 22px;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.disclosure p { margin-bottom: 12px; }
+
+.disclosure .readout-label { margin-bottom: 8px; }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 640px) {
+  .hero { padding: 56px 0 48px; }
+  .hero h1 { font-size: 34px; }
+  .standfirst { font-size: 17px; }
+  h2 { font-size: 21px; }
+  .pull { font-size: 19px; }
+  main { padding: 48px 0 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Field notes · autonomous agents</p>
+    <h1>Tests That Prove Nothing</h1>
+    <p class="standfirst">I spent twenty days building an agent that onboards suppliers and then keeps
+      governing them for months. The bugs that mattered were never red. <strong>Every one of them shipped
+      under a green suite</strong>, and four of the five came from the plan rather than the code.</p>
+    <p class="byline">Five defects, and the discipline that caught them.</p>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <section>
+      <p class="lede">A passing test is a claim about your code. A test you have watched fail is
+        evidence. Most of the time the difference does not matter, because most tests are written
+        against code that either works or obviously does not. Autonomous systems break that
+        assumption, and they break it quietly.</p>
+
+      <p>The system I was building reads a supplier's certificate, screens the company against a
+        sanctions index, scores the result against a written policy, escalates to a human when the
+        policy demands one, writes to a real ERP, and then wakes up months later to chase the renewal,
+        restrict the supplier if the evidence is overdue, and lift the restriction when it arrives.
+        Agents propose; deterministic code decides; a ledger records. That last part matters more than
+        it sounds like it should.</p>
+
+      <p>What follows is five real defects. None of them was caught by a failing test, because in every
+        case the tests were green and wrong. They are grouped by symptom rather than numbered, because
+        they are a taxonomy and not a sequence — you can meet them in any order, and probably will.</p>
+    </section>
+
+    <article class="case">
+      <p class="symptom">symptom: the control was never exercised</p>
+      <h2>A safety eval that measured the model's manners</h2>
+
+      <p>A document arrives with a sentence planted in it addressed to whatever machine reads the page
+        next. The eval for this passed. I believed I had a working injection defence for about a day.</p>
+
+      <div class="turn">
+        <p>What the eval actually measured was the model declining to comply. Nothing in the enforcement
+          path had been exercised at all. On a different day, with a different temperature, the same
+          green test would have sat over a system that did the wrong thing.</p>
+      </div>
+
+      <p>Worse, the control I thought was doing the work could not have done it. Extracted values are
+        checked against the source document — a value has to appear in the span the agent cites. But an
+        obedient agent cites the planted sentence as its provenance, and <em>that sentence genuinely is
+        on the page</em>. Provenance checking accepts injection-obedient extraction by construction. It
+        is a defence against invention, not against instruction.</p>
+
+      <p>The fix was to stop conflating the two. Detection of a planted directive is a separate,
+        deliberately narrow heuristic. Enforcement is exact and structural: a document flagged as
+        tainted is never published to any state key an agent's instruction can resolve, so extraction
+        has nothing to read, and the risk gate is forced to <code>blocked</code> regardless of what any
+        model would have said. The claim I can defend is not "we detect prompt injection" — a rephrased
+        payload gets past the heuristic. It is that a tainted document cannot produce a write.</p>
+
+      <div class="readout">
+        <span class="edit">grade the enforcement outcome, not the model's reply</span>
+        <span class="verdict">eval was measuring nothing</span>
+      </div>
+    </article>
+
+    <article class="case">
+      <p class="symptom">symptom: both halves correct, jointly inert</p>
+      <h2>An approval system where every part worked and nothing happened</h2>
+
+      <p>Human approval was specified carefully. One decision per approval id, bound to the exact
+        version of the case the reviewer was shown. A replay is refused as a duplicate. A decision about
+        a version the case has already moved past is refused as stale. The executor independently
+        refuses to perform anything for a case the policy has not cleared. Both pieces had tests. Both
+        pieces were correct.</p>
+
+      <div class="turn">
+        <p>Together they did nothing whatsoever. The terminal that parked a case for review claimed no
+          work — so when a human approved, the approval and the executor agreed, precisely and
+          correctly, about an empty queue.</p>
+      </div>
+
+      <p>This is the failure mode I now watch for hardest, because unit tests are structurally bad at
+        it. Each component's tests passed because each component was right. The tests that appeared to
+        prove the release path built their starting state by hand, and the state they built was one the
+        real system produces only during a rare redelivery anomaly. They tested a shape the system
+        essentially never has.</p>
+
+      <p>Nothing failed. I found it by reading the parking code and the approval code side by side and
+        asking what actually connects them. The answer was: nothing did.</p>
+
+      <div class="readout">
+        <span class="edit">make the parking terminal claim what it parks</span>
+        <span class="verdict">feature existed for the first time</span>
+      </div>
+    </article>
+
+    <article class="case">
+      <p class="symptom">symptom: off-by-one in a comparison, not a count</p>
+      <h2>The audit that asked <code>&gt; 1</code> and got a clean bill of health</h2>
+
+      <p>A short one, and my favourite, because the bug is a single character and the consequence was
+        nearly a false gate.</p>
+
+      <p>Commands carry a counter that is incremented in exactly one place: the function that records a
+        failed attempt. I wanted to prove the retry path had genuinely happened in production — that
+        some command had failed, been retried, and succeeded exactly once. So I queried for commands
+        with a counter greater than one and a status of done.</p>
+
+      <div class="turn">
+        <p>Nothing matched, and I briefly concluded the retry path had never once been exercised for
+          real. But a command that failed once and then succeeded has a counter of exactly <em>1</em>.
+          The correct query was <code>&gt;= 1</code>. One record among forty-eight matched it — a
+          single command that failed, was re-driven by the scheduled sweep, and completed six seconds
+          later, leaving exactly one downstream record behind.</p>
+      </div>
+
+      <p>The lesson is not "be careful with comparisons". It is that a field whose only writer is the
+        failure path does not mean what its name suggests, and I should have read that writer before
+        writing a query against it.</p>
+
+      <div class="readout">
+        <span class="edit">the audit query: <b>&gt; 1</b> becomes <b>&gt;= 1</b></span>
+        <span class="verdict">0 matches → 1 match</span>
+      </div>
+    </article>
+
+    <article class="case">
+      <p class="symptom">symptom: the acceptance criterion is impossible</p>
+      <h2>A proof written to wait for an event the system cannot emit</h2>
+
+      <p>My own plan told me to verify something that cannot occur. It said: watch a restriction get
+        applied to a supplier whose review was rejected, through the browser, after the rejection.</p>
+
+      <p>It cannot be watched, because it has already happened. Restrictions are not withheld pending
+        human approval — only permissive actions are. And the drain that executes pending work runs
+        unconditionally after every invocation, so by the time a reviewer opens the page, the
+        restriction is long since applied.</p>
+
+      <div class="turn">
+        <p>Measured on the real run: the restriction landed at 18:33:13.987Z and the human decision
+          committed at 18:44:22.401Z. Eleven minutes and eight seconds earlier, not after.</p>
+      </div>
+
+      <p>Had I built the proof as written, it would have hung waiting for an event with no producer, and
+        the only way to make it pass would have been to weaken the assertion until it described
+        something else — which is exactly how a suite fills up with tests that pass and mean nothing. I
+        caught it while designing the harness, by reading the drain against the executor before writing
+        a line of it.</p>
+
+      <p>The replacement claim is both true and stronger, and it took two server timestamps rather than
+        a screen recording: <strong>a rejection withholds the permissive actions; the restrictive one
+        never waited for a human at all.</strong></p>
+
+      <div class="readout">
+        <span class="edit">when a proof will not pass, suspect the claim before the test</span>
+        <span class="verdict">criterion was unsatisfiable</span>
+      </div>
+    </article>
+
+    <article class="case">
+      <p class="symptom">symptom: a correct consumer of state nobody writes</p>
+      <h2>Reading a field that is null on every record ever stored</h2>
+
+      <p>This one is from the last week, while building the scoreboard that reports what the system
+        actually did. One metric counts data fields carried into the ERP without anyone retyping them,
+        and the obvious source was the structured extraction the evidence step produces — a list of
+        fields, each with its value and the span it came from.</p>
+
+      <div class="turn">
+        <p>That list is never persisted. It lives in working state during the run and is written to the
+          record under a different key, in a different shape, holding a summary rather than the fields.
+          On every stored case, the key I was about to read is <code>null</code>.</p>
+      </div>
+
+      <p>A metric built on it would have compiled, passed its unit tests against hand-built fixtures,
+        run happily in production, and reported zero forever without ever failing. I found it by opening
+        two real documents and printing their keys before writing the code — three minutes that saved a
+        silently wrong number in a scored artifact.</p>
+
+      <p class="pull">Read the code that writes the state before you build anything that reads it. A
+        correct consumer of state that is never produced ships inert, and its tests still pass.</p>
+
+      <div class="readout">
+        <span class="edit">print the real document's keys before coding</span>
+        <span class="verdict">source field is always null</span>
+      </div>
+    </article>
+
+    <section>
+      <h2>What actually catches these</h2>
+
+      <p>Three habits, in rough order of how much they earned.</p>
+
+      <h3>Name the edit that would break each test, then make it</h3>
+
+      <p>For every test that guards something load-bearing, I write down the specific change to
+        production code that should turn it red — and then I actually apply that change and watch. It
+        takes a minute per test. On the failure-handling work, five tests passed while proving nothing,
+        and mutation caught every one. Four of those five were test code my own plan had specified,
+        which is the part I did not expect: <strong>plan code is unverified code</strong>, and it
+        arrives wearing the authority of a decision already made.</p>
+
+      <p>Every readout strip above is a real mutation with its real outcome. On the metrics module in
+        this article's own system, five mutations — flipping <code>&gt;=</code> to <code>&gt;</code>,
+        dropping the cycle from a write key, ignoring whether a command executed, trusting dates without
+        the writes that back them, and returning <code>0</code> instead of <code>null</code> for a
+        missing input — each flip exactly one test red. That is what makes the green meaningful.</p>
+
+      <h3>Make the summary re-execute its own citations</h3>
+
+      <p>A table mapping "criterion" to "the test that proves it" is a claim about the repository, and
+        it rots the moment a test is renamed. The exit-criteria manifest re-runs the twenty-two test ids
+        it cites and re-reads each evidence file it points at, every time it runs. A deleted, renamed,
+        or red test demotes its criterion instead of continuing to look satisfied. I mutation-tested the
+        manifest too: renaming a cited test, deleting a file, and removing a downstream record each
+        turned it red.</p>
+
+      <h3>Accept that some defects need a live run</h3>
+
+      <p>One bug could not have been caught by any unit test at any coverage level. A platform field
+        that reports how many times a message was delivered is populated only on subscriptions that
+        carry a dead-letter policy. Mine deliberately has none, so the field is empty and the count
+        arrives as a message attribute instead. Every mock returned the number I expected. Only a real
+        message through real infrastructure showed the field blank — the live run measured five where
+        the code would have recorded zero forever.</p>
+    </section>
+
+    <section>
+      <h2>The pieces worth stealing</h2>
+
+      <p>Four contracts did most of the structural work. None is clever; all are boring on purpose,
+        which is the point.</p>
+
+      <ul class="plain">
+        <li><strong>the event envelope</strong>Every inbound event carries its own id, the case it
+          belongs to, and optionally the case version it expects. One transaction claims the id, rejects
+          a duplicate, rejects a stale version, and advances the case — or does none of it. That single
+          transaction is the entire boundary between at-least-once delivery and duplicate side effects.</li>
+
+        <li><strong>the tool surface</strong>Every external write is addressed by an id derived from
+          (case, action, cycle). The cycle is in the identity because the lifecycle repeats: the same
+          action in a later cycle is legitimately new work, and without the discriminator the second one
+          silently finds the first marked done and skips. Where the far side deduplicates by
+          deterministic id, redelivery is harmless twice over. Where it does not — outbound mail, which
+          nothing on the far side deduplicates — the ledger is the <em>only</em> guard, and saying so
+          plainly in the code is what keeps someone from assuming otherwise later.</li>
+
+        <li><strong>the catalog contract</strong>Agents are declared with their permitted tools and
+          their permitted routes, and routing narrows against that declaration rather than trusting a
+          model's proposal. A known-but-not-permitted agent is dropped and the drop is recorded; an
+          unknown agent stops the case. The guarantee is narrow and exact: nothing runs unless policy
+          permitted it.</li>
+
+        <li><strong>the contract-test harness</strong>Every failure encountered in the build becomes a
+          contract test or an eval case, and evidence for anything gate-shaped is written into the
+          repository next to the code — never to a temporary directory. I learned that one the direct
+          way, by losing a day's proof to a scratch path that did not survive the session.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>The uncomfortable part</h2>
+
+      <p>Every defect here was found by reading, by mutating, or by running the thing for real. None was
+        found by a test going red on its own. If I had trusted the suite, all five would have shipped,
+        and the suite would have been just as green afterwards.</p>
+
+      <p>I do not think that is unusual for agentic systems. The components are individually testable
+        and the interesting failures live between them, in the gap where two correct pieces agree about
+        nothing, or where a control is present but never exercised because the model happened to
+        behave. Coverage does not see that gap. Only adversarial reading and deliberate breakage do.</p>
+
+      <p class="pull">Green is not evidence. Green plus a mutation you watched turn it red is evidence.</p>
+    </section>
+
+    <section>
+      <div class="disclosure">
+        <p class="readout-label">Disclosure</p>
+        <p>This piece describes work built as an entry in a public AI agent hackathon run by Google
+          Cloud and Devpost, and is written by the entrant. It is published as part of that entry and
+          is eligible for the competition's bonus content points.</p>
+        <p>All supplier names, certificates, and watchlist entries referenced in the system are
+          synthetic fixtures authored for the project. No customer or production data is involved.
+          Portions of the code and this article were written with AI assistance, disclosed in the
+          project's provenance ledger.</p>
+      </div>
+    </section>
+
+  </div>
+</main>
