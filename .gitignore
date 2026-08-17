@@ -31,3 +31,4 @@ artifacts/
 # Transient by nature — the run's real record is evidence.json, which IS
 # committed.
 spikes/hitl_release/.parked.json
+spikes/hitl_reject/.parked.json

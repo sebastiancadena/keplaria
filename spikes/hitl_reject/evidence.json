@@ -1,0 +1,236 @@
+{
+  "captured_at": "2026-08-17T18:44:45.668953+00:00",
+  "result": "PASS",
+  "what_this_proves": "Two review-band cases were parked by the deployed graph and REJECTED by a human signed in through IAP. On the first, the rejection withheld a permissive command: create_supplier stayed PENDING and no Supplier was ever created in the ERP. On the second, the restrictive command had already executed -- the ERP hold was written before the reviewer decided, on the ingress drain that followed the overdue event -- while the permissive commands beside it stayed refused after the rejection. The band guard is one-directional in both directions, live.",
+  "what_this_does_not_prove": "Not a general claim about restrictive commands: apply_hold is currently the only member of app.lifecycle.RESTRICTIVE. A `blocked`-band case still claims nothing, so a newly-sanctioned supplier still cannot be held -- unchanged by this run. Nothing here exercises a stale rejection, or a rejection racing a later event.",
+  "correction_to_the_standing_note": "The plan recorded this as watching apply_hold execute ON a rejected case through the UI. That cannot happen: ingress/main.py drains unconditionally after every engine invocation and the guard refuses only permissive commands, so a claimed hold executes while the case is still parking, before any reviewer sees it. Measured here, not inferred -- see b_hold_preceded_the_decision.",
+  "track_a_withheld": {
+    "case_id": "REJ-A-225CED",
+    "supplier": "Comercial Andes Verde",
+    "policy": {
+      "score": 0.25,
+      "factors_fired": [
+        {
+          "value": "syn-co-001 @ 0.637",
+          "id": "SUBTHRESHOLD_CANDIDATE",
+          "weight": 0.25
+        }
+      ],
+      "policy_id": "supplier_risk",
+      "reasons": [],
+      "policy_version": 2,
+      "band": "review"
+    },
+    "screening": {
+      "reachable": true,
+      "error": null,
+      "candidate_count": 1,
+      "top_candidate": {
+        "score": 0.6369426751592356,
+        "id": "syn-co-001",
+        "match": false
+      }
+    },
+    "approval": {
+      "decision": "rejected",
+      "committed_at": "2026-08-17 18:44:14.389000+00:00",
+      "case_version": 1,
+      "approval_id": "REJ-A-225CED:v1",
+      "actor": "sebastiancadena@gmail.com"
+    },
+    "commands": {
+      "create_supplier": {
+        "status": "pending",
+        "attempts": 1,
+        "command_id": "REJ-A-225CED:create_supplier:c1",
+        "updated_at": "2026-08-17 18:32:32.721000+00:00",
+        "action": "create_supplier",
+        "case_id": "REJ-A-225CED",
+        "cycle": 1,
+        "payload": {
+          "supplier_name": "Comercial Andes Verde",
+          "country": "Colombia",
+          "email_id": "comercial-andes-verde@example.com"
+        },
+        "created_at": "2026-08-17 18:32:32.721000+00:00"
+      }
+    },
+    "erp_supplier_after": null,
+    "final_phase": "awaiting_approval",
+    "final_case_version": 1
+  },
+  "track_b_restriction": {
+    "case_id": "REJ-B-564088",
+    "supplier": "Andes Verde Import Export SAS",
+    "beats": [
+      {
+        "step": 1,
+        "event_type": "new_supplier_packet",
+        "effective_date": "2026-01-05",
+        "lifecycle_state": "active",
+        "expected_state": "active",
+        "phase": "awaiting_approval",
+        "ok": true
+      },
+      {
+        "step": 2,
+        "event_type": "renewal_due",
+        "effective_date": "2026-12-01",
+        "lifecycle_state": "renewal_requested",
+        "expected_state": "renewal_requested",
+        "phase": "awaiting_approval",
+        "ok": true
+      },
+      {
+        "step": 3,
+        "event_type": "evidence_overdue",
+        "effective_date": "2027-01-15",
+        "lifecycle_state": "held",
+        "expected_state": "held",
+        "phase": "awaiting_approval",
+        "ok": true
+      }
+    ],
+    "screening": {
+      "reachable": true,
+      "error": null,
+      "candidate_count": 3,
+      "top_candidate": {
+        "score": 0.6716417910447763,
+        "id": "syn-co-008",
+        "match": false
+      }
+    },
+    "approval": {
+      "decision": "rejected",
+      "committed_at": "2026-08-17 18:44:22.401000+00:00",
+      "case_version": 3,
+      "approval_id": "REJ-B-564088:v3",
+      "actor": "sebastiancadena@gmail.com"
+    },
+    "commands": {
+      "apply_hold": {
+        "external_id": "Andes Verde Import Export SAS",
+        "attempts": 1,
+        "status": "done",
+        "command_id": "REJ-B-564088:apply_hold:c1",
+        "updated_at": "2026-08-17 18:33:13.987000+00:00",
+        "action": "apply_hold",
+        "result": {
+          "external_id": "Andes Verde Import Export SAS",
+          "created": true
+        },
+        "error": null,
+        "case_id": "REJ-B-564088",
+        "cycle": 1,
+        "created_at": "2026-08-17 18:33:13.314000+00:00",
+        "payload": {
+          "hold_type": "All",
+          "supplier_name": "Andes Verde Import Export SAS"
+        }
+      },
+      "attach_evidence": {
+        "status": "pending",
+        "attempts": 1,
+        "command_id": "REJ-B-564088:attach_evidence:c1",
+        "updated_at": "2026-08-17 18:32:58.922000+00:00",
+        "action": "attach_evidence",
+        "case_id": "REJ-B-564088",
+        "cycle": 1,
+        "payload": {
+          "cycle": 1,
+          "supplier_name": "Andes Verde Import Export SAS"
+        },
+        "created_at": "2026-08-17 18:32:58.922000+00:00"
+      },
+      "create_supplier": {
+        "status": "pending",
+        "attempts": 1,
+        "command_id": "REJ-B-564088:create_supplier:c1",
+        "updated_at": "2026-08-17 18:32:58.795000+00:00",
+        "action": "create_supplier",
+        "case_id": "REJ-B-564088",
+        "cycle": 1,
+        "payload": {
+          "supplier_name": "Andes Verde Import Export SAS",
+          "country": "Colombia",
+          "email_id": "andes-verde-import-export-sas@example.com"
+        },
+        "created_at": "2026-08-17 18:32:58.795000+00:00"
+      },
+      "request_renewal": {
+        "status": "pending",
+        "attempts": 1,
+        "command_id": "REJ-B-564088:request_renewal:c1",
+        "updated_at": "2026-08-17 18:33:06.802000+00:00",
+        "action": "request_renewal",
+        "case_id": "REJ-B-564088",
+        "cycle": 1,
+        "payload": {
+          "expiry_date": "2027-01-01",
+          "supplier_name": "Andes Verde Import Export SAS"
+        },
+        "created_at": "2026-08-17 18:33:06.802000+00:00"
+      }
+    },
+    "hold_updated_at": "2026-08-17 18:33:13.987000+00:00",
+    "decision_committed_at": "2026-08-17 18:44:22.401000+00:00",
+    "permissive_after_rejection": {
+      "attach_evidence": "pending",
+      "create_supplier": "pending",
+      "request_renewal": "pending"
+    },
+    "erp_supplier_after": {
+      "name": "Andes Verde Import Export SAS",
+      "owner": "sebastiancadena@gmail.com",
+      "creation": "2026-08-17 07:54:37.760936",
+      "modified": "2026-08-17 13:33:13.903294",
+      "modified_by": "sebastiancadena@gmail.com",
+      "docstatus": 0,
+      "idx": 0,
+      "naming_series": "SUP-.YYYY.-",
+      "supplier_name": "Andes Verde Import Export SAS",
+      "supplier_type": "Company",
+      "supplier_group": "Distributor",
+      "country": "Colombia",
+      "supplier_primary_contact": "Andes Verde Import Export SAS-Andes Verde Import Export SAS",
+      "mobile_no": "",
+      "email_id": "andes-verde-import-export-sas@example.com",
+      "is_internal_supplier": 0,
+      "represents_company": "",
+      "is_transporter": 0,
+      "allow_purchase_invoice_creation_without_purchase_order": 0,
+      "allow_purchase_invoice_creation_without_purchase_receipt": 0,
+      "disabled": 0,
+      "is_frozen": 0,
+      "on_hold": 1,
+      "hold_type": "All",
+      "warn_rfqs": 0,
+      "prevent_rfqs": 0,
+      "warn_pos": 0,
+      "prevent_pos": 0,
+      "language": "en",
+      "doctype": "Supplier",
+      "accounts": [],
+      "companies": [],
+      "portal_users": [],
+      "customer_numbers": []
+    },
+    "final_phase": "awaiting_approval",
+    "final_case_version": 3
+  },
+  "checks": {
+    "a_decision_recorded": true,
+    "a_decision_is_reject": true,
+    "a_decided_by_a_verified_reviewer": true,
+    "a_bound_to_the_parked_version": true,
+    "a_create_supplier_still_pending": true,
+    "a_no_supplier_in_the_erp": true,
+    "b_decision_is_reject": true,
+    "b_hold_executed": true,
+    "b_hold_preceded_the_decision": true,
+    "b_erp_supplier_on_hold": true,
+    "b_permissive_commands_still_pending": true
+  },
+  "teardown_required": "Andes Verde Import Export SAS is on hold in the live ERP. Run `harness.py teardown` to release it."
+}
