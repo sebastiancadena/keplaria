@@ -82,19 +82,44 @@ saw.
 The deterministic gate's verdict is never overwritten. The executor combines
 the machine's band with the human's decision and records both, so the outbox
 shows whether policy or a person decided, and a rejection can withhold what
-the gate would have granted. Restrictive actions — a hold — bypass this
-entirely in both directions: refusing to hold a risky supplier because a case
-is under review would invert the gate's purpose.
+the gate would have granted.
 
-The approval UI and its authenticated service are not part of this; this is
-the state layer they will call. The composition they will perform — commit,
-then drain — is exercised in `tests/unit/test_approval_release.py`.
+Restrictive actions — a hold — bypass this entirely, and the consequence is
+sharper than "bypass" suggests: **a hold never waits for a human at all.** The
+executor refuses only permissive commands and the ingress drains the outbox
+after every engine invocation, so a claimed `apply_hold` executes on that
+drain while the case is still parking — already applied in the ERP before a
+reviewer opens the page. Refusing to hold a risky supplier because a case is
+under review would invert the gate's purpose, so the guard is deliberately
+one-directional: it can stop this process granting something, never stop it
+withholding something.
 
-Two honest limits. The `review` band is a parked case, not a live pause —
+Both directions are proven on the deployed system, by a reviewer signed in
+through IAP:
+
+- **Approval releases** — `spikes/hitl_release/evidence.json`. A case parked
+  on a genuine near-match (0.672, `match=false`) was approved and
+  `create_supplier` wrote to the live ERP.
+- **Rejection withholds** — `spikes/hitl_reject/evidence.json`, track A.
+  `create_supplier` stayed `pending` and no Supplier was ever created.
+- **Rejection does not withhold a restriction** — same evidence, track B. The
+  ERP hold was written 11m08s *before* the decision committed, both Firestore
+  server timestamps, while the three permissive commands beside it stayed
+  refused after the rejection.
+
+Track B also shows that a parked case still advances: its lifecycle walked
+`active → renewal_requested → held` with every permissive command refused
+throughout, because `park_case` persists lifecycle state and only *execution*
+is gated.
+
+Honest limits. The `review` band is a parked case, not a live pause —
 `RequestInput` is not in this graph, and a later milestone reinstates a real
-pause on this same branch. And the score is computed from screening results
-only: the Evidence agent is still a stub, so nothing here is
-evidence-grounded yet.
+pause on this same branch. `apply_hold` is the only member of
+`app.lifecycle.RESTRICTIVE`, so the restrictive claim is about one action, not
+a category. And a `blocked` case claims nothing at all, so a supplier who
+becomes sanctioned after onboarding still cannot be held — closing that means
+letting the quarantine terminal claim restrictive commands, which is a
+separate decision.
 
 **Document injection gate.** `app/injection.py` scans a document's redacted
 text for a sentence that pairs a machine-directed instruction (imperative
@@ -192,6 +217,18 @@ and is reported rather than retried blindly.
   post-deploy verification script — see
   [Deploying](#deploying-to-agent-runtime). The committed evidence is one
   five-step deployed lifecycle run with all five steps passing.
+- `spikes/hitl_reject/harness.py` — the rejection half of the approval
+  contract, in three modes (`park`, `verify`, `teardown`) because the decision
+  itself is a human in a browser and cannot be automated. Parks two review-band
+  cases: one whose supplier is absent from the ERP, so "the rejection created
+  nothing" is checkable, and one walked through to an overdue hold. Asserts
+  that the hold's completion timestamp *precedes* the approval's, which is what
+  makes "a restriction never waits for a human" a measurement rather than a
+  reading of the code. `teardown` releases the ERP hold and is deliberately
+  separate, so the evidence is captured against a genuinely held record.
+  Writes `spikes/hitl_reject/evidence.json`.
+- `spikes/hitl_release/harness.py` — the approval half, same two-phase shape.
+  Writes `spikes/hitl_release/evidence.json`.
 - `spikes/thin_vertical/verify.py` — the narrower single-event vertical
   (event → route → screen → ERP write), superseded by the lifecycle harness
   as the post-deploy check but still runnable.
