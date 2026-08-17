@@ -21,6 +21,7 @@ from app.state.commands import (
     DEAD,
     MAX_EXECUTION_ATTEMPTS,
     claim_command,
+    get_command,
     record_failure,
 )
 from app.state.firestore import CASES
@@ -130,9 +131,22 @@ def test_the_sweep_counts_a_command_that_dies_on_its_watch(db, case_id, monkeypa
     for _ in range(MAX_EXECUTION_ATTEMPTS - 1):
         record_failure(db, case_id, "create_supplier", 1, "HTTP 503")
 
-    summary = sweep_failed_commands(db)
+    # limit=1000, matching the other case-presence tests above: the db
+    # fixture is a shared database, and by the time this test runs the
+    # emulator has accumulated cases from every earlier test run in the
+    # session. Under the default MAX_CASES_PER_SWEEP cap this test's own
+    # case can sort outside the swept set — its command is never driven,
+    # commands_dead stays 0, and the test fails for reasons that have
+    # nothing to do with the code under test.
+    summary = sweep_failed_commands(db, limit=1000)
 
     assert summary["commands_dead"] >= 1
+    # The aggregate count alone is exactly what pollution can fake: some
+    # OTHER case's dead command satisfies ">= 1" even if this test's own
+    # command never ran. Reading the command back and asserting ITS status
+    # is what actually pins the behaviour this test claims to cover.
+    command = get_command(db, case_id, "create_supplier", 1)
+    assert command["status"] == DEAD
 
 
 def test_one_broken_case_does_not_abort_the_sweep(db, monkeypatch):
