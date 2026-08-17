@@ -242,3 +242,68 @@ def test_admin_sweep_reports_a_failure_as_503(client, monkeypatch):
     response = client.post("/admin/sweep")
 
     assert response.status_code == 503
+
+
+def test_dead_letter_push_records_the_event(client, case_id, db):
+    from app.state.dead_events import DEAD_EVENTS
+
+    event = _event(case_id)
+    envelope = _push(event)
+    envelope["message"]["deliveryAttempt"] = 5
+
+    response = client.post("/pubsub/dead", json=envelope)
+
+    assert response.status_code == 200
+    stored = db.collection(DEAD_EVENTS).document(event["event_id"]).get().to_dict()
+    assert stored["case_id"] == case_id
+    assert stored["delivery_attempt"] == 5
+
+
+def test_dead_letter_push_acks_even_when_the_write_fails(client, monkeypatch, case_id):
+    """The dead-letter path must never itself dead-letter."""
+    import ingress.main as main
+
+    def _boom(*a, **k):
+        raise RuntimeError("firestore unreachable")
+
+    monkeypatch.setattr(main, "record_dead_event", _boom)
+
+    response = client.post("/pubsub/dead", json=_push(_event(case_id)))
+
+    assert response.status_code == 200
+
+
+def test_dead_letter_push_acks_an_unparseable_payload(client):
+    """A malformed dead-lettered message is still acked, not rejected: it is
+    the last stop, so there is nowhere left to retry to.
+
+    Genuinely undecodable data, not merely a payload missing event_id — the
+    point is to exercise the decode `except` branch, and valid base64 holding
+    valid JSON would sail straight past it.
+    """
+    envelope = {"message": {"data": "!!!not-base64!!!", "messageId": "m-1"}}
+
+    response = client.post("/pubsub/dead", json=envelope)
+
+    assert response.status_code == 200
+
+
+def test_dead_letter_push_falls_back_to_the_message_id(client, db):
+    """An event whose body will not parse still deserves a durable record;
+    Pub/Sub's own messageId is the only identity it has left.
+
+    The messageId is generated per run rather than hardcoded: a fixed id
+    would let a stale document from an earlier test run make this pass even
+    if the write path were broken, since the shared emulator database is
+    never wiped between runs.
+    """
+    from app.state.dead_events import DEAD_EVENTS
+
+    message_id = f"m-fallback-{uuid.uuid4().hex[:12]}"
+    envelope = {"message": {"data": "!!!not-base64!!!", "messageId": message_id}}
+
+    response = client.post("/pubsub/dead", json=envelope)
+
+    assert response.status_code == 200
+    stored = db.collection(DEAD_EVENTS).document(message_id).get()
+    assert stored.exists, "a dead letter with no parseable body must still be recorded"

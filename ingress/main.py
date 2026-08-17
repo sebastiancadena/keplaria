@@ -16,20 +16,20 @@ duplicate-event redelivery.
 
 Every response is 200 unless the request itself is malformed, the engine call
 failed, or draining the outbox after a fresh claim failed: Pub/Sub retries a
-non-2xx response with backoff until the message's retention window (not
-forever) elapses, after which it is dropped — there is no dead-letter topic
-configured, so a message that keeps failing past retention is simply lost,
-not parked anywhere for later inspection. That retry-with-eventual-drop
-behaviour is exactly what we want for a malformed envelope (a structurally
-broken Pub/Sub push payload — fix the producer) or a transient engine
-failure or failed command execution (both worth retrying), and exactly what
-we don't want for an unparseable event (a well-formed envelope whose inner
-event data fails schema validation — no retry can fix that, so it is acked
-immediately instead). A persistently failing engine call is dead-lettered
-rather than dropped: the subscription carries a deadLetterPolicy with
-maxDeliveryAttempts 5, and the dead-letter topic pushes to POST /pubsub/dead
-below, which records the event in Firestore so it survives and can be
-inspected. A duplicate is always acked too, deliberately,
+non-2xx response with backoff, bounded by the keplaria-events-push
+subscription's deadLetterPolicy (maxDeliveryAttempts 5) rather than by the
+message's 7-day retention window — a message that keeps failing exhausts its
+delivery attempts and is dead-lettered long before retention would otherwise
+let it quietly expire. That retry-with-eventual-dead-letter behaviour is
+exactly what we want for a malformed envelope (a structurally broken Pub/Sub
+push payload — fix the producer) or a transient engine failure or failed
+command execution (both worth retrying), and exactly what we don't want for
+an unparseable event (a well-formed envelope whose inner event data fails
+schema validation — no retry can fix that, so it is acked immediately
+instead). The dead-letter topic pushes to POST /pubsub/dead below, which
+records the event in Firestore so it survives past what retention alone
+would have preserved and can be inspected, rather than simply vanishing. A
+duplicate is always acked too, deliberately,
 *regardless of whether draining the outbox there succeeds* — the alternative
 (503 on a failed drain) would make Pub/Sub redeliver the duplicate itself,
 recreating the redelivery storm this project already had once. This means
@@ -60,6 +60,7 @@ from app.executor.runner import execute_pending_commands
 from app.executor.sweep import sweep_failed_commands
 from app.schemas import CanonicalEvent
 from app.state.commands import DEAD
+from app.state.dead_events import record_dead_event
 from app.state.firestore import claim_event, get_client, mark_dispatched
 from ingress.engine_client import invoke_engine
 
@@ -301,3 +302,68 @@ def admin_sweep() -> dict:
             summary["case_ids"],
         )
     return summary
+
+
+@api.post("/pubsub/dead")
+def dead_letter(envelope: Any = Body(...)) -> dict:
+    """Record an event that exhausted redelivery on keplaria-events-push.
+
+    ALWAYS returns 200, including when the payload is unparseable and when
+    the Firestore write fails. This is the last stop: there is nowhere left
+    to retry to, and a non-2xx here would only make the dead-letter
+    subscription redeliver the dead letter. Everything that goes wrong is
+    logged instead.
+
+    The event is deliberately NOT re-processed. It arrived here because the
+    ingress rejected it five times; automatically feeding it back into the
+    same path is how a dead-letter queue becomes a slower retry loop.
+    """
+    message = envelope.get("message") if isinstance(envelope, dict) else None
+    if not isinstance(message, dict):
+        logger.error("dead-letter push with no message envelope; acking anyway")
+        return {"status": "acked", "recorded": False}
+
+    delivery_attempt = int(message.get("deliveryAttempt") or 0)
+    event_id = None
+    case_id = None
+    payload: dict = {}
+    try:
+        payload = json.loads(base64.b64decode(message["data"]))
+        event_id = payload.get("event_id")
+        case_id = payload.get("case_id")
+    except (ValueError, TypeError, KeyError, binascii.Error) as exc:
+        # Never log the payload itself — the data-handling contract permits
+        # case identifiers and masked values, not arbitrary event bodies.
+        logger.error(
+            "dead-lettered event is unparseable: %s: %s",
+            type(exc).__name__,
+            str(exc)[:200],
+        )
+
+    # messageId is the fallback key: an event whose body would not parse still
+    # deserves a durable record, and Pub/Sub's own id is the only identity it
+    # has left.
+    key = event_id or message.get("messageId")
+    if not key:
+        logger.error("dead-lettered event has no usable id; acking anyway")
+        return {"status": "acked", "recorded": False}
+
+    logger.error(
+        "event dead-lettered after %s deliveries: event %s case %s",
+        delivery_attempt,
+        key,
+        case_id,
+    )
+    try:
+        record_dead_event(get_client(), key, case_id, delivery_attempt, payload)
+    except Exception as exc:
+        logger.error(
+            "failed to record dead-lettered event %s: %s: %s",
+            key,
+            type(exc).__name__,
+            str(exc)[:200],
+        )
+        return {"status": "acked", "recorded": False}
+
+    return {"status": "acked", "recorded": True, "event_id": key}
+
