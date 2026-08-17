@@ -271,6 +271,46 @@ if command -v uvx >/dev/null; then
   echo "$resp" | grep -q 'llms-txt' && ok "adk-docs MCP server handshakes" || meh "adk-docs MCP probe failed (check network / mcp pin)"
 fi
 
+echo "== dead-letter and sweep =="
+DLQ_TOPIC_PATH=$(gcloud pubsub topics describe keplaria-events-dead \
+  --project=keplaria --format='value(name)' 2>/dev/null || true)
+[ -n "$DLQ_TOPIC_PATH" ] \
+  && ok "dead-letter topic keplaria-events-dead exists" \
+  || bad "dead-letter topic keplaria-events-dead missing — a stuck event is dropped at retention"
+
+DLQ_ATTEMPTS=$(gcloud pubsub subscriptions describe keplaria-events-push \
+  --project=keplaria --format='value(deadLetterPolicy.maxDeliveryAttempts)' 2>/dev/null || true)
+[ "$DLQ_ATTEMPTS" = "5" ] \
+  && ok "keplaria-events-push dead-letters after 5 deliveries" \
+  || bad "keplaria-events-push has no dead-letter policy (maxDeliveryAttempts='${DLQ_ATTEMPTS:-unset}') — stuck events expire silently"
+
+# Both bindings or dead-lettering silently does not happen. Checked separately
+# from the policy above because the policy can be set and look correct while
+# the agent lacks permission to act on it.
+PROJECT_NUMBER=$(gcloud projects describe keplaria --format='value(projectNumber)' 2>/dev/null || true)
+PUBSUB_AGENT="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com"
+gcloud pubsub topics get-iam-policy keplaria-events-dead --project=keplaria \
+  --format=json 2>/dev/null | grep -q "$PUBSUB_AGENT" \
+  && ok "pubsub service agent can publish to the dead-letter topic" \
+  || bad "pubsub service agent lacks publisher on keplaria-events-dead — dead-lettering will silently not happen"
+gcloud pubsub subscriptions get-iam-policy keplaria-events-push --project=keplaria \
+  --format=json 2>/dev/null | grep -q "$PUBSUB_AGENT" \
+  && ok "pubsub service agent can ack on keplaria-events-push" \
+  || bad "pubsub service agent lacks subscriber on keplaria-events-push — dead-lettering will silently not happen"
+
+SWEEP_STATE=$(gcloud scheduler jobs describe keplaria-command-sweep \
+  --location=us-central1 --project=keplaria --format='value(state)' 2>/dev/null || true)
+[ "$SWEEP_STATE" = "ENABLED" ] \
+  && ok "keplaria-command-sweep is ENABLED (failed commands are re-driven unattended)" \
+  || bad "keplaria-command-sweep state='${SWEEP_STATE:-missing}' — a failed command gets no second chance"
+
+# The emulator does not enforce collection-group indexes, so the sweep's unit
+# tests pass locally whether or not this exists in production.
+gcloud firestore indexes composite list --project=keplaria --format=json 2>/dev/null \
+  | grep -q '"collectionGroup": "outbox"' \
+  && ok "outbox collection-group index present (the sweep's query needs it)" \
+  || meh "no outbox collection-group index found — confirm the sweep query works against the real database, not just the emulator"
+
 echo
 printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
 [ "$fail" -eq 0 ]
