@@ -1,0 +1,227 @@
+{
+  "captured_at": "2026-08-18T20:10:55.008618+00:00",
+  "result": "PASS",
+  "what_this_is": "A single person performing by hand, against the same inputs, the work the deployed system does for one supplier across one full lifecycle cycle. The denominator for 'manual steps eliminated'.",
+  "validation": "author-timed, not practitioner-reviewed",
+  "caveat": "No procurement or compliance practitioner reviewed this step list or the timings. This is a measurement, not a validation, and no claim derived from it may be described as practitioner-validated.",
+  "manual_steps": 20,
+  "steps_timed": 20,
+  "steps_skipped": 0,
+  "manual_seconds": 663.5,
+  "wall_clock_seconds": 663.4,
+  "timed_only_steps": [
+    12,
+    15,
+    19
+  ],
+  "timed_only_note": "Certificate uploads and the renewal send were timed up to the button and not executed: both create Communication/File rows that scripts/erp.py cannot see or purge, and a File linked to a Supplier can refuse the Supplier delete.",
+  "screening_note": "Step 9 was timed against the public OpenSanctions index, not the private synthetic watchlist the system screens: that index has no browser interface (the VM has no external IP and serves a JSON API only). The task is the same, the dataset is not.",
+  "supplier_used": "Empaques Sabana Norte SAS",
+  "erp": {
+    "site": "https://andina-foods.v.frappe.cloud",
+    "erpnext": "16.32.0",
+    "frappe": "16.31.0"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "phase": "onboarding",
+      "description": "Read the certificate end to end",
+      "mirrors": "parse_case",
+      "mode": "performed",
+      "navigation": "The certificate text is in protocol.md under 'Before you start'. Expiry is 2027-01-01.",
+      "seconds": 11.5,
+      "skipped": false
+    },
+    {
+      "step": 2,
+      "phase": "onboarding",
+      "description": "Enter the supplier name",
+      "mirrors": "create_supplier",
+      "mode": "performed",
+      "navigation": "https://andina-foods.v.frappe.cloud/app/supplier/new  ->  Details tab  ->  Supplier Name = Empaques Sabana Norte SAS",
+      "seconds": 25.7,
+      "skipped": false
+    },
+    {
+      "step": 3,
+      "phase": "onboarding",
+      "description": "Choose the supplier group",
+      "mirrors": "create_supplier",
+      "mode": "performed",
+      "navigation": "Same form -> Supplier Group = Distributor (link field: type and pick)",
+      "seconds": 8.5,
+      "skipped": false
+    },
+    {
+      "step": 4,
+      "phase": "onboarding",
+      "description": "Choose the supplier type",
+      "mirrors": "create_supplier",
+      "mode": "performed",
+      "navigation": "Same form -> Supplier Type = Company (dropdown: Company/Individual/Partnership)",
+      "seconds": 6.5,
+      "skipped": false
+    },
+    {
+      "step": 5,
+      "phase": "onboarding",
+      "description": "Enter the country",
+      "mirrors": "create_supplier",
+      "mode": "performed",
+      "navigation": "Same form -> Country = Colombia (link field)",
+      "seconds": 8.2,
+      "skipped": false
+    },
+    {
+      "step": 6,
+      "phase": "onboarding",
+      "description": "Create a primary contact and set the email",
+      "mirrors": "create_supplier",
+      "mode": "performed",
+      "navigation": "Ctrl+S FIRST -- the contact area is hidden until the supplier exists. Then Address & Contact tab -> Contacts -> '+ New Contact' -> First Name 'Sabana Norte', Email 'empaques-sabana-norte-sas@example.com' -> in the contact's Links table add Link Document Type 'Supplier', Link Name 'Empaques Sabana Norte SAS' -> save. Back on the supplier: Primary Address and Contact -> Primary Contact -> pick it -> Ctrl+S. The Links row is what makes the contact visible to the field; without it the dropdown is empty. Email ID is FETCHED and cannot be typed into.",
+      "seconds": 97.0,
+      "skipped": false
+    },
+    {
+      "step": 7,
+      "phase": "onboarding",
+      "description": "Save the supplier record",
+      "mirrors": "create_supplier",
+      "mode": "performed",
+      "navigation": "Ctrl+S on the supplier, with the contact now linked.",
+      "seconds": 7.5,
+      "skipped": false
+    },
+    {
+      "step": 8,
+      "phase": "onboarding",
+      "description": "Find and copy the certificate expiry date",
+      "mirrors": "validate_evidence",
+      "mode": "performed",
+      "navigation": "From the certificate text: 2027-01-01",
+      "seconds": 14.4,
+      "skipped": false
+    },
+    {
+      "step": 9,
+      "phase": "onboarding",
+      "description": "Search the supplier name in a sanctions tool",
+      "mirrors": "screen_supplier",
+      "mode": "performed",
+      "navigation": "https://www.opensanctions.org/search/ -> search 'Empaques Sabana Norte SAS'. NOTE: the system screens a private synthetic index with no browser UI, so this step is timed against the PUBLIC index. Same task, different dataset.",
+      "seconds": 26.1,
+      "skipped": false
+    },
+    {
+      "step": 10,
+      "phase": "onboarding",
+      "description": "Read the candidates and judge each near-match",
+      "mirrors": "compliance_agent",
+      "mode": "performed",
+      "navigation": "Decide for each result whether it plausibly refers to your supplier. Record the real time even if there are no hits.",
+      "seconds": 29.2,
+      "skipped": false
+    },
+    {
+      "step": 11,
+      "phase": "onboarding",
+      "description": "Record the screening decision durably",
+      "mirrors": "assess_risk",
+      "mode": "performed",
+      "navigation": "On the Supplier -> bottom timeline -> Comment -> write the decision and why -> save.",
+      "seconds": 80.8,
+      "skipped": false
+    },
+    {
+      "step": 12,
+      "phase": "onboarding",
+      "description": "Attach the certificate to the supplier",
+      "mirrors": "attach_evidence",
+      "mode": "timed_only",
+      "navigation": "Supplier right sidebar -> Attachments -> Add file -> reach the file dialog -> CANCEL.",
+      "seconds": 113.7,
+      "skipped": false
+    },
+    {
+      "step": 13,
+      "phase": "onboarding",
+      "description": "Diarise the renewal date",
+      "mirrors": "lifecycle.decide",
+      "mode": "performed",
+      "navigation": "https://andina-foods.v.frappe.cloud/app/todo/new -> Due Date 2027-01-01, description naming the supplier -> save.",
+      "seconds": 72.6,
+      "skipped": false
+    },
+    {
+      "step": 14,
+      "phase": "renewal",
+      "description": "Notice the renewal is due and find the supplier",
+      "mirrors": "lifecycle.decide",
+      "mode": "performed",
+      "navigation": "https://andina-foods.v.frappe.cloud/app/supplier -> find and open 'Empaques Sabana Norte SAS'",
+      "seconds": 16.7,
+      "skipped": false
+    },
+    {
+      "step": 15,
+      "phase": "renewal",
+      "description": "Compose the renewal request email",
+      "mirrors": "request_renewal",
+      "mode": "timed_only",
+      "navigation": "Supplier -> bottom timeline -> New Email -> fill recipient, subject, message asking for the renewed certificate -> then DISCARD. Do not send.",
+      "seconds": 32.8,
+      "skipped": false
+    },
+    {
+      "step": 16,
+      "phase": "renewal",
+      "description": "Notice the evidence is overdue",
+      "mirrors": "lifecycle.decide",
+      "mode": "performed",
+      "navigation": "Check the ToDo against the expiry date; nothing has arrived.",
+      "seconds": 13.0,
+      "skipped": false
+    },
+    {
+      "step": 17,
+      "phase": "renewal",
+      "description": "Put the supplier on hold and choose the hold type",
+      "mirrors": "apply_hold",
+      "mode": "performed",
+      "navigation": "Supplier -> Settings tab -> 'Block Supplier' section -> tick 'Block Supplier' (this is the on_hold field), Hold Type = All, leave Release Date empty -> Ctrl+S.",
+      "seconds": 45.8,
+      "skipped": false
+    },
+    {
+      "step": 18,
+      "phase": "renewal",
+      "description": "Read the replacement certificate and find the new expiry",
+      "mirrors": "validate_evidence",
+      "mode": "performed",
+      "navigation": "Second certificate block in protocol.md. New expiry is 2028-01-01.",
+      "seconds": 10.9,
+      "skipped": false
+    },
+    {
+      "step": 19,
+      "phase": "renewal",
+      "description": "Attach the replacement certificate",
+      "mirrors": "attach_evidence",
+      "mode": "timed_only",
+      "navigation": "Sidebar -> Attachments -> Add file -> reach the dialog -> CANCEL.",
+      "seconds": 33.4,
+      "skipped": false
+    },
+    {
+      "step": 20,
+      "phase": "renewal",
+      "description": "Release the hold",
+      "mirrors": "clear_hold",
+      "mode": "performed",
+      "navigation": "Supplier -> Settings tab -> untick 'Block Supplier' -> Ctrl+S.",
+      "seconds": 9.2,
+      "skipped": false
+    }
+  ]
+}
