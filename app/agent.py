@@ -118,9 +118,12 @@ coordinator = LlmAgent(
     output_key="routing_decision",
     # Routing must be reproducible run to run; this is a control-flow decision,
     # not a creative one.
-    # The thinking budget is deliberately generous here: routing is a small
-    # share of the run's machine time, and the failure mode that matters at
-    # this node is a missed route, not a slow one.
+    # A budget is named here for consistency with the other two agents, but
+    # see the note on the extractor below: on this model any explicit budget
+    # reads as "do not reason at length", so this is not the generous setting
+    # the number suggests. Routing is the node whose failure mode is a missed
+    # route rather than a slow one, so it is the first place to restore
+    # reasoning if a routing flake ever reappears.
     generate_content_config=types.GenerateContentConfig(
         temperature=0.0,
         thinking_config=types.ThinkingConfig(thinking_budget=512),
@@ -159,8 +162,17 @@ evidence_agent = LlmAgent(
     output_key="evidence_result",
     # Extraction is where the run's machine time actually goes. Left unpinned,
     # reasoning length varies by roughly half again for byte-identical input
-    # and sets the whole beat's latency; this caps the tail near the observed
-    # median. tests/unit/test_agent_generation_config.py records the numbers.
+    # and sets the whole beat's latency.
+    #
+    # Measured on the deployed engine 2026-08-18: naming ANY budget here does
+    # not truncate the model's usual reasoning at that number -- it stops the
+    # model reasoning at length at all. The limit is reported back as a
+    # ceiling (gen_ai.usage.experimental.reasoning_tokens_limit) that the
+    # model then leaves nearly empty: this agent went from ~1500 reasoning
+    # tokens per call to effectively none, and its calls from 8-13s to 2-3s.
+    # So read the number as "reasoning is off", not "reasoning is capped at
+    # 1024" -- raising it will not buy back a middle setting.
+    # tests/unit/test_agent_generation_config.py records what this cost.
     generate_content_config=types.GenerateContentConfig(
         temperature=0.0,
         thinking_config=types.ThinkingConfig(thinking_budget=1024),
@@ -198,9 +210,8 @@ compliance_agent = LlmAgent(
     ),
     output_schema=ComplianceAssessment,
     output_key="compliance_assessment",
-    # Interpreting candidates is the second-largest reasoning cost in the run;
-    # capped just above its observed median, for the same reason as the
-    # extractor above.
+    # Interpreting candidates was the second-largest reasoning cost in the
+    # run, and is subject to the same measured caveat as the extractor above.
     generate_content_config=types.GenerateContentConfig(
         temperature=0.0,
         thinking_config=types.ThinkingConfig(thinking_budget=768),

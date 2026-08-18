@@ -10,19 +10,26 @@ and 85.4s with no code change between them, and the slowest single call in the
 window landed on the *faster* run -- the distribution has a heavy tail, and an
 unlucky draw on camera would approach the budget ceiling.
 
-The budgets below cap that tail. They are set from observed medians rather than
-minimised:
+These numbers were chosen as caps near each agent's observed median, on the
+assumption that a budget truncates the model's usual reasoning. **Measuring the
+deployed engine on 2026-08-18 showed that is not what happens.** The limit
+comes back in the trace as a ceiling
+(`gen_ai.usage.experimental.reasoning_tokens_limit` = exactly these values)
+that the model then leaves nearly empty: the extractor fell from ~1500
+reasoning tokens per call to effectively none, and the whole timed sequence
+from 85.4s to 56.9s -- far more than capping a tail could explain. So naming
+any budget here reads as "do not reason at length", and the specific value
+mostly does not matter. Raising one will not buy back a middle setting.
 
-  - coordinator (512): recent draws are 171-414 tokens, so this rarely binds.
-    Deliberately generous -- the known failure mode here is a routing miss
-    (an empty route failing closed to quarantine, seen 2026-08-15), and the
-    coordinator is only ~3s of the run. Cutting time here buys little and
-    risks the one thing that must not flake on camera.
-  - evidence (1024) and compliance (768): where the time actually is. Both sit
-    near their observed medians, so a typical call is unaffected while the
-    long tail is truncated.
+What that bought, and what it cost, both measured rather than assumed: 8/8
+graded domain cases before and after, and a full deployed run that parked a
+near-match for review, released it on approval, and drove the renewal, hold
+and release cycle with every band correct. What it did not buy is a margin
+anyone has measured on cases harder than those. The coordinator is the first
+place to restore reasoning if a routing flake reappears, because a missed
+route is the failure mode that matters there and it costs the least time.
 
-A budget of 0 would disable thinking entirely and -1 restores the automatic
+A budget of 0 would disable thinking explicitly and -1 restores the automatic
 behaviour this module exists to prevent; both are rejected below.
 """
 
