@@ -118,7 +118,13 @@ coordinator = LlmAgent(
     output_key="routing_decision",
     # Routing must be reproducible run to run; this is a control-flow decision,
     # not a creative one.
-    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    # The thinking budget is deliberately generous here: routing is a small
+    # share of the run's machine time, and the failure mode that matters at
+    # this node is a missed route, not a slow one.
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.0,
+        thinking_config=types.ThinkingConfig(thinking_budget=512),
+    ),
     disallow_transfer_to_parent=True,
     disallow_transfer_to_peers=True,
 )
@@ -151,7 +157,14 @@ evidence_agent = LlmAgent(
     ),
     output_schema=EvidenceResult,
     output_key="evidence_result",
-    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    # Extraction is where the run's machine time actually goes. Left unpinned,
+    # reasoning length varies by roughly half again for byte-identical input
+    # and sets the whole beat's latency; this caps the tail near the observed
+    # median. tests/unit/test_agent_generation_config.py records the numbers.
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.0,
+        thinking_config=types.ThinkingConfig(thinking_budget=1024),
+    ),
     disallow_transfer_to_parent=True,
     disallow_transfer_to_peers=True,
 )
@@ -185,7 +198,13 @@ compliance_agent = LlmAgent(
     ),
     output_schema=ComplianceAssessment,
     output_key="compliance_assessment",
-    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    # Interpreting candidates is the second-largest reasoning cost in the run;
+    # capped just above its observed median, for the same reason as the
+    # extractor above.
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.0,
+        thinking_config=types.ThinkingConfig(thinking_budget=768),
+    ),
     disallow_transfer_to_parent=True,
     disallow_transfer_to_peers=True,
 )
