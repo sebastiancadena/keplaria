@@ -27,7 +27,7 @@ command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 \
 
 echo "== ERP maintenance tooling =="
 [ -x scripts/erp.py ] \
-  && ok "scripts/erp.py present (suppliers | cases | audit | purge --yes)" \
+  && ok "scripts/erp.py present (suppliers | cases | links | audit | purge --yes)" \
   || meh "scripts/erp.py missing or not executable — ERP cleanup falls back to ad-hoc one-offs"
 # The pre-recording question this answers: is a watchlist entity on record?
 # An exact string search does NOT answer it — the ERP once held
