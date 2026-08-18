@@ -122,14 +122,33 @@ looks like one field and is not. **Email ID on the Supplier form is a
 fetched, non-editable field** — it displays whatever the linked primary
 contact has, so you cannot type into it.
 
-- Save the supplier first: `Ctrl+S`.
-- Go to the **Address & Contact** tab.
-- Find the **Primary Address and Contact** section → **Supplier Primary
-  Contact** field.
-- Type `Sabana Norte` — the dropdown offers **Create a new Contact**. Click it.
-- In the dialog, fill **First Name** `Sabana Norte` and **Email Address**
-  `empaques-sabana-norte-sas@example.com`, then save the dialog.
+- **Save the supplier first: `Ctrl+S`.** Not optional. While the record is
+  unsaved the form hides its whole contact area, and the Primary Contact
+  field filters on the supplier's name — which does not exist yet.
+- Go to the **Address & Contact** tab. The **Contacts** area is now visible;
+  click **+ New Contact** there. (Equivalent: open
+  <https://andina-foods.v.frappe.cloud/app/contact/new> directly.)
+- Fill **First Name** `Sabana Norte` and **Email Address**
+  `empaques-sabana-norte-sas@example.com`.
+- **In the contact's `Links` table, add a row: Link Document Type =
+  `Supplier`, Link Name = `Empaques Sabana Norte SAS`.** If you arrived via
+  **+ New Contact** the row may already be filled in — check it, and add it
+  if it is empty. Save the contact.
+- Back on the supplier: **Address & Contact** tab → **Primary Address and
+  Contact** section → **Primary Contact** field → pick `Sabana Norte`.
 - `Ctrl+S` on the supplier. Email ID now shows the address.
+
+> **Why the link row, and why this is not optional.** The Primary Contact
+> field does not list every contact. It calls
+> `erpnext.buying.doctype.supplier.supplier.get_supplier_primary` filtered by
+> `supplier: doc.name`, which returns only contacts carrying a Dynamic Link
+> row to *this* supplier. A contact created from the field's own
+> **Create a new Contact** quick dialog is saved with an empty `links` table,
+> so it is invisible to the field that created it — the dropdown comes back
+> empty and the contact looks like it was never saved. **Corrected
+> 2026-08-18** after that failure, by executing the field's query against the
+> live site rather than reading the form definition, which shows the field
+> but not the client-side filter applied to it.
 
 **7. Save the supplier record.** `Ctrl+S`. (If you already saved during step
 6, re-save after the contact is linked — that is the save being timed.)
@@ -214,6 +233,12 @@ so the ERP stays clean for recording:
 The comment from step 11 goes with the Supplier. Nothing else was created,
 because steps 12, 15 and 19 stopped before their side effect — which is the
 whole reason they stop there.
+
+**If an earlier attempt failed part-way**, check
+<https://andina-foods.v.frappe.cloud/app/contact> for a leftover `Sabana
+Norte` contact (Frappe suffixes repeats: `Sabana Norte-1`, `-2`) and delete it
+before re-running. An orphan contact is harmless to the ERP but makes the next
+run's naming confusing.
 
 ## Then
 

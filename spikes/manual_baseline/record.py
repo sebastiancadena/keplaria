@@ -54,6 +54,15 @@ CONTACT_EMAIL = "empaques-sabana-norte-sas@example.com"
 # supplier_primary_contact) and cannot be typed into, and the hold checkbox is
 # labelled "Block Supplier", not "On Hold".
 #
+# A third was wrong until 2026-08-18, and reading the DocType could not have
+# caught it: the Primary Contact link field carries a client-side set_query
+# (`...supplier.get_supplier_primary`, filtered by `supplier: doc.name`), so it
+# lists ONLY contacts holding a Dynamic Link row to that supplier. The field's
+# own "Create a new Contact" dialog saves a contact with an empty `links`
+# table, which the field then cannot see. Step 6 adds the link row explicitly.
+# Field definitions describe fields; they do not describe the queries bound to
+# them. Verify navigation by executing it.
+#
 # (phase, description, mirrors, mode, hint)
 #
 # `mirrors` names the system action or node that removes this step. It is the
@@ -72,10 +81,13 @@ STEPS: list[tuple[str, str, str, str, str]] = [
     ("onboarding", "Enter the country", "create_supplier", PERFORMED,
      "Same form -> Country = Colombia (link field)"),
     ("onboarding", "Create a primary contact and set the email", "create_supplier", PERFORMED,
-     "Ctrl+S first. Then Address & Contact tab -> Primary Address and Contact -> "
-     "Supplier Primary Contact -> type 'Sabana Norte' -> 'Create a new Contact' -> "
-     f"First Name 'Sabana Norte', Email '{CONTACT_EMAIL}' -> save dialog. "
-     "Email ID is FETCHED from the contact and cannot be typed into directly."),
+     "Ctrl+S FIRST -- the contact area is hidden until the supplier exists. Then "
+     "Address & Contact tab -> Contacts -> '+ New Contact' -> First Name "
+     f"'Sabana Norte', Email '{CONTACT_EMAIL}' -> in the contact's Links table add "
+     f"Link Document Type 'Supplier', Link Name '{SUPPLIER}' -> save. Back on the "
+     "supplier: Primary Address and Contact -> Primary Contact -> pick it -> Ctrl+S. "
+     "The Links row is what makes the contact visible to the field; without it the "
+     "dropdown is empty. Email ID is FETCHED and cannot be typed into."),
     ("onboarding", "Save the supplier record", "create_supplier", PERFORMED,
      "Ctrl+S on the supplier, with the contact now linked."),
     ("onboarding", "Find and copy the certificate expiry date", "validate_evidence", PERFORMED,
