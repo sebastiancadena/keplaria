@@ -173,6 +173,21 @@ and is reported rather than retried blindly.
   rate-limit error becomes a self-sustaining redelivery storm: the ingress
   503s, Pub/Sub redelivers near-instantly, the engine takes another hit,
   guaranteed 429, repeat.
+- **A `thinking_budget` on the agents is an off switch, not a dial.** The three
+  agents in `app/agent.py` pin one. Naming any value does not truncate the
+  model's usual reasoning at that number: the value comes back in the trace as
+  `gen_ai.usage.experimental.reasoning_tokens_limit`, a ceiling the model then
+  leaves nearly empty. Measured 2026-08-18 on the deployed engine, the extractor
+  went from ~1500 reasoning tokens per call to effectively none and the timed
+  sequence from 85.4s to 56.9s. Read the numbers as "reasoning off"; raising one
+  will not buy a middle setting. Validated by 8/8 graded domain cases and a full
+  deployed run, and pinned by `tests/unit/test_agent_generation_config.py`.
+- **A yente VM that is RUNNING is not yet SERVING, and the difference costs
+  30s per screened beat.** `screen_supplier` waits `timeout=30` before giving
+  up and recording `SCREENING_UNAVAILABLE`, so a sequence started while the
+  index is still loading pays that on every screened event. `scripts/doctor.sh`
+  probes the service over IAP rather than trusting the VM's run state; run it
+  after starting the VM and before any timed or recorded run.
 - **`GOOGLE_CLOUD_LOCATION` must be `global`, not `us-central1`** —
   `gemini-3.6-flash` 404s at the regional endpoint. This is documented, not
   incidental: the [official model card](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-6-flash)
@@ -192,7 +207,9 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 54 read-only checks covering toolchain, auth,
+- `scripts/doctor.sh` — 56 read-only checks (one fewer when the yente VM is
+  stopped, since the serving probe only runs against a running VM) covering
+  toolchain, auth,
   provisioned infra, the event-flow wiring (topic, push subscription
   OIDC, ingress auth, concurrency/maxScale, retry policy), the console and
   review services, and the failure-handling infrastructure (dead-letter
