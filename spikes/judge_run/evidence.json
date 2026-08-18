@@ -1,28 +1,28 @@
 {
-  "captured_at": "2026-08-17T13:20:54.597348+00:00",
+  "captured_at": "2026-08-18T20:30:40.794611+00:00",
   "result": "PASS",
   "what_this_is": "One full deployed rehearsal of the live judge run: a case parked for a near-match and released by a human approval, then the four-beat lifecycle sequence. Machine time only -- the human approval is timed but excluded from the budget total.",
   "case_ids": {
-    "hitl": "JR-A-4A74AE",
-    "lifecycle": "JR-B-EDD373"
+    "hitl": "JR-A-1C1535",
+    "lifecycle": "JR-B-D64DE7"
   },
   "suppliers": {
     "hitl": "Andes Verde Import Export SAS",
     "lifecycle": "Distribuidora Llanos Azules SAS"
   },
   "machine_seconds": {
-    "hitl_track": 22.4,
-    "lifecycle_track": 52.4,
-    "total": 74.8
+    "hitl_track": 31.4,
+    "lifecycle_track": 54.0,
+    "total": 85.4
   },
-  "human_seconds": 234.3,
+  "human_seconds": 34.8,
   "budget_seconds": 130,
   "within_budget": true,
   "steps": [
     {
       "track": "A",
       "beat": "event -> parked for review",
-      "seconds": 22.2,
+      "seconds": 31.0,
       "ok": true,
       "phase": "awaiting_approval",
       "band": "review",
@@ -42,9 +42,9 @@
     {
       "track": "A",
       "beat": "human approval -> ERP write",
-      "seconds": 0.2,
+      "seconds": 0.4,
       "ok": true,
-      "human_seconds": 234.3,
+      "human_seconds": 34.8,
       "decision": "approved",
       "actor": "sebastiancadena@gmail.com",
       "executed": [
@@ -55,7 +55,7 @@
     {
       "track": "B",
       "beat": "1. new_supplier_packet",
-      "seconds": 23.5,
+      "seconds": 25.6,
       "ok": true,
       "expected": {
         "state": "active",
@@ -72,7 +72,7 @@
     {
       "track": "B",
       "beat": "2. renewal_due",
-      "seconds": 8.3,
+      "seconds": 4.1,
       "ok": true,
       "expected": {
         "state": "active",
@@ -89,7 +89,7 @@
     {
       "track": "B",
       "beat": "3. renewal_due",
-      "seconds": 4.1,
+      "seconds": 4.0,
       "ok": true,
       "expected": {
         "state": "renewal_requested"
@@ -105,7 +105,7 @@
     {
       "track": "B",
       "beat": "4. evidence_overdue",
-      "seconds": 4.0,
+      "seconds": 3.6,
       "ok": true,
       "expected": {
         "state": "held"
@@ -121,7 +121,7 @@
     {
       "track": "B",
       "beat": "5. certificate_received",
-      "seconds": 12.4,
+      "seconds": 16.7,
       "ok": true,
       "expected": {
         "state": "active",
@@ -141,45 +141,65 @@
       "seconds": 0.0,
       "ok": true,
       "commands": {
-        "JR-B-EDD373:apply_hold:c1": {
+        "JR-B-D64DE7:apply_hold:c1": {
           "status": "done",
           "cycle": 1,
           "action": "apply_hold",
           "external_id": "Distribuidora Llanos Azules SAS"
         },
-        "JR-B-EDD373:attach_evidence:c1": {
+        "JR-B-D64DE7:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "action": "attach_evidence",
           "external_id": "9161a08a96"
         },
-        "JR-B-EDD373:attach_evidence:c2": {
+        "JR-B-D64DE7:attach_evidence:c2": {
           "status": "done",
           "cycle": 2,
           "action": "attach_evidence",
           "external_id": "fc302b6f7d"
         },
-        "JR-B-EDD373:clear_hold:c2": {
+        "JR-B-D64DE7:clear_hold:c2": {
           "status": "done",
           "cycle": 2,
           "action": "clear_hold",
           "external_id": "Distribuidora Llanos Azules SAS"
         },
-        "JR-B-EDD373:create_supplier:c1": {
+        "JR-B-D64DE7:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "action": "create_supplier",
           "external_id": "Distribuidora Llanos Azules SAS"
         },
-        "JR-B-EDD373:request_renewal:c1": {
+        "JR-B-D64DE7:request_renewal:c1": {
           "status": "done",
           "cycle": 1,
           "action": "request_renewal",
-          "external_id": "1tl98sivcg"
+          "external_id": "03b77nsbaa"
         }
-      },
-      "ledger_note": "Re-read after the run. The original read was taken the instant the case settled and caught clear_hold still PENDING: settle() waits on the case phase, which the graph writes inside the engine, while the ingress drains the outbox after the engine call returns. clear_hold was already done seconds later. The harness now waits for the drain (drained_outbox); this run's ledger below is the corrected read.",
-      "ledger_reread_at": "2026-08-17T13:27:52.493232+00:00"
+      }
     }
-  ]
+  ],
+  "scoreboard": {
+    "policy_required_interventions": 1,
+    "workflow_steps_completed": 6,
+    "workflow_steps_total": 6,
+    "manual_steps_eliminated": 19,
+    "baseline_validation": "author-timed, not practitioner-reviewed",
+    "commands_retried_then_succeeded": 0,
+    "duplicate_writes_after_retry": 0,
+    "fields_without_rekeying": 22,
+    "simulated_business_days": 380,
+    "enforced_hold_days": 5,
+    "automation_seconds": 85.4,
+    "human_seconds": 34.8,
+    "contract_suite": {
+      "passed": 386,
+      "failed": 0,
+      "deselected": 15,
+      "denominator": 386,
+      "summary_line": "386 passed, 15 deselected, 6 warnings in 249.94s (0:04:09)",
+      "note": "re-executed by this harness, not quoted from a previous run"
+    }
+  }
 }
