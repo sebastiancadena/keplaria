@@ -101,7 +101,25 @@ gcloud compute networks describe keplaria-vpc --project=keplaria >/dev/null 2>&1
 yente_status=$(gcloud compute instances list --filter=name=keplaria-yente \
   --format='value(status)' --project=keplaria 2>/dev/null)
 case "$yente_status" in
-  RUNNING)    ok "keplaria-yente VM RUNNING" ;;
+  RUNNING)
+    ok "keplaria-yente VM RUNNING"
+    # RUNNING is not SERVING. The VM reports RUNNING long before yente has
+    # loaded its index, and the graph's screening call (app/nodes.py) waits
+    # 30s before giving up and recording SCREENING_UNAVAILABLE. A sequence
+    # started inside that window pays the 30s on every screened beat, which is
+    # enough on its own to blow a timed run. Probe the service, over IAP --
+    # never the serial console, which reports a booted VM as a working one.
+    yente_catalog=$(timeout 90 gcloud compute ssh keplaria-yente --zone=us-central1-c \
+      --tunnel-through-iap --project=keplaria --quiet --command \
+      'curl -sf -m 5 http://127.0.0.1:8000/catalog' 2>/dev/null)
+    if printf '%s' "$yente_catalog" | grep -q 'keplaria_synthetic'; then
+      ok "yente SERVING, keplaria_synthetic indexed"
+    elif [ -n "$yente_catalog" ]; then
+      meh "yente answers but keplaria_synthetic is absent from /catalog — screening would return nothing rather than fail"
+    else
+      meh "keplaria-yente RUNNING but not answering on 8000 (index still loading?) — every screened beat would wait 30s and then record SCREENING_UNAVAILABLE"
+    fi
+    ;;
   TERMINATED) meh "keplaria-yente VM TERMINATED — nightly stop fired, no start schedule exists; start it (expect us-central1-c stockout retries)" ;;
   "")         meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)" ;;
   *)          meh "keplaria-yente VM in state $yente_status" ;;
