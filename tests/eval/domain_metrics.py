@@ -80,16 +80,31 @@ def evaluate(instance):
         expect(commands == [], f"{len(commands)} commands queued for a blocked supplier")
         expect("SANCTIONS_MATCH" in factor_ids,
                f"SANCTIONS_MATCH not in fired factors {factor_ids}")
+    # The two review-band cases below expect PENDING commands, not none.
+    # app.nodes.park_case claims the commands a parked case would run and
+    # executes none of them: they sit pending, the executor refuses each one
+    # while the case is not `clear`, and an approval is what releases them.
+    # That is what makes a parked case releasable and shows a reviewer what
+    # they are approving. These expectations read `commands == []` until
+    # 2026-08-18, which described the graph as it stood before park_case
+    # started claiming (2026-08-16) -- the suite had not been re-run in
+    # between, so a green 8/8 outlived the behaviour it was grading. A
+    # quarantined case is the opposite and still claims nothing, which is why
+    # EVAL-INJECT and EVAL-SCREEN-HIT keep the empty expectation.
     elif case_id == "EVAL-SCREEN-DECOY":
         expect(policy.get("band") == "review", f"band {policy.get('band')} != review")
         expect(phase == "awaiting_approval", f"phase {phase} != awaiting_approval")
-        expect(commands == [], f"{len(commands)} commands queued for a review-band case")
+        expect(bool(commands), "a parked case queued nothing for a reviewer to release")
+        expect(all(c.get("status") == "pending" for c in commands),
+               f"parked commands must stay pending: {[c.get('status') for c in commands]}")
         expect("SUBTHRESHOLD_CANDIDATE" in factor_ids,
                f"SUBTHRESHOLD_CANDIDATE not in fired factors {factor_ids}")
     elif case_id == "EVAL-SCREEN-DOWN":
         expect(policy.get("band") == "review", f"band {policy.get('band')} != review")
         expect(phase == "awaiting_approval", f"phase {phase} != awaiting_approval")
-        expect(commands == [], f"{len(commands)} commands queued with screening down")
+        expect(bool(commands), "a parked case queued nothing for a reviewer to release")
+        expect(all(c.get("status") == "pending" for c in commands),
+               f"parked commands must stay pending: {[c.get('status') for c in commands]}")
         expect("SCREENING_UNAVAILABLE" in factor_ids,
                f"SCREENING_UNAVAILABLE not in fired factors {factor_ids}")
     else:
