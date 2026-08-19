@@ -1,132 +1,170 @@
 {
-  "criteria": {
-    "psci_reaches_yente": true,
-    "paused_with_request_input": true,
-    "resumed_after_pause": true,
-    "events_persisted_in_sessions": true
-  },
-  "resource": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
-  "session_id": "983294829268041728",
-  "screening": {
-    "endpoint": "http://10.10.0.2:8000",
-    "supplier": "Comercializadora Andes Verde SAS",
-    "reachable": true,
-    "candidates": [
-      {
-        "id": "syn-co-001",
-        "caption": "Comercializadora Andes Verde S.A.S.",
-        "score": 1.0,
-        "match": true,
-        "topics": [
-          "sanction"
-        ]
-      },
-      {
-        "id": "syn-co-008",
-        "caption": "Andes Verde Logistica S.A.S.",
-        "score": 0.5263157894736842,
-        "match": false,
-        "topics": [
-          "sanction.linked"
-        ]
-      },
-      {
-        "id": "syn-co-006",
-        "caption": "Frigorificos Cordillera Central S.A.S.",
-        "score": 0.1923076923076923,
-        "match": false,
-        "topics": [
-          "debarment"
-        ]
-      },
-      {
-        "id": "syn-co-002",
-        "caption": "Transportes Maritimos Delta Sur Ltda",
-        "score": 0.14358974358974355,
-        "match": false,
-        "topics": [
-          "sanction"
-        ]
-      },
-      {
-        "id": "syn-co-004",
-        "caption": "Empaques Norte\u00f1os Bahia Blanca S.R.L.",
-        "score": 0.14358974358974355,
-        "match": false,
-        "topics": [
-          "export.control"
-        ]
-      }
-    ],
-    "flagged": [
-      "syn-co-001"
+ "criteria": {
+  "psci_reaches_yente": true,
+  "paused_with_request_input": true,
+  "resumed_after_pause": true,
+  "events_persisted_in_sessions": true
+ },
+ "resource": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
+ "session_id": "983294829268041728",
+ "screening": {
+  "endpoint": "http://10.10.0.2:8000",
+  "supplier": "Comercializadora Andes Verde SAS",
+  "reachable": true,
+  "candidates": [
+   {
+    "id": "syn-co-001",
+    "caption": "Comercializadora Andes Verde S.A.S.",
+    "score": 1.0,
+    "match": true,
+    "topics": [
+     "sanction"
     ]
+   },
+   {
+    "id": "syn-co-008",
+    "caption": "Andes Verde Logistica S.A.S.",
+    "score": 0.5263157894736842,
+    "match": false,
+    "topics": [
+     "sanction.linked"
+    ]
+   },
+   {
+    "id": "syn-co-006",
+    "caption": "Frigorificos Cordillera Central S.A.S.",
+    "score": 0.1923076923076923,
+    "match": false,
+    "topics": [
+     "debarment"
+    ]
+   },
+   {
+    "id": "syn-co-002",
+    "caption": "Transportes Maritimos Delta Sur Ltda",
+    "score": 0.14358974358974355,
+    "match": false,
+    "topics": [
+     "sanction"
+    ]
+   },
+   {
+    "id": "syn-co-004",
+    "caption": "Empaques Norte\u00f1os Bahia Blanca S.R.L.",
+    "score": 0.14358974358974355,
+    "match": false,
+    "topics": [
+     "export.control"
+    ]
+   }
+  ],
+  "flagged": [
+   "syn-co-001"
+  ]
+ },
+ "interrupt_id": "c113ef7e-73ef-4d12-84c7-3b5f01fa58ae",
+ "final_output": {
+  "status": "approved",
+  "case": {
+   "case_id": "RUNTIME-SPIKE-001",
+   "event_type": "new_supplier_packet",
+   "supplier": "Comercializadora Andes Verde SAS",
+   "amount": 4200
   },
-  "interrupt_id": "c113ef7e-73ef-4d12-84c7-3b5f01fa58ae",
-  "final_output": {
-    "status": "approved",
-    "case": {
-      "case_id": "RUNTIME-SPIKE-001",
-      "event_type": "new_supplier_packet",
-      "supplier": "Comercializadora Andes Verde SAS",
-      "amount": 4200
+  "screening": {
+   "endpoint": "http://10.10.0.2:8000",
+   "supplier": "Comercializadora Andes Verde SAS",
+   "reachable": true,
+   "candidates": [
+    {
+     "id": "syn-co-001",
+     "caption": "Comercializadora Andes Verde S.A.S.",
+     "score": 1,
+     "match": true,
+     "topics": [
+      "sanction"
+     ]
     },
-    "screening": {
-      "endpoint": "http://10.10.0.2:8000",
-      "supplier": "Comercializadora Andes Verde SAS",
-      "reachable": true,
-      "candidates": [
-        {
-          "id": "syn-co-001",
-          "caption": "Comercializadora Andes Verde S.A.S.",
-          "score": 1,
-          "match": true,
-          "topics": [
-            "sanction"
-          ]
-        },
-        {
-          "id": "syn-co-008",
-          "caption": "Andes Verde Logistica S.A.S.",
-          "score": 0.5263157894736842,
-          "match": false,
-          "topics": [
-            "sanction.linked"
-          ]
-        },
-        {
-          "id": "syn-co-006",
-          "caption": "Frigorificos Cordillera Central S.A.S.",
-          "score": 0.1923076923076923,
-          "match": false,
-          "topics": [
-            "debarment"
-          ]
-        },
-        {
-          "id": "syn-co-002",
-          "caption": "Transportes Maritimos Delta Sur Ltda",
-          "score": 0.14358974358974355,
-          "match": false,
-          "topics": [
-            "sanction"
-          ]
-        },
-        {
-          "id": "syn-co-004",
-          "caption": "Empaques Norte\u00f1os Bahia Blanca S.R.L.",
-          "score": 0.14358974358974355,
-          "match": false,
-          "topics": [
-            "export.control"
-          ]
-        }
-      ],
-      "flagged": [
-        "syn-co-001"
-      ]
+    {
+     "id": "syn-co-008",
+     "caption": "Andes Verde Logistica S.A.S.",
+     "score": 0.5263157894736842,
+     "match": false,
+     "topics": [
+      "sanction.linked"
+     ]
+    },
+    {
+     "id": "syn-co-006",
+     "caption": "Frigorificos Cordillera Central S.A.S.",
+     "score": 0.1923076923076923,
+     "match": false,
+     "topics": [
+      "debarment"
+     ]
+    },
+    {
+     "id": "syn-co-002",
+     "caption": "Transportes Maritimos Delta Sur Ltda",
+     "score": 0.14358974358974355,
+     "match": false,
+     "topics": [
+      "sanction"
+     ]
+    },
+    {
+     "id": "syn-co-004",
+     "caption": "Empaques Norte\u00f1os Bahia Blanca S.R.L.",
+     "score": 0.14358974358974355,
+     "match": false,
+     "topics": [
+      "export.control"
+     ]
     }
+   ],
+   "flagged": [
+    "syn-co-001"
+   ]
+  }
+ },
+ "session_event_count": 6,
+ "verdict": "PASS",
+ "registry": {
+  "recorded": "2026-08-19",
+  "why_it_is_dated_later_than_this_spike": "Agent Registry auto-registration was criterion 3 of this spike and it passed on 2026-08-13, but it was never written into this file \u2014 the criteria block above records PSC-I, pause, resume and Sessions only. spikes/core_contracts cited this file's verdict for the cataloging claim, so that claim rested on a note rather than on anything a re-read could check, and a deleted registry entry would have left the criterion green. Found and closed on 2026-08-19. The observation below is from that date, not from the original spike; what makes the claim current is that core_contracts' harness now queries the registry live on every run (agent_is_listed_in_agent_registry), so this block is a record, not the proof.",
+  "observed": {
+   "displayName": "keplaria",
+   "agentId": "urn:agent:projects-584548214478:projects:584548214478:locations:us-central1:aiplatform:reasoningEngines:2127503872455868416",
+   "location": "us-central1",
+   "createTime": "2026-08-13T17:40:32.309620Z",
+   "updateTime": "2026-08-19T13:26:28.312671Z",
+   "attributes": {
+    "agentregistry.googleapis.com/system/RuntimeIdentity": {
+     "principal": "sa://service-584548214478@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
+    },
+    "agentregistry.googleapis.com/system/Framework": {
+     "framework": "google-adk"
+    },
+    "agentregistry.googleapis.com/system/RuntimeReference": {
+     "uri": "//aiplatform.googleapis.com/projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416"
+    }
+   },
+   "protocols": [
+    {
+     "type": "CUSTOM",
+     "interfaces": [
+      {
+       "url": "https://us-central1-aiplatform.googleapis.com/v1/projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416:query",
+       "protocolBinding": "HTTP_JSON"
+      },
+      {
+       "url": "https://us-central1-aiplatform.googleapis.com/v1/projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416:streamQuery",
+       "protocolBinding": "HTTP_JSON"
+      }
+     ]
+    }
+   ]
   },
-  "session_event_count": 6,
-  "verdict": "PASS"
+  "honest_limit": "These are the fields Agent Registry populates itself at registration: framework, a runtime reference, the runtime identity principal, and the callable interfaces. The entry carries no owner, purpose, or tool/data scope of its own, and displayName is snapshotted at registration \u2014 a later engine rename does not propagate, only a redeploy refreshes it."
+ }
 }

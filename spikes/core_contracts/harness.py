@@ -20,6 +20,7 @@ there is no separate hand-maintained pass list to drift out of date.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -138,12 +139,17 @@ CRITERIA = [
         "id": "category_proof_visible",
         "requirement": "Agent cataloging is externally observable",
         "spike": "agent_runtime",
+        "live": "agent_is_listed_in_agent_registry",
         "note": (
-            "Fleet. Agent Registry auto-registration observed at deploy time with "
-            "no publish step (criterion 3 of the runtime spike). The versioned "
-            "first-party catalog is retained as the documented fallback and is "
-            "independently submission-eligible under the organizer ruling on "
-            "forum 44797."
+            "Fleet. Auto-registration happens at deploy time with no publish "
+            "step. The live check is what proves it: until 2026-08-19 this "
+            "criterion cited only the runtime spike's verdict, and that "
+            "evidence file records PSC-I, pause, resume and Sessions — it "
+            "never held a registry field, so the cataloging claim rested on "
+            "this note rather than on anything re-read. The registry is now "
+            "queried on every run. The versioned first-party catalog is "
+            "retained as the documented fallback and is independently "
+            "submission-eligible under the organizer ruling on forum 44797."
         ),
     },
     {
@@ -248,7 +254,84 @@ def retried_erp_write_is_singular() -> tuple[bool, str]:
     )
 
 
-LIVE_CHECKS = {"retried_erp_write_is_singular": retried_erp_write_is_singular}
+ENGINE_DISPLAY_NAME = "keplaria"
+REGISTRY_HOST = "https://agentregistry.googleapis.com/v1"
+
+
+def agent_is_listed_in_agent_registry() -> tuple[bool, str]:
+    """The deployed graph is discoverable in Agent Registry, right now.
+
+    Read-only. This is the cataloging half of the Fleet acceptance contract,
+    and it is checked here rather than inferred from a spike verdict because
+    the spike never recorded it: `spikes/agent_runtime/evidence.json` holds
+    PSC-I, pause, resume and Sessions, and `_spike_verdict` reads its
+    top-level `verdict`, so a registry entry that had been deleted, or never
+    created, would have left this criterion green. The entry is also not
+    inert state — Agent Registry snapshots `displayName` at registration and
+    refreshes it only on redeploy, so an entry can drift stale while the
+    engine it names moves on.
+
+    Three things must hold, not one: an entry exists whose `agentId` names a
+    reasoning engine; it carries the display name the deployment claims; and
+    the engine it points at is the same one the runtime spike recorded. That
+    last comparison is what stops this passing on some other engine in the
+    project — the failure mode `doctor.sh`'s one-engine invariant exists to
+    prevent, checked here from the catalog's side instead.
+    """
+    import google.auth
+    from google.auth.transport.requests import AuthorizedSession
+
+    credentials, default_project = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    )
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT") or default_project
+    location = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
+    url = f"{REGISTRY_HOST}/projects/{project}/locations/{location}/agents"
+
+    response = AuthorizedSession(credentials).get(url, timeout=30)
+    if response.status_code != 200:
+        return False, f"registry list returned HTTP {response.status_code}"
+
+    engines = [
+        a for a in (response.json().get("agents") or [])
+        if "reasoningEngines" in (a.get("agentId") or "")
+    ]
+    if not engines:
+        return False, "no reasoning engine is registered in Agent Registry"
+
+    named = [a for a in engines if a.get("displayName") == ENGINE_DISPLAY_NAME]
+    if not named:
+        found = ", ".join(sorted(str(a.get("displayName")) for a in engines))
+        return False, (
+            f"registered engines are named {found}; expected "
+            f"{ENGINE_DISPLAY_NAME!r} (a rename does not propagate — redeploy)"
+        )
+
+    entry = named[0]
+    engine_id = (entry.get("agentId") or "").rsplit(":", 1)[-1]
+    spike = json.loads((ROOT / "spikes" / "agent_runtime" / "evidence.json").read_text())
+    expected_id = (spike.get("resource") or "").rsplit("/", 1)[-1]
+    if expected_id and engine_id != expected_id:
+        return False, (
+            f"registry points at engine {engine_id}, but the runtime spike "
+            f"was recorded against {expected_id}"
+        )
+
+    framework = (
+        (entry.get("attributes") or {})
+        .get("agentregistry.googleapis.com/system/Framework", {})
+        .get("framework")
+    )
+    return True, (
+        f"{entry.get('displayName')} -> engine {engine_id}, framework="
+        f"{framework}, updated {entry.get('updateTime')}"
+    )
+
+
+LIVE_CHECKS = {
+    "retried_erp_write_is_singular": retried_erp_write_is_singular,
+    "agent_is_listed_in_agent_registry": agent_is_listed_in_agent_registry,
+}
 
 
 def _run_tests(node_ids: list[str]) -> tuple[bool, str]:

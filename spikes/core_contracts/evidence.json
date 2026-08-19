@@ -1,9 +1,11 @@
 {
   "spike": "core_contracts",
   "scope": "core contracts",
-  "captured_at": "2026-08-17T18:06:03.038271+00:00",
-  "result": "PASS",
-  "unproven": [],
+  "captured_at": "2026-08-19T19:30:26.590622+00:00",
+  "result": "FAIL",
+  "unproven": [
+    "one_erp_write_after_retry"
+  ],
   "what_this_proves": "Every criterion listed here was re-verified at capture time: cited tests were re-executed in this run, and cited spike evidence was re-read and its verdict re-checked. This is a verification pass over work already done, not a fresh end-to-end execution.",
   "not_proven_here": [
     "The closed loop is not re-executed by this harness; spikes/judge_run owns that and its run is cited, not repeated.",
@@ -34,7 +36,7 @@
         {
           "kind": "tests",
           "ok": true,
-          "detail": "2 passed in 8.25s",
+          "detail": "2 passed in 8.60s",
           "node_ids": [
             "tests/unit/test_inbox.py::test_duplicate_event_is_rejected_and_does_not_bump_version",
             "tests/unit/test_inbox.py::test_stale_event_is_rejected"
@@ -88,7 +90,7 @@
         {
           "kind": "tests",
           "ok": true,
-          "detail": "4 passed, 4 warnings in 17.23s",
+          "detail": "4 passed, 4 warnings in 16.72s",
           "node_ids": [
             "tests/unit/test_approvals.py::test_replaying_the_same_approval_is_rejected_as_a_duplicate",
             "tests/unit/test_approvals.py::test_an_approval_against_an_older_version_is_rejected_as_stale",
@@ -121,12 +123,12 @@
     {
       "id": "one_erp_write_after_retry",
       "requirement": "A retried command leaves exactly one ERP record",
-      "proven": true,
+      "proven": false,
       "checks": [
         {
           "kind": "tests",
           "ok": true,
-          "detail": "3 passed in 8.66s",
+          "detail": "3 passed in 8.67s",
           "node_ids": [
             "tests/unit/test_commands.py::test_claim_after_success_is_refused_and_returns_the_external_id",
             "tests/unit/test_commands.py::test_claim_after_failure_is_reacquired_and_counts_attempts",
@@ -135,8 +137,8 @@
         },
         {
           "kind": "live",
-          "ok": true,
-          "detail": "failed 1x then done; exactly 1 ERP record, hold cleared",
+          "ok": false,
+          "detail": "command DLQ-SWEEP-43CDC293:clear_hold:c1 is absent from the deployed ledger",
           "check": "retried_erp_write_is_singular"
         }
       ],
@@ -152,9 +154,15 @@
           "ok": true,
           "detail": "verdict=PASS",
           "evidence": "spikes/agent_runtime/evidence.json"
+        },
+        {
+          "kind": "live",
+          "ok": true,
+          "detail": "keplaria -> engine 2127503872455868416, framework=google-adk, updated 2026-08-19T13:26:28.312671Z",
+          "check": "agent_is_listed_in_agent_registry"
         }
       ],
-      "note": "Fleet. Agent Registry auto-registration observed at deploy time with no publish step (criterion 3 of the runtime spike). The versioned first-party catalog is retained as the documented fallback and is independently submission-eligible under the organizer ruling on forum 44797."
+      "note": "Fleet. Auto-registration happens at deploy time with no publish step. The live check is what proves it: until 2026-08-19 this criterion cited only the runtime spike's verdict, and that evidence file records PSC-I, pause, resume and Sessions \u2014 it never held a registry field, so the cataloging claim rested on this note rather than on anything re-read. The registry is now queried on every run. The versioned first-party catalog is retained as the documented fallback and is independently submission-eligible under the organizer ruling on forum 44797."
     },
     {
       "id": "eval_cases",
