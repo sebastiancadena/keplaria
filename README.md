@@ -273,12 +273,35 @@ and is reported rather than retried blindly.
   that back each contract (duplicate and out-of-order events, provenance
   failure, injection refusal, stale and double approval, forbidden
   agent→tool edges, one ERP write after retry, cataloging, the graded eval
-  suite), plus one read-only live check against deployed Firestore and the
-  ERP. **Deliberately self-checking rather than a hand-maintained list:** a
-  test that is deleted, renamed, or red demotes its criterion instead of
-  continuing to look green. Exits non-zero if any contract is unproven, and
-  writes `spikes/core_contracts/evidence.json`. Needs `--env-file .env` for
-  the live check.
+  suite), plus two read-only live checks — one against deployed Firestore and
+  the ERP, one against Agent Registry. **Deliberately self-checking rather
+  than a hand-maintained list:** a test that is deleted, renamed, or red
+  demotes its criterion instead of continuing to look green. Exits non-zero if
+  any contract is unproven, and writes
+  `spikes/core_contracts/evidence.json`. Needs `--env-file .env` for the live
+  checks.
+
+  Both live checks **discover** what they verify rather than naming it. The
+  retry check asks the deployed ledger whether any command carries
+  `status: done` with `execution_attempts >= 1` (`record_failure` is that
+  field's only writer, so that combination *is* a failure followed by a
+  success); the cataloging check queries Agent Registry for an entry naming a
+  reasoning engine, carrying the expected display name, and pointing at the
+  engine the runtime spike recorded. Neither is a hardcoded id, because both
+  were: a routine ERP cleanup deleted the records the retry check named and
+  took the criterion with them, and the cataloging claim rested on a note in
+  the manifest rather than on anything a re-read could check.
+- `spikes/core_contracts/redrill_retry.py` — re-makes the retry proof when
+  the ledger holds none. Some criteria assert things about *deployed state*,
+  so their evidence is a pair of live records rather than a committed file,
+  and live records get deleted. The failure it produces is real (a
+  `clear_hold` against a supplier absent from the ERP, refused with a 404),
+  the repair is real, and the **deployed sweep** — not the script — finds the
+  failed command and drives it to `done`. Aborts if the supplier already
+  exists, since the first drain would then succeed and leave
+  `execution_attempts` at 0 while every step reported green. Writes
+  `spikes/core_contracts/retry_drill.json`; `scripts/erp.py purge` refuses to
+  delete anything that file names.
 - `spikes/dlq/harness.py` — proves bounded retry and durable dead-lettering
   against deployed resources: a command driven to `dead` through five real
   ERP refusals and not re-driven a sixth time, the deployed `POST /admin/sweep`
