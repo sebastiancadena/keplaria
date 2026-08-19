@@ -21,15 +21,19 @@ and the build pipeline are unchanged.
 
 ## Status
 
-- **Draft published privately** as an artifact for review:
+- **PUBLISHED 2026-08-19** on dev.to:
+  <https://dev.to/sebastiancadena7/the-smoke-test-said-yes-1068>
+  (article id 4437730; posted via the API with `DEVTO_API_KEY` from `.env` —
+  see `.env.example`; source of truth for the body is `article.dev.md`, edit
+  there and PUT the same id to update). Rendering verified after publish:
+  title, both tables, blockquotes, disclosure all correct. This earns the
+  +0.2 article bonus.
+- **Draft also published privately** as an artifact (the styled HTML edition):
   <https://claude.ai/code/artifact/ee1192be-a8e8-4ea0-8345-d1ec50f84cb8>
-  (updated in place 2026-08-19; pass the URL as `url` when republishing from a
-  new conversation or it creates a second artifact).
-- **Platform not chosen.** dev.to remains the recommendation (free, indexes
-  fast, stable canonical URL for the submission); keplaria.com was rejected for
-  now because `site/` does not exist and building it is unbudgeted.
-- **The social post is drafted but unposted** — see below. It needs the
-  article's public URL first, so it is blocked on the platform decision.
+  (pass the URL as `url` when republishing from a new conversation or it
+  creates a second artifact).
+- **The social post is drafted but unposted** — see below, URL already filled
+  in. Posting it with the hashtag earns the remaining +0.2.
 
 ## Building
 
@@ -109,5 +113,5 @@ Needs `#AllThingsAgenticHackathon` and the article's public URL.
 > Enabled is not detecting. Configured is not bounded. Responding is not
 > serving.
 >
-> Write-up: [link]
+> Write-up: <https://dev.to/sebastiancadena7/the-smoke-test-said-yes-1068>
 > #AllThingsAgenticHackathon
