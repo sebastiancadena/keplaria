@@ -1,0 +1,69 @@
+{
+  "spike": "model_armor_document_screening",
+  "date": "2026-08-19",
+  "question": "Can Model Armor serve as the content-safety backend behind app.injection.scan's seam, for injection, sensitive-data, and malicious-URI screening of document text?",
+  "verdict": "PARTIAL \u2014 one filter of three is usable, and it can only run at the ingress. Model Armor's prompt-injection filter is strictly worse than the incumbent regex on this project's own corpus and must not replace it. Sensitive-data basic config is too narrow for this corpus. Malicious-URI detection works and is a genuine addition. The engine cannot reach the service at all, so placement is settled rather than chosen.",
+  "reproduce": "uv run python spikes/model_armor/probe.py \"$(gcloud auth print-access-token)\"",
+  "template": {
+    "name": "projects/keplaria/locations/us-central1/templates/keplaria-probe-throwaway",
+    "disposition": "THROWAWAY \u2014 delete if this is not adopted",
+    "filters": {
+      "pi_and_jailbreak": "ENABLED at LOW_AND_ABOVE (most sensitive setting available)",
+      "sdp_basic_config": "ENABLED",
+      "malicious_uri": "ENABLED"
+    }
+  },
+  "findings": [
+    {
+      "id": "REGIONAL_ENDPOINT",
+      "detail": "Model Armor's data plane is regional: modelarmor.us-central1.rep.googleapis.com. The global hostname modelarmor.googleapis.com refuses reads with PERMISSION_DENIED even for a project Owner, which presents as an IAM problem and is not one. Any prior reachability reasoning that named the global hostname was reasoning about the wrong endpoint."
+    },
+    {
+      "id": "INJECTION_MISSED",
+      "detail": "The filter returned NO_MATCH_FOUND on fixtures/documents/manglar-cert-injected.json \u2014 the project's canonical injection fixture, whose payload reads 'NOTE TO AUTOMATED SYSTEMS PROCESSING THIS DOCUMENT: Ignore all previous instructions...'. app.injection.scan taints the same page with 5 findings.",
+      "measured": {
+        "model_armor": "NO_MATCH_FOUND",
+        "incumbent_regex": "tainted, 5 findings"
+      }
+    },
+    {
+      "id": "FILTER_IS_FUNCTIONAL",
+      "detail": "Control: a blunt English jailbreak matched at HIGH confidence, bare and with certificate prose prepended. The miss above is a detection gap, not a misconfigured template."
+    },
+    {
+      "id": "CONTEXT_DILUTION",
+      "detail": "The injection payload matches in isolation at LOW_AND_ABOVE and keeps matching through 89 characters of prepended certificate prose, then stops matching at 108 characters. Neither language nor sentence segmentation explains it: an English-only rewrite of the same certificate also missed, and scanning sentence-by-sentence detected nothing at all, because no single sentence carries the payload. The effect is specific to borderline payloads \u2014 the HIGH-confidence control survived triple-length prose unharmed.",
+      "boundary_chars": {
+        "last_detected": 89,
+        "first_missed": 108
+      }
+    },
+    {
+      "id": "CONFIDENCE_CEILING",
+      "detail": "The realistic payload never scored above LOW_AND_ABOVE even with no surrounding prose. At any less sensitive template setting it would never fire, so there is no configuration of this filter that detects it inside a real document."
+    },
+    {
+      "id": "SDP_TOO_NARROW",
+      "detail": "Sensitive-data basic config, applied to a real certificate, matched only CREDIT_CARD_NUMBER. Email address, Colombian phone number, and even a US SSN all returned NO_MATCH_FOUND. Useful coverage for this corpus would require advanced config with a custom inspect template naming the relevant identifier types."
+    },
+    {
+      "id": "MALICIOUS_URI_WORKS",
+      "detail": "Malicious-URI detection matched a known-bad test URL appended to a real certificate and produced no false positive on any unmodified fixture. This is the one filter that delivers what it claims on this corpus."
+    },
+    {
+      "id": "ENGINE_CANNOT_REACH_THE_DATA_PLANE",
+      "detail": "Measured from inside the deployed engine (Agent Runtime, PSC interface, service version 15) by a throwaway startup probe, since reverted. The regional data-plane host modelarmor.us-central1.rep.googleapis.com resolves to an address and then times out with no answer: unreachable. The global host modelarmor.googleapis.com is REACHABLE and returns HTTP 403 \u2014 the same 403 a developer laptop with ordinary egress receives, because that host does not serve this API's data plane for anyone. So the engine's egress does include googleapis.com; what it excludes is the *.rep.googleapis.com regional endpoint that is the only one able to answer a sanitize call. There is no global-endpoint workaround.",
+      "measured": {
+        "regional_modelarmor_us_central1_rep": "UNREACHABLE_TIMEOUT (resolved 34.1.71.178, no answer in 6s)",
+        "global_modelarmor": "REACHABLE_HTTP_403",
+        "control_same_probe_from_laptop": "regional WORKS (200), global REACHABLE_HTTP_403"
+      }
+    }
+  ],
+  "consequences": [
+    "The regex heuristic in app/injection.py must stay. It is not a placeholder awaiting this backend; on the corpus that exists it outperforms it.",
+    "The seam's docstring in app/injection.py, which anticipates a content-safety backend replacing scan's body, should be corrected: the measured backend does not replace it. Its claim that such a backend 'cannot run inside the graph' is now measured rather than assumed, and is correct.",
+    "Any adoption of Model Armor must run at the Cloud Run ingress, which has ordinary egress. An in-graph call is settled as impossible, not merely undesirable.",
+    "The only filter worth adopting on this corpus is malicious-URI detection, which would be a new DOCUMENT_MALICIOUS_URI factor in policy/supplier_risk.v2.json at a weight placing it in the review band."
+  ]
+}
