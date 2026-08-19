@@ -97,7 +97,7 @@ def list_cases(db: firestore.Client, limit: int = 50) -> list[dict]:
 
 
 def list_awaiting_cases(db: firestore.Client) -> list[dict]:
-    """Every case currently parked for review — no cap, no cursor.
+    """Every case currently parked for review — complete, by requirement.
 
     Deliberately not built on `list_cases`: that query orders by
     `updated_at` and stops at `limit` (50), which is right for "recent
@@ -106,23 +106,40 @@ def list_awaiting_cases(db: firestore.Client) -> list[dict]:
     the 50 most-recently-touched documents must not vanish from here just
     because it has been waiting quietly.
 
-    The query is a single equality `where` on `phase`, with no `order_by`.
-    That is deliberate, not an oversight: combining a `where` on one field
-    with an `order_by` on a *different* field (`updated_at`, say) requires a
-    composite index, and this project has none — it would work against the
-    local/emulator Firestore that auto-creates indexes on demand, then fail
-    at runtime the moment this ran against the real deployed database. A
-    bare equality filter needs no composite index at all (Firestore
-    auto-indexes every field singly for equality), so this query is safe
-    exactly because it asks for nothing more than that. Sorting, such as it
-    is, happens in Python afterward instead.
+    The query is a single equality `where` on `phase`, ordered by document
+    name. That combination is deliberate, not an oversight: an `order_by` on
+    a *different* field (`updated_at`, say) alongside the filter would
+    require a composite index, and this project has none — it would work
+    against the local/emulator Firestore that auto-creates indexes on demand,
+    then fail at runtime the moment it ran against the real deployed
+    database. `__name__` is the one ordering the single-field index on
+    `phase` already serves, so it costs nothing at deploy time (verified
+    against the real `keplaria-test` database, not assumed). Case documents
+    are keyed by `case_id`, so this is an ascending sort by case id, done by
+    Firestore instead of in Python.
+
+    **A ceiling was tried here on 2026-08-19 and removed.** The obvious
+    hardening — `.limit(n)` plus a "this read was cut" flag on the page — is
+    wrong for this particular query, and the reason is worth keeping. Cutting
+    the read means some parked cases are not listed; on an approval queue
+    that is not a display concession, it is a case nobody is told to decide.
+    The measurement that settled it: `keplaria-test` holds 1964 documents in
+    `awaiting_approval` (5258 cases total, almost all residue from earlier
+    runs), and under any ceiling below that, the regression test asserting a
+    long-parked case still reaches this queue fails — the bound removes
+    exactly the property the queue exists to guarantee. A complete read is
+    therefore the requirement, and the growth it implies is answered by
+    clearing the queue, not by hiding its tail. If this collection ever grows
+    past what one page should hold, the answer is cursor pagination over this
+    same `__name__` ordering, which keeps every case reachable; it is not a
+    truncating limit.
     """
-    query = db.collection(CASES).where(
-        filter=firestore.FieldFilter("phase", "==", "awaiting_approval")
+    query = (
+        db.collection(CASES)
+        .where(filter=firestore.FieldFilter("phase", "==", "awaiting_approval"))
+        .order_by("__name__")
     )
-    cases = [doc.to_dict() or {} for doc in query.stream()]
-    cases.sort(key=lambda c: str(c.get("case_id") or ""))
-    return cases
+    return [doc.to_dict() or {} for doc in query.stream()]
 
 
 def _touched_at(row: dict) -> tuple[int, float]:

@@ -66,19 +66,51 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     assert "create_supplier" in response.text
 
 
-def test_the_detail_page_never_shows_the_screening_endpoint(db, case_id, client):
-    _park_a_real_case(db, case_id)
-    response = client.get(f"/cases/{case_id}")
-    assert "10.10.0.2" not in response.text
+def test_the_templates_refuse_a_withheld_field_the_view_model_hands_them(
+    db, case_id, client, monkeypatch
+):
+    """The template layer, pinned separately from the allowlist.
 
+    Replaces two earlier tests that fetched the detail page and asserted the
+    screening endpoint and the approval actor were absent from the body.
+    Neither could fail. Measured 2026-08-19 by mutation: adding
+    `"endpoint": screening.get("endpoint")` and `"actor":
+    approval.get("actor")` to console.projection.public_case leaves both of
+    those assertions passing and is caught only by test_console_projection's
+    own withheld-field tests. The reason is structural — case.html names the
+    fields it prints, and Jinja renders a path the view model does not carry
+    as the empty string, so a leak upstream never reaches the text those
+    assertions searched. A negative assertion over a surface that cannot
+    produce the value is a test that reports on nothing.
 
-def test_the_detail_page_never_shows_the_approval_actor(db, case_id, client):
+    So the leak is injected here instead. The view model is made to carry
+    both withheld values, and the rendered page must still not show them.
+    That fails the moment a template starts reading `case.screening.endpoint`
+    or `case.approval.actor` — the one failure mode the allowlist cannot
+    catch by itself, since a template may read any path it likes.
+    """
+    import console.public as public
+
+    real = public.public_case
+
+    def leaky(case, commands=()):
+        view = real(case, commands)
+        view["screening"]["endpoint"] = "http://10.10.0.2:8000"
+        view["approval"] = {**(view.get("approval") or {}), "actor": "reviewer@example.com"}
+        return view
+
     version = _park_a_real_case(db, case_id)
     commit_approval(db, case_id, f"{case_id}:v{version}", version, APPROVED,
                     "reviewer@example.com")
+    monkeypatch.setattr(public, "public_case", leaky)
+
     response = client.get(f"/cases/{case_id}")
+
     assert response.status_code == 200
-    assert "reviewer@example.com" not in response.text
+    assert "10.10.0.2" not in response.text, "case.html must not print the endpoint"
+    assert "reviewer@example.com" not in response.text, (
+        "case.html must not print the approval actor"
+    )
 
 
 def test_the_detail_page_shows_both_bands_when_they_differ(db, case_id, client):
