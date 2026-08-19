@@ -32,8 +32,10 @@ and the build pipeline are unchanged.
   <https://claude.ai/code/artifact/ee1192be-a8e8-4ea0-8345-d1ec50f84cb8>
   (pass the URL as `url` when republishing from a new conversation or it
   creates a second artifact).
-- **The social post is drafted but unposted** — see below, URL already filled
-  in. Posting it with the hashtag earns the remaining +0.2.
+- **The social post is drafted but DEFERRED (2026-08-19)** — the user wants to
+  re-review the message before promoting it. Do not post it on their behalf.
+  URL is already filled in below; posting it on X/LinkedIn with the hashtag
+  earns the remaining +0.2.
 
 ## Building
 
@@ -90,6 +92,13 @@ regenerable artifact dominated by ~1.2 MB of font bytes that already live in
 The piece carries an explicit hackathon-participation disclosure in its
 closing section, alongside the synthetic-data statement and the AI-assistance
 disclosure. Both are prerequisites, not decoration.
+
+Checked against the live rules page 2026-08-19: the **article** needs no
+hashtag — its requirement is stating the content was *"created for the
+purposes of entering this hackathon"*, which the disclosure now says
+literally (do not paraphrase it away in edits). The
+`#AllThingsAgenticHackathon` hashtag is required on the **social post**
+(X/LinkedIn), not here.
 
 ## Social post (drafted, not posted)
 

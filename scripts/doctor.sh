@@ -24,6 +24,11 @@ command -v wrangler >/dev/null && { wrangler whoami >/dev/null 2>&1 \
   && ok "wrangler authenticated" || meh "wrangler not authenticated"; }
 command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 \
   && ok "gh authenticated" || meh "gh not authenticated"; }
+# Offline presence check only — no API call. The key is needed solely to edit
+# the published dev.to article (id 4437730) from docs/build-piece/article.dev.md.
+grep -q '^DEVTO_API_KEY=.\+' .env 2>/dev/null \
+  && ok "DEVTO_API_KEY present in .env (can edit the published dev.to article)" \
+  || meh "DEVTO_API_KEY absent from .env (only needed to edit dev.to article 4437730)"
 
 echo "== ERP maintenance tooling =="
 [ -x scripts/erp.py ] \
