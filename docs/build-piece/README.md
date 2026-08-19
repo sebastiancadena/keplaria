@@ -1,7 +1,12 @@
-# Build piece — "Tests That Prove Nothing"
+# Build piece — "The hold landed before I approved it"
 
 The public content piece. Written 2026-08-17; **not yet published to a public
 platform** — the platform decision is open.
+
+**Reframed 2026-08-18**: rewritten around the system rather than the testing
+discipline — the unattended 11m08s hold is now the opening scene, and the five
+defects are the plot. The previous "Tests That Prove Nothing" draft lives in
+git history. Disclosure block, claim wording, and build pipeline unchanged.
 
 ## Status
 
@@ -60,12 +65,15 @@ disclosure. Both are prerequisites, not decoration.
 
 Needs `#AllThingsAgenticHackathon` and the article's public URL.
 
-> The five bugs that mattered in my hackathon build were never red.
+> The hold landed eleven minutes and eight seconds before I clicked approve.
 >
-> A safety eval that only measured the model's manners. An approval system
-> whose two halves were each correct and jointly inert. An audit that asked
-> `> 1` when the answer was `>= 1`. A proof written to wait for an event the
-> system cannot emit. A metric reading a field that's null on every record
+> My proof was written to watch it land after. It would have hung forever on
+> an event the system can't emit.
+>
+> That's the first of five bugs that mattered in my hackathon build. A safety
+> eval that only measured the model's manners. An approval system whose two
+> halves were each correct and jointly inert. An audit that asked `> 1` when
+> the answer was `>= 1`. A metric reading a field that's null on every record
 > ever stored.
 >
 > All green. All wrong.
