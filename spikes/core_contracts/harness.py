@@ -191,7 +191,15 @@ def _spike_verdict(name: str) -> tuple[bool, str]:
         if metric.get("metric_name") == "domain_case_pass":
             total = metric.get("num_cases_total") or 0
             mean = metric.get("mean_score")
-            ok = total >= 8 and mean == 1.0
+            # 24 is the Core-green floor, not the current suite size. It read
+            # 8 until 2026-08-19 — the size the suite happened to be when this
+            # was written — so the suite could have shrunk back below the floor
+            # and this criterion would have gone on reporting green. A
+            # threshold that tracks whatever exists today checks nothing.
+            # mean == 1.0 is deliberately stricter than the criterion's 90%:
+            # every case here has an exact answer, so a single failure is a
+            # finding, not noise to average away.
+            ok = total >= 24 and mean == 1.0
             return ok, f"{total} cases, mean_score={mean}"
 
     return False, "no recognisable verdict in evidence"

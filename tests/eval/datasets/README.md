@@ -2,9 +2,43 @@
 
 This directory contains evaluation datasets for testing agent behavior.
 
+## Start here: the domain suite
+
+Everything below this section is the scaffold's generic guidance. The eval
+that actually gates anything in this project is the **domain suite**, and it
+does not run the way the scaffold describes:
+
+```bash
+bash tests/eval/run_domain_evals.sh     # seed -> generate -> grade -> save evidence
+```
+
+- **Dataset:** `domain-dataset.json` — 24 cases, each one a canonical supplier
+  event. `basic-dataset.json` is the untouched scaffold sample.
+- **`agents-cli eval generate` cannot collect this graph's stream.** Its SSE
+  parser requires every event to carry `author` and `content`, and Workflow
+  function nodes legitimately emit state-only events with neither. Only the
+  *generate* stage is replaced, by `../generate_traces.py`; grading stays in
+  `agents-cli eval grade`.
+- **Grading is deterministic**, not judged: `../domain_metrics.py` scores each
+  case 1.0/0.0 against the post-run Firestore case document. Every expectation
+  is a binary policy outcome with an exact answer, so a judged rubric would
+  only add noise.
+- **Prerequisites**, both local: the Firestore emulator listening on 8451 (it
+  dies silently — the runner checks first) and `../yente_stub.py`, which the
+  runner starts for you. Real Gemini calls are made; no ERP call ever is.
+- **Adding a case** means four edits, and unit tests in
+  `tests/unit/test_domain_metrics.py` fail if you miss one: the dataset here,
+  a wipe/seed slot in `../seed.py`, a branch in `../domain_metrics.py`, and a
+  model-exposure expectation in that same file naming which agents may and may
+  not run on it.
+- **Evidence** lands in `spikes/domain_evals/evidence.json`, with every graded
+  run kept in `history/` — the failing ones too, not just the flattering
+  latest. A score you did not re-run is not evidence.
+
 ## Running Evaluations
 
 ### Default Dataset
+
 ```bash
 # Generate traces using the default dataset
 agents-cli eval generate
@@ -12,6 +46,7 @@ agents-cli eval grade
 ```
 
 ### Custom Dataset
+
 ```bash
 # Generate traces for a custom dataset
 agents-cli eval generate --dataset tests/eval/datasets/custom-dataset.json --output custom_traces/
@@ -87,6 +122,7 @@ You can create custom datasets in two ways:
 
 1. **By Hand**: Copy `basic-dataset.json` as a template and manually add evaluation cases.
 2. **Synthesize**: Use the synthetic dataset generation command to generate conversation scenarios:
+
    ```bash
    agents-cli eval dataset synthesize --count 10
    ```

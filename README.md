@@ -229,8 +229,9 @@ and is reported rather than retried blindly.
   leaves nearly empty. Measured 2026-08-18 on the deployed engine, the extractor
   went from ~1500 reasoning tokens per call to effectively none and the timed
   sequence from 85.4s to 56.9s. Read the numbers as "reasoning off"; raising one
-  will not buy a middle setting. Validated by 8/8 graded domain cases and a full
-  deployed run, and pinned by `tests/unit/test_agent_generation_config.py`.
+  will not buy a middle setting. Validated by the graded domain suite — 8/8
+  when the pin was measured, 24/24 since the suite grew — and a full deployed
+  run, and pinned by `tests/unit/test_agent_generation_config.py`.
 - **A yente VM that is RUNNING is not yet SERVING, and the difference costs
   30s per screened beat.** `screen_supplier` waits `timeout=30` before giving
   up and recording `SCREENING_UNAVAILABLE`, so a sequence started while the
