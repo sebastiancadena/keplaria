@@ -1,9 +1,25 @@
+# `metrics_to_run` is the DEFAULT selection, and nothing in this repository
+# uses it. The only eval that runs — and the only one that gates anything — is
+# tests/eval/run_domain_evals.sh, which names its metric explicitly
+# (`eval grade --metrics domain_case_pass`) and therefore ignores this list.
+# Read that as the honest state of things rather than as a judge standing
+# behind any number that ships: no score here reaches evidence, the README,
+# or the video.
 metrics_to_run:
   - custom_response_quality
 
 custom_metrics:
-  # Default: local LLM-as-judge (see response_quality.py). Runs in-process via
-  # google-genai on Agent Platform (ADC) or Google AI Studio (GEMINI_API_KEY).
+  # Scaffold default: a local LLM-as-judge (see response_quality.py), running
+  # in-process via google-genai rather than through the runner's own
+  # `LLMMetric` / built-in `final_response_quality`. Kept as scaffolded and
+  # deliberately not switched to the managed backend: the swap buys a
+  # first-party judge for a metric no script invokes, while the grading this
+  # project actually relies on is `domain_case_pass`, a deterministic
+  # CodeExecutionMetric with no judge in it at all — which is the stronger
+  # instrument for binary policy outcomes, not a fallback from one.
+  # If a judged score is ever quoted anywhere, switch to a built-in metric or
+  # an `LLMMetric` FIRST; see
+  # .agents/skills/google-agents-cli-eval/references/metrics-guide.md.
   - name: custom_response_quality
     custom_function_file: response_quality.py
   # Deterministic domain grading for tests/eval/datasets/domain-dataset.json
