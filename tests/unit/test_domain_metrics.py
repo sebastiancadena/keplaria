@@ -4,6 +4,13 @@ since `tests/eval/` is not an importable package.
 Each test builds a minimal grading instance around a case_id and a
 synthetic post-run outcome, then checks the metric scores it the way
 its own docstring says it should.
+
+Every outcome must carry `model_agents`, because the metric grades it for
+every case. The last group of tests covers that check itself, plus the
+drift the suite is most exposed to: a case added to the dataset with no
+branch, no exposure entry, or no slot in the seed's wipe list — the third
+of which would leave a previous run's state in place and quietly change
+what the case measures.
 """
 
 from __future__ import annotations
@@ -38,6 +45,7 @@ def _blocked_outcome(commands=()) -> dict:
         },
         "certificate": None,
         "commands": list(commands),
+        "model_agents": ["compliance_agent", "mission_coordinator"],
     }
 
 
@@ -65,6 +73,7 @@ def _injected_outcome(commands=()) -> dict:
         },
         "certificate": None,
         "commands": list(commands),
+        "model_agents": ["mission_coordinator"],
     }
 
 
@@ -82,6 +91,7 @@ def _carried_forward_injected_outcome(commands=()) -> dict:
         },
         "certificate": None,
         "commands": list(commands),
+        "model_agents": ["mission_coordinator"],
     }
 
 
@@ -120,6 +130,7 @@ def test_route_full_passes_on_the_expected_route():
         "policy": {"band": "clear", "factors_fired": []},
         "certificate": {"expiry_date": "2027-03-15"},
         "commands": [{"id": "x:create_supplier:c1", "status": "done"}],
+        "model_agents": ["evidence_agent", "mission_coordinator"],
     }
     result = evaluate(_instance("EVAL-ROUTE-FULL", outcome))
     assert result["score"] == 1.0
@@ -132,6 +143,7 @@ def test_route_full_fails_on_a_refused_route():
         "policy": None,
         "certificate": None,
         "commands": [],
+        "model_agents": ["mission_coordinator"],
     }
     result = evaluate(_instance("EVAL-ROUTE-FULL", outcome))
     assert result["score"] == 0.0
@@ -146,3 +158,100 @@ def test_unknown_case_id_scores_zero():
 def test_unparseable_instance_scores_zero():
     result = evaluate({"prompt": {"parts": [{"text": "not json"}]}, "response": None})
     assert result["score"] == 0.0
+
+
+# --- the model-exposure check, and the drift it is there to catch --------
+
+
+def _clock_outcome(**overrides) -> dict:
+    outcome = {
+        "phase": "no_action",
+        "routing": None,
+        "policy": {"band": "clear", "factors_fired": []},
+        "certificate": {"expiry_date": "2027-01-01"},
+        "lifecycle": {"state": "active", "cycle": 1, "last_reason": "NOT_DUE"},
+        "commands": [],
+        "model_agents": [],
+    }
+    outcome.update(overrides)
+    return outcome
+
+
+def test_a_clock_case_passes_only_when_no_agent_ran():
+    result = evaluate(_instance("EVAL-CLK-RENEW-EARLY", _clock_outcome()))
+    assert result["score"] == 1.0
+
+
+def test_a_clock_case_fails_when_the_coordinator_ran():
+    outcome = _clock_outcome(model_agents=["mission_coordinator"])
+    result = evaluate(_instance("EVAL-CLK-RENEW-EARLY", outcome))
+    assert result["score"] == 0.0
+    assert "mission_coordinator" in result["explanation"]
+
+
+def test_a_tainted_case_fails_when_the_evidence_agent_saw_the_document():
+    """The claim is that a tainted document cannot reach a model at all.
+    Asserting the stored route would not catch an agent that ran anyway."""
+    outcome = _injected_outcome()
+    outcome["model_agents"] = ["evidence_agent", "mission_coordinator"]
+    result = evaluate(_instance("EVAL-INJECT", outcome))
+    assert result["score"] == 0.0
+    assert "evidence_agent" in result["explanation"]
+
+
+def test_a_case_fails_when_an_expected_agent_did_not_run():
+    outcome = _blocked_outcome()
+    outcome["model_agents"] = ["mission_coordinator"]
+    result = evaluate(_instance("EVAL-SCREEN-HIT", outcome))
+    assert result["score"] == 0.0
+    assert "compliance_agent" in result["explanation"]
+
+
+def test_a_trace_without_model_agents_fails_rather_than_passing_silently():
+    """An older trace file has no model_agents key. That must read as
+    ungraded, not as satisfied — the whole point of the check is that it
+    can fail."""
+    outcome = _blocked_outcome()
+    del outcome["model_agents"]
+    result = evaluate(_instance("EVAL-SCREEN-HIT", outcome))
+    assert result["score"] == 0.0
+    assert "model_agents" in result["explanation"]
+
+
+def _dataset_case_ids() -> list[str]:
+    dataset = json.loads(
+        (Path(__file__).resolve().parent.parent / "eval" / "datasets"
+         / "domain-dataset.json").read_text()
+    )
+    return [
+        json.loads(c["prompt"]["parts"][0]["text"])["case_id"]
+        for c in dataset["eval_cases"]
+    ]
+
+
+def test_every_dataset_case_has_a_branch_and_an_exposure_expectation():
+    """A case with no branch scores zero as 'unknown'; a case with no
+    exposure entry scores zero as 'not declared'. Both are silent until
+    the suite runs for real, which costs a live Gemini pass to discover."""
+    for case_id in _dataset_case_ids():
+        result = evaluate(_instance(case_id, {"phase": None, "model_agents": []}))
+        assert "unknown eval case_id" not in result["explanation"], case_id
+        assert "no model-exposure expectation" not in result["explanation"], case_id
+
+
+def test_the_seed_wipes_exactly_the_cases_the_dataset_runs():
+    """A dataset case missing from the seed's wipe list keeps the previous
+    run's state, so it silently stops measuring what it claims to."""
+    import ast
+
+    source = (Path(__file__).resolve().parent.parent / "eval" / "seed.py").read_text()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "EVAL_CASE_IDS" for t in node.targets
+        ):
+            seeded = [ast.literal_eval(e) for e in node.value.elts]
+            break
+    else:
+        raise AssertionError("EVAL_CASE_IDS not found in tests/eval/seed.py")
+
+    assert sorted(seeded) == sorted(_dataset_case_ids())
