@@ -1,0 +1,44 @@
+{
+ "drill": "one_erp_write_after_retry",
+ "captured_at": "2026-08-19T19:35:58.642353+00:00",
+ "result": "PASS",
+ "why_this_exists": "The criterion's original records (DLQ-SWEEP-43CDC293 and its supplier) were deleted by the day-7 ERP hygiene pass 0f5e831, which removed cases by DLQ-* prefix. The contract never regressed; its evidence was deleted. This run re-made it.",
+ "case_id": "DLQ-SWEEP-C1BDE3FC",
+ "command_id": "DLQ-SWEEP-C1BDE3FC:clear_hold:c1",
+ "supplier": "DLQ Sweep Probe SAS",
+ "observed": {
+  "first_drain": [
+   {
+    "action": "clear_hold",
+    "status": "failed",
+    "error": "FrappeError: hold release failed: HTTP 404 {\"exc_type\":\"DoesNotExistError\",\"_server_messages\":\"[\\\"{\\\\\\\"message\\\\\\\":\\\\\\\"Supplier DLQ Sweep Probe SAS not found\\\\\\\",\\\\\\\"as_table\\\\\\\":false,\\\\\\\"title\\\\\\\":\\\\\\\"Message\\\\\\\",\\\\\\\"indicator\\\\\\\":\\\\\\\"red\\\\\\\",\\\\\\\"raise_exception\\\\\\\":1,\\\\\\\"__frappe_exc_id\\\\\\\":\\\\\\\"659596ecb8844be3848764e50d1d934425404f56d69c"
+   }
+  ],
+  "status_after_first_drain": "failed",
+  "execution_attempts_after_first_drain": 1,
+  "supplier_created_out_of_band": {
+   "external_id": "DLQ Sweep Probe SAS",
+   "created": true
+  },
+  "sweep_http_status": 200,
+  "sweep_summary": {
+   "cases_swept": 1,
+   "commands_driven": 1,
+   "commands_refused": 0,
+   "commands_dead": 0,
+   "cases_skipped": 0,
+   "case_ids": [
+    "DLQ-SWEEP-C1BDE3FC"
+   ]
+  },
+  "status_after_sweep": "done",
+  "execution_attempts_after_sweep": 1,
+  "erp_records_named_supplier": [
+   {
+    "name": "DLQ Sweep Probe SAS",
+    "on_hold": 0
+   }
+  ]
+ },
+ "do_not_delete": "This case, command and supplier ARE the proof of one_erp_write_after_retry. scripts/erp.py purge refuses targets named in a committed evidence file; if they must ever go, stop citing them here first, then re-run this drill to replace them."
+}

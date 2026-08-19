@@ -159,3 +159,60 @@ def test_purge_with_no_target_still_refuses():
         communication=None, file=None, yes=True, database="(default)",
     )
     assert erp.cmd_purge(args) == 2
+
+
+def test_a_target_named_by_a_spike_evidence_file_is_cited(tmp_path, monkeypatch):
+    """Hermetic: a temporary spikes tree, so the assertion is about the rule
+    and not about whichever evidence happens to be committed today."""
+    (tmp_path / "judge_run").mkdir()
+    (tmp_path / "judge_run" / "evidence.json").write_text(
+        '{"suppliers": ["Andes Verde Import Export SAS"], "case_ids": ["JR-A-1C1535"]}'
+    )
+    monkeypatch.setattr(erp, "SPIKES", tmp_path)
+
+    cited = erp.cited_by_evidence(
+        ["Andes Verde Import Export SAS", "JR-A-1C1535", "TEST Supplier 4"]
+    )
+
+    assert set(cited) == {"Andes Verde Import Export SAS", "JR-A-1C1535"}
+    # Reported relative to the repo root in production ("spikes/<name>/..."),
+    # which under a tmp_path SPIKES becomes the tmp dir's own name.
+    assert cited["JR-A-1C1535"][0].endswith("judge_run/evidence.json")
+
+
+def test_purge_refuses_a_target_a_spike_evidence_file_cites(tmp_path, monkeypatch):
+    """The rule that did not exist on day 7.
+
+    A cleanup deleted the case and supplier that `one_erp_write_after_retry`
+    reads, and the criterion could not be re-proven until the drill was run
+    again. Naming the target is not enough when a committed proof asserts
+    something about it, so the refusal happens before the dry-run print — a
+    purge that would destroy evidence cannot be rehearsed and then confirmed.
+    """
+    (tmp_path / "core_contracts").mkdir()
+    (tmp_path / "core_contracts" / "retry_drill.json").write_text(
+        '{"case_id": "DLQ-SWEEP-C1BDE3FC", "supplier": "DLQ Sweep Probe SAS"}'
+    )
+    monkeypatch.setattr(erp, "SPIKES", tmp_path)
+    args = Namespace(
+        test_suppliers=False, supplier=["DLQ Sweep Probe SAS"],
+        case=None, communication=None, file=None, yes=True, database="(default)",
+    )
+
+    assert erp.cmd_purge(args) == 2
+
+
+def test_purge_still_proceeds_for_a_target_no_evidence_mentions(tmp_path, monkeypatch, capsys):
+    """The guard must not become a refusal of everything: residue is exactly
+    what purge exists to remove, and a rule that blocks it would be worked
+    around rather than obeyed."""
+    (tmp_path / "core_contracts").mkdir()
+    (tmp_path / "core_contracts" / "retry_drill.json").write_text('{"supplier": "DLQ Sweep Probe SAS"}')
+    monkeypatch.setattr(erp, "SPIKES", tmp_path)
+    args = Namespace(
+        test_suppliers=False, supplier=["TEST Supplier 12"],
+        case=None, communication=None, file=None, yes=False, database="(default)",
+    )
+
+    assert erp.cmd_purge(args) == 0
+    assert "TEST Supplier 12" in capsys.readouterr().out

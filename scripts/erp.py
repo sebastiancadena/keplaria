@@ -53,6 +53,7 @@ from app.executor.frappe import frappe_client  # noqa: E402
 from app.state.firestore import CASES, get_client  # noqa: E402
 
 WATCHLIST = Path(__file__).resolve().parent.parent / "fixtures" / "watchlist" / "entities.ftm.json"
+SPIKES = Path(__file__).resolve().parent.parent / "spikes"
 LIVE_DB = "(default)"
 
 
@@ -199,6 +200,48 @@ def protected_files(rows: list[dict]) -> list[str]:
     and deleting one takes the site's attachment tree with it.
     """
     return [row["name"] for row in rows if row.get("is_folder")]
+
+
+def cited_by_evidence(targets: list[str]) -> dict[str, list[str]]:
+    """Which purge targets are named by a spike evidence file, and by which.
+
+    Committed evidence is not a description of a proof, it IS the proof for
+    anything asserted about deployed state — a case id, a command id, a
+    supplier the ERP must hold exactly one of. Deleting such a record does
+    not make a claim stale, it makes it unverifiable, and nothing about the
+    deletion looks wrong at the time.
+
+    That is not hypothetical. The day-7 hygiene pass (`0f5e831`) deleted 13
+    cases by `DLQ-*` prefix and the supplier they named; on 2026-08-19 the
+    core-contracts manifest went red because `one_erp_write_after_retry` had
+    nothing left to read, and the proof had to be re-made from scratch
+    (`spikes/core_contracts/redrill_retry.py`). The cleanup and the manifest
+    depending on it were committed the same day.
+
+    So this refuses rather than warns — the opposite of the watchlist
+    substring rule above, and for the opposite reason. There, a substring hit
+    cannot distinguish a real mention from the demo's deliberate near-miss,
+    so it can only warn. Here the target is an exact record name the operator
+    typed, and a file asserting something about it is enough: over-refusing
+    costs one edit, under-refusing costs a gate.
+
+    Every .json under spikes/ is read, not only committed ones, so a drill's
+    fresh output protects its own records before anyone commits it.
+    """
+    if not targets:
+        return {}
+    citations: dict[str, list[str]] = {}
+    for path in sorted(SPIKES.rglob("*.json")):
+        try:
+            text = path.read_text()
+        except OSError:
+            continue
+        for target in targets:
+            if target and target in text:
+                citations.setdefault(target, []).append(
+                    str(path.relative_to(SPIKES.parent))
+                )
+    return citations
 
 
 def _cases(database: str = LIVE_DB) -> list[tuple[str, dict]]:
@@ -351,6 +394,26 @@ def cmd_purge(args) -> int:
                 print(f"  File          {name}")
             print("Nothing was deleted. Re-run without them.")
             return 2
+
+    # Same placement and the same reason as the folder check above: this runs
+    # before the dry-run print, so a purge that would destroy a proof cannot
+    # even be rehearsed and then confirmed out of habit.
+    cited = cited_by_evidence(
+        targets_suppliers + targets_cases + targets_comms + targets_files
+    )
+    if cited:
+        print(f"Refusing {len(cited)} target(s) — committed evidence asserts something about them:")
+        for target, files in sorted(cited.items()):
+            print(f"  {target}")
+            for file in files:
+                print(f"      cited by {file}")
+        print(
+            "\nNothing was deleted. Deleting these does not make a claim stale, it "
+            "makes it unverifiable — this already cost the core-contracts manifest "
+            "a criterion on 2026-08-19. If they must go, stop citing them first, "
+            "then re-run the drill that replaces them."
+        )
+        return 2
 
     print(
         f"Would delete {len(targets_suppliers)} supplier(s), {len(targets_comms)} message(s), "

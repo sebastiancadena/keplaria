@@ -197,11 +197,6 @@ def _spike_verdict(name: str) -> tuple[bool, str]:
     return False, "no recognisable verdict in evidence"
 
 
-SWEEP_CASE = "DLQ-SWEEP-43CDC293"
-SWEEP_COMMAND = f"{SWEEP_CASE}:clear_hold:c1"
-SWEEP_SUPPLIER = "DLQ Sweep Probe SAS"
-
-
 def retried_erp_write_is_singular() -> tuple[bool, str]:
     """A command that failed, retried, and succeeded left exactly ONE record.
 
@@ -212,32 +207,64 @@ def retried_erp_write_is_singular() -> tuple[bool, str]:
     The unit tests above prove the ledger REFUSES a re-claim after success.
     This proves the consequence actually held in the ERP: one supplier, not a
     duplicate created by the second execution.
+
+    **The proof is DISCOVERED, not named.** Until 2026-08-19 this check read
+    one hardcoded command id, and that command stopped existing: the day-7
+    ERP hygiene pass (`0f5e831`) deleted 13 cases by prefix, DLQ-* among
+    them, and the supplier they name — the exact records this criterion
+    reads. The contract had not regressed; its evidence had been deleted by a
+    cleanup committed the same day as the manifest depending on it. Pinning
+    to a single id made a routine tidy-up able to unprove a gate, so the
+    ledger is now asked the question instead: does ANY command in the
+    deployed outbox carry `status: done` with `execution_attempts >= 1`?
+    `record_failure` is that field's only writer, so `>= 1` with `done` IS a
+    failure followed by a success — `> 1` would silently exclude the single
+    failure, which is the ordinary case and was briefly mistaken for a hole.
+
+    When nothing matches, the answer is to re-run
+    `spikes/core_contracts/redrill_retry.py`, which makes a real one: a
+    genuine ERP refusal, an out-of-band repair, and the DEPLOYED sweep — not
+    the script — driving the command to done.
     """
+    from google.cloud import firestore
+
     from app.executor.frappe import frappe_client
+    from app.lifecycle import CLEAR_HOLD
+    from app.state.commands import DONE
     from app.state.firestore import CASES, OUTBOX, get_client
 
     db = get_client(database="(default)")
-    snap = (
-        db.collection(CASES).document(SWEEP_CASE)
-        .collection(OUTBOX).document(SWEEP_COMMAND).get()
-    )
-    if not snap.exists:
-        return False, f"command {SWEEP_COMMAND} is absent from the deployed ledger"
-    command = snap.to_dict() or {}
-    attempts = int(command.get("execution_attempts") or 0)
-    if command.get("status") != "done":
-        return False, f"command status is {command.get('status')!r}, expected done"
-    if attempts < 1:
+    candidates = []
+    for snap in db.collection_group(OUTBOX).where(
+        filter=firestore.FieldFilter("status", "==", DONE)
+    ).stream():
+        row = snap.to_dict() or {}
+        if int(row.get("execution_attempts") or 0) >= 1:
+            candidates.append((snap.reference.parent.parent.id, snap.id, row))
+    if not candidates:
         return False, (
-            "command never failed, so this proves nothing about retry "
-            "(execution_attempts is written only by record_failure)"
+            "no command in the deployed ledger has failed then succeeded "
+            "(status=done with execution_attempts>=1); re-run "
+            "spikes/core_contracts/redrill_retry.py to make one"
         )
+
+    # A clear_hold carries a second, stronger assertion — that the retried
+    # write took EFFECT in the ERP, not merely that it was recorded — so it
+    # is preferred when the ledger holds one.
+    candidates.sort(key=lambda c: c[2].get("action") != CLEAR_HOLD)
+    case_id, cmd_id, command = candidates[0]
+    action = command.get("action")
+
+    case = (db.collection(CASES).document(case_id).get().to_dict() or {})
+    supplier = case.get("supplier")
+    if not supplier:
+        return False, f"case {case_id} names no supplier, so the ERP side cannot be checked"
 
     with frappe_client() as client:
         response = client.get(
             "/api/resource/Supplier",
             params={
-                "filters": json.dumps([["name", "=", SWEEP_SUPPLIER]]),
+                "filters": json.dumps([["name", "=", supplier]]),
                 "fields": '["name","on_hold"]',
                 "limit_page_length": 100,
             },
@@ -246,11 +273,14 @@ def retried_erp_write_is_singular() -> tuple[bool, str]:
         records = response.json()["data"]
 
     if len(records) != 1:
-        return False, f"{len(records)} ERP records named {SWEEP_SUPPLIER!r}, expected exactly 1"
-    if records[0].get("on_hold"):
-        return False, "the retried clear_hold did not take effect (on_hold is still set)"
+        return False, f"{len(records)} ERP records named {supplier!r}, expected exactly 1"
+    if action == CLEAR_HOLD and records[0].get("on_hold"):
+        return False, f"the retried {action} did not take effect (on_hold is still set)"
     return True, (
-        f"failed {attempts}x then done; exactly 1 ERP record, hold cleared"
+        f"{cmd_id} failed {command.get('execution_attempts')}x then done; "
+        f"exactly 1 ERP record for {supplier!r}"
+        + ("; hold cleared" if action == CLEAR_HOLD else "")
+        + f" ({len(candidates)} such command(s) in the ledger)"
     )
 
 
