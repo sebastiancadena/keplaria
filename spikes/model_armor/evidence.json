@@ -6,12 +6,14 @@
   "reproduce": "uv run python spikes/model_armor/probe.py \"$(gcloud auth print-access-token)\"",
   "template": {
     "name": "projects/keplaria/locations/us-central1/templates/keplaria-probe-throwaway",
-    "disposition": "THROWAWAY \u2014 delete if this is not adopted",
+    "disposition": "DELETED 2026-08-19, same day it was created. Nothing was admitted, so nothing needed it. Recreate with the command below if the malicious-URI filter is ever taken up; both probes in this directory target this exact template name and will 404 until it exists.",
     "filters": {
       "pi_and_jailbreak": "ENABLED at LOW_AND_ABOVE (most sensitive setting available)",
       "sdp_basic_config": "ENABLED",
       "malicious_uri": "ENABLED"
-    }
+    },
+    "recreate": "CLOUDSDK_API_ENDPOINT_OVERRIDES_MODELARMOR=https://modelarmor.us-central1.rep.googleapis.com/ gcloud model-armor templates create keplaria-probe-throwaway --location=us-central1 --project=keplaria --malicious-uri-filter-settings-enforcement=enabled --pi-and-jailbreak-filter-settings-enforcement=enabled --pi-and-jailbreak-filter-settings-confidence-level=low-and-above --basic-config-filter-enforcement=enabled",
+    "endpoint_note": "The CLOUDSDK_API_ENDPOINT_OVERRIDES_MODELARMOR prefix is required. Without it gcloud targets the global hostname, which refuses every Model Armor read with PERMISSION_DENIED even for a project Owner \u2014 an error that reads as missing IAM and is not."
   },
   "findings": [
     {
