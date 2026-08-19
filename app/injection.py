@@ -12,10 +12,24 @@ platform allows one concurrent query, so a raising scanner becomes retry
 pressure rather than a decision. Malformed input is tainted, not an
 exception; unreadable evidence fails closed.
 
-`scan`'s signature is the seam. A later content-safety backend replaces this
-body without touching the graph, the policy factor, or any test. That backend
-cannot run inside the graph — the serving engine's network attachment has no
-public internet egress — so it will live on the ingress side behind this same
+`scan`'s signature is the seam, but the seam is for ADDING a check beside
+this one, not for swapping this one out. That distinction is measured, not
+stylistic. Model Armor — the obvious commercial backend — was probed against
+this project's own corpus on 2026-08-19 and lost: at its most sensitive
+setting its prompt-injection filter returns NO_MATCH_FOUND on
+fixtures/documents/manglar-cert-injected.json, the page this module taints
+with five findings. The payload does match in isolation and survives 89
+characters of prepended certificate prose, then stops matching at 108; a
+realistic document is longer than that, so no configuration of that filter
+detects this class of payload where it actually appears. Whatever else
+arrives here, this body stays until something beats it on the corpus that
+exists. See spikes/model_armor/evidence.json.
+
+Where such a backend can run is settled too, and not by preference: the
+serving engine reaches googleapis.com but not the *.rep.googleapis.com
+regional endpoints that answer Model Armor's data plane, measured from
+inside the deployed engine. An in-graph call is impossible rather than
+inadvisable, so any added check lives on the ingress side behind this same
 signature.
 
 Detection is a conjunction, not five independent regexes: text taints a page
