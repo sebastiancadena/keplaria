@@ -120,7 +120,7 @@ case "$yente_status" in
       meh "keplaria-yente RUNNING but not answering on 8000 (index still loading?) — every screened beat would wait 30s and then record SCREENING_UNAVAILABLE"
     fi
     ;;
-  TERMINATED) meh "keplaria-yente VM TERMINATED — nightly stop fired, no start schedule exists; start it (expect us-central1-c stockout retries)" ;;
+  TERMINATED) meh "keplaria-yente VM TERMINATED — nightly stop fired, no start schedule exists; start it. On a capacity error, switch machine family (set-machine-type e2-/n2-/t2d-standard-4) rather than retrying the same one — see README" ;;
   "")         meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)" ;;
   *)          meh "keplaria-yente VM in state $yente_status" ;;
 esac

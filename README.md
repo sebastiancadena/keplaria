@@ -383,15 +383,31 @@ Vertex AI API under its current name, not a separate product.
   project. It is also what `services.py` binds to as the session backend on
   Cloud Run / local, via its find-or-create-by-display-name fallback. See
   [Deploying](#deploying-to-agent-runtime).
-- **VM `keplaria-yente`** (`us-central1-c`): `t2d-standard-4` (e2 was stocked
-  out region-wide on creation day), 60 GB pd-ssd, **no external IP**
-  (10.10.0.2), service account `yente-vm@`. Nightly stop 01:00
-  America/Bogota (`keplaria-nightly-stop`), daily snapshots, 7-day retention
-  (`keplaria-daily-snap`). SSH:
+- **VM `keplaria-yente`** (`us-central1-c`): `e2-standard-4`, 60 GB pd-ssd,
+  **no external IP** (10.10.0.2), service account `yente-vm@`. Nightly stop
+  01:00 America/Bogota (`keplaria-nightly-stop`), daily snapshots, 7-day
+  retention (`keplaria-daily-snap`). SSH:
   `gcloud compute ssh keplaria-yente --zone us-central1-c --tunnel-through-iap`
   — **the nightly stop has no matching start schedule, so the VM is
-  `TERMINATED` most mornings and must be started by hand; `us-central1-c`
-  returns capacity errors on start often enough to need a retry loop.**
+  `TERMINATED` most mornings and must be started by hand.**
+- **When the start fails with "does not have enough resources available",
+  change the machine family — do not sit in a retry loop.** The stockout is
+  per family and it moves: `e2` was out region-wide on creation day (hence the
+  original `t2d-standard-4`), and on 2026-08-19 `t2d` and `n2` were both out
+  while `e2` started first try. All three are 4 vCPU / 16 GB and yente does not
+  care which it runs on. The boot disk is zonal and stays put, so this is one
+  command on the stopped VM and the IP, subnet, and index survive it:
+
+  ```bash
+  gcloud compute instances set-machine-type keplaria-yente \
+    --zone us-central1-c --machine-type e2-standard-4   # or n2-, t2d-standard-4
+  gcloud compute instances start keplaria-yente --zone us-central1-c
+  ```
+
+  Changing **zone** is the expensive fallback and rarely the right first move:
+  the disk would have to be imaged and the VM rebuilt. After any start, wait
+  for SERVING — the index takes ~90s to load and the VM reports `RUNNING`
+  throughout; `scripts/doctor.sh` probes for it.
 - **Screening service** on that VM: yente + Elasticsearch, serving
   `10.10.0.2:8000` inside the VPC. Runbook, network posture, and the
   `/match` cutoff/threshold gotcha are in
