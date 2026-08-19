@@ -1,0 +1,112 @@
+{
+  "spike": "gemini_37_flash_evaluation",
+  "date": "2026-08-19",
+  "question": "Should the three LlmAgents move from gemini-3.6-flash to gemini-3.7-flash? The reason to look was never speed: on 3.6 a named thinking budget is an off switch, so all three agents run with reasoning effectively off and no measured margin on cases harder than the eight graded ones. If 3.7 honoured a budget as a BOUND, that margin would come back at bounded latency -- the one thing raising the current numbers cannot buy.",
+  "verdict": "REJECT -- reverted the same session, nothing shipped. 3.7 does not honour a budget as a bound under this graph's configuration (zero reasoning tokens, same as 3.6), so the sole reason to move is answered no. Independently, it could not complete the 8-case domain eval suite: two full attempts aborted on 429 RESOURCE_EXHAUSTED at different cases, while 3.6 ran the same suite twice clean in the same session. A model change has to happen well before submission or not at all, so this closes the question rather than deferring it.",
+  "reproduce": "set -a && source .env && set +a; GOOGLE_CLOUD_LOCATION=global uv run python spikes/gemini_37_eval/probe.py matrix",
+  "decisive_finding": {
+    "claim": "On the configuration the graph actually deploys -- output_schema plus a named thinking_budget -- BOTH models emit ZERO reasoning tokens. 3.7 buys back no margin.",
+    "thought_tokens_by_cell": {
+      "note": "Median of 3 calls, extractor's own instruction over fixtures/documents/andes-verde-cert-2027.json, temperature 0. 'schema' means response_schema=EvidenceResult, which is what output_schema on the LlmAgent produces.",
+      "gemini-3.6-flash": {
+        "budget=None,schema=True": {
+          "median": 972,
+          "runs": [
+            912,
+            972,
+            1380
+          ]
+        },
+        "budget=1024,schema=True": {
+          "median": 0,
+          "runs": [
+            0,
+            0,
+            0
+          ]
+        },
+        "budget=1024,schema=False": {
+          "median": 514,
+          "runs": [
+            869,
+            514,
+            194
+          ]
+        }
+      },
+      "gemini-3.7-flash": {
+        "budget=None,schema=True": {
+          "median": 532,
+          "runs": [
+            971,
+            491,
+            532
+          ]
+        },
+        "budget=1024,schema=True": {
+          "median": 0,
+          "runs": [
+            0,
+            0,
+            0
+          ]
+        },
+        "budget=1024,schema=False": {
+          "median": 0,
+          "runs": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "reading": "The deployed cell (budget + schema) is zero on both models: the pin is an off switch on 3.7 exactly as on 3.6, and the margin the evaluation was looking for does not exist there.",
+    "refinement_of_an_existing_claim": "app/agent.py and STATUS record this as a property of the MODEL ('on this model any explicit budget reads as do-not-reason-at-length'). Measured here, it is a property of the model AND the call. Same prompt, same 1024 budget, schema removed: 3.6 reasons at a 514-token median rather than zero. So on 3.6 the off switch is conditioned on structured output. It is not a clean model-level rule on 3.7 either -- on a short unstructured sanctions-band prompt 3.7 reasoned at a 502-token median. What holds without qualification is the operational claim: every LLM call this graph makes carries an output_schema and a budget, and that cell is zero on both models.",
+    "consequence_for_the_pin": "Unchanged. The pin stays, on 3.6, and the standing note stands: the coordinator is the first place to restore reasoning if a routing flake reappears. 3.7 is not a way to get a middle setting."
+  },
+  "control_gemini_36_flash": {
+    "domain_evals": {
+      "ran": "2026-08-19 12:15:25",
+      "mean_score": 1.0,
+      "num_cases_total": 8,
+      "num_cases_valid": 8,
+      "num_cases_error": 0,
+      "evidence": "spikes/domain_evals/evidence.json (also spikes/domain_evals/history/results_20260819_121525.json)",
+      "note": "Run FIRST, before any swap, because the 8/8 we held was a day-old number and this suite has gone stale under us once before. It is green today, on the shipped graph, unmodified."
+    },
+    "judge_run": {
+      "ran": false,
+      "blocked_by": "keplaria-yente could not be started: us-central1-c has no capacity for t2d-standard-4. Seven start attempts across ~10 minutes, all 'does not have enough resources available'. The VM's boot disk is zonal, so another zone means rebuilding the VM, not restarting it.",
+      "consequence": "The 56.9s machine-time criterion was never tested on either model, and no fresh 3.6 judge-run control exists for today. This does not change the verdict: 3.7 fails at the eval stage, before latency is reachable, and the decisive reasoning measurement needs no deployment at all. It does mean the standing 56.9s figure is still a 2026-08-18 number carried forward, measured on an engine that has been redeployed twice since."
+    }
+  },
+  "candidate_gemini_37_flash": {
+    "change_under_test": "The three model= lines in app/agent.py only. tests/eval/response_quality.py stayed on 3.6 deliberately -- moving the grader with the graded makes the score meaningless.",
+    "domain_evals": {
+      "attempt_1": {
+        "aborted_at": "injection_refusal (case 5 of 8)",
+        "error": "429 RESOURCE_EXHAUSTED"
+      },
+      "attempt_2": {
+        "aborted_at": "screening_match_blocked (case 6 of 8)",
+        "error": "429 RESOURCE_EXHAUSTED"
+      },
+      "score": null,
+      "note": "No score was ever produced, so the 'must beat 8/8' criterion cannot be met. 3.6 completed the identical suite twice in the same session with zero 429s."
+    },
+    "is_the_429_model_specific": {
+      "test": "24 interleaved small calls, both models, same minute (probe.py throttle)",
+      "result": {
+        "gemini-3.6-flash": "12/12 ok",
+        "gemini-3.7-flash": "12/12 ok"
+      },
+      "reading": "Not a blanket per-request block on 3.7. It is payload- and load-dependent: the eval's calls carry a full document and a response schema, and those are what fail. Small calls do not reproduce it, so a shallow smoke test would have called 3.7 healthy.",
+      "not_a_documented_quota": "The per-model Vertex quotas are IDENTICAL for the two models on this project (global_generate_content_input_tokens_per_minute_per_base_model: 50,000,000 and 5,000,000,000, effective == default for both). So this is serving-side capacity for a newly released model, not a limit that can be raised by request."
+    },
+    "risk_if_adopted_anyway": "The judging window is 2026-09-01 to 2026-10-01 and the infrastructure has to stay up through it unattended. A model that intermittently 429s on exactly this graph's payloads would fail the demo in a way no local smoke test would catch first."
+  },
+  "price_note": "3.7 introductory pricing is $0.75 / $3.75 per 1M in/out. Never became load-bearing -- the evaluation failed on behaviour and availability before cost was reachable.",
+  "residue": "None. app/agent.py is reverted to gemini-3.6-flash (verified by re-reading the three lines), spikes/domain_evals/evidence.json holds today's 3.6 control run rather than a half-finished 3.7 run, and no engine was ever deployed on 3.7 -- every 3.7 call in this evaluation was local or a direct API probe. Firestore emulator and yente stub were local and are stopped.",
+  "revisit": "Only if the pin's cost becomes load-bearing while a model change is still safely reversible AND 3.7's serving capacity settles. Once the build is frozen for submission, a model change is out of scope by rule."
+}

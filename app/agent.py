@@ -173,6 +173,15 @@ evidence_agent = LlmAgent(
     # So read the number as "reasoning is off", not "reasoning is capped at
     # 1024" -- raising it will not buy back a middle setting.
     # tests/unit/test_agent_generation_config.py records what this cost.
+    #
+    # Refined 2026-08-19 (spikes/gemini_37_eval): the off switch is a property
+    # of the model AND the call, not of the model alone. Strip the output_schema
+    # and 3.6 reasons at a ~514-token median under this same 1024 budget. Every
+    # call this graph makes carries a schema, so the note above holds where it
+    # is written -- but it is not a general rule about the model, and neither is
+    # changing model a way around it: gemini-3.7-flash is zero in this same cell.
+    # Switching to a different model was evaluated on exactly that hope and
+    # rejected; the spike's evidence.json carries the matrix.
     generate_content_config=types.GenerateContentConfig(
         temperature=0.0,
         thinking_config=types.ThinkingConfig(thinking_budget=1024),
