@@ -4,6 +4,55 @@ Agent project built on the [Google Agent Development Kit (ADK)](https://adk.dev)
 for Python, targeting the
 [Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start).
 
+**Continuous supplier assurance.** A supplier is onboarded once and then kept
+compliant with no one watching. The same durable mission that created the ERP
+record wakes months later on its own clock, requests renewed evidence, places a
+reversible hold when the certificate lapses, validates the renewal against the
+source document, and releases the hold. Work that a person otherwise does by hand,
+on a calendar reminder, if they remember.
+
+One deployed run of that whole loop: **61.5 s of machine time and a single
+25.5 s human approval**, against an author-timed manual walkthrough of the work
+that took **663.5 s over 20 steps** — 19 of which the run removes, the twentieth
+being the approval that policy requires a human to make. Numbers and method:
+[`spikes/judge_run/evidence.json`](spikes/judge_run/evidence.json) and
+[`spikes/manual_baseline/evidence.json`](spikes/manual_baseline/evidence.json).
+The baseline is author-timed, not practitioner-reviewed, and is labelled that
+way everywhere it is used.
+
+Live case console (no sign-in):
+<https://keplaria-console-bklu5jcdea-uc.a.run.app>
+
+## Judging criteria → proof
+
+Every row points at a file in this repository that was produced by running the
+system, not by describing it. `spikes/core_contracts/harness.py` re-executes the
+tests it cites and re-reads the evidence it cites on every run, so a claim here
+cannot outlive the behaviour behind it.
+
+| Criterion | What it asks | Proof in this repo |
+|---|---|---|
+| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? | The lifecycle closes: onboard → wake → request evidence → hold → validate renewal → release, over two suppliers and 380 simulated business days, in [`spikes/judge_run/`](spikes/judge_run/). A coordinator selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. |
+| **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure, injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite. A schema-valid but source-unsupported worker value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
+| **Demo & Production Readiness** (30%) | Does the video define the friction and architecture, show an unedited live execution, and are setup, diagram, deployment and proof reproducible? | The console URL above is live. The run in `spikes/judge_run/` is a real deployment, re-run on the engine currently serving. `bash scripts/doctor.sh` checks deployment and configuration preconditions read-only and prints its own pass/fail summary; the architecture diagram is generated from committed sources, not drawn; setup is [below](#setup-from-a-fresh-clone). |
+
+## Platform subsystem coverage
+
+The track names seven subsystems. This table says which are used natively, which
+are answered by a first-party equivalent, and which are deliberately not used.
+A subsystem that is not used says so and says why — including the one that was
+measured and turned down.
+
+| Subsystem | Status | What is actually true |
+|---|---|---|
+| **Agent Runtime** | Native | Hosts the ADK graph as reasoning engine `keplaria`. Reaches the screening VM over a PSC interface; that VM has no external IP and is not reachable from the internet, and keeps execution state in Agent Platform Sessions. |
+| **Agent Registry** | Native | The deployment auto-registers with no publish step; the entry is live and refreshes on redeploy. It carries the framework (`google-adk`), the runtime reference, the runtime identity principal, and the callable interfaces. Honest limit: those are the fields the Registry populates itself — it holds no owner, purpose, or tool-scope description of its own. |
+| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP identity is scoped rather than trusted: it receives Frappe's native 403 on anything outside its role. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
+| **Memory Bank** | Deliberately not used | Transactional Firestore owns authoritative case state — case version, event claim, approval, command outbox — and Sessions retain resumable agent history. Generative memory is not trusted with compliance facts, and Sessions are not described here as a Memory Bank equivalent; they hold different things. |
+| **Model Armor** | Measured, not adopted | Probed against this project's own corpus on 2026-08-19 and turned down on the evidence: its prompt-injection filter returns `NO_MATCH_FOUND` on the planted injection fixture that the incumbent check catches with five findings, and its data plane is unreachable from the engine's network. One filter did deliver — malicious-URI detection, with no false positives on clean fixtures. Full measurement, including the context-dilution boundary that explains the miss: [`spikes/model_armor/evidence.json`](spikes/model_armor/evidence.json). |
+| **Agent Gateway** | Not used | Ingress is an authenticated Pub/Sub push adapter on Cloud Run that refuses anonymous callers, and the human decision surface sits behind IAP. Nothing in the design needed a gateway in front of that. |
+| **Agent Observability** | Native | Cloud Trace and Cloud Logging. Traces are load-bearing rather than decorative: a 10.6 s rise in run time was diagnosed node-by-node against them and traced to model reasoning length, not to code. |
+
 ## Architecture
 
 ![Keplaria system architecture](docs/architecture/architecture.svg)
