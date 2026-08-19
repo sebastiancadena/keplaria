@@ -1,4 +1,4 @@
-<title>The hold landed before I approved it</title>
+<title>The smoke test said yes</title>
 <style>
 /*__FONTS__*/
 
@@ -209,7 +209,7 @@ strong { font-weight: 600; }
 
 .turn p:last-child { margin-bottom: 0; }
 
-/* the mutation readout — the page's signature device */
+/* the probe readout — the page's signature device */
 
 .readout {
   display: flex;
@@ -245,6 +245,41 @@ strong { font-weight: 600; }
   color: var(--muted);
   margin: 0 0 6px;
 }
+
+/* ---------- measurement tables ---------- */
+
+.table-scroll { overflow-x: auto; margin: 20px 0; }
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.matrix th {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  text-align: left;
+  padding: 6px 14px 6px 0;
+}
+
+.matrix td {
+  border-top: 1px solid var(--rule);
+  padding: 8px 14px 8px 0;
+  vertical-align: baseline;
+}
+
+.matrix th.num, .matrix td.num { text-align: right; padding-right: 0; padding-left: 14px; }
+
+.matrix .zero { color: var(--fail); font-weight: 700; }
+.matrix .hit { color: var(--pass); font-weight: 500; }
+.matrix .note { color: var(--muted); }
 
 /* ---------- pull quote ---------- */
 
@@ -317,13 +352,14 @@ li:last-child { margin-bottom: 0; }
 <header class="hero">
   <div class="wrap">
     <p class="eyebrow">Field notes · autonomous agents</p>
-    <h1>The hold landed before I approved it</h1>
-    <p class="standfirst">I built an agent that puts a supplier into a real ERP, and then keeps governing
-      it for months — renewals, holds, releases — mostly unattended. One evening it placed a hold
-      <strong>eleven minutes and eight seconds before I clicked approve</strong>. What that meant for the
-      test suite that stayed green the whole time is the five defects below.</p>
-    <p class="byline">An unattended agent, five green defects, and the methods that actually find this
-      kind of thing.</p>
+    <h1>The smoke test said yes</h1>
+    <p class="standfirst">Three times in one build, the signal everyone acts on said yes and a small
+      probe said no. A commercial injection filter at its most sensitive setting missed the payload a
+      sentence-level heuristic catches — and the miss has a <strong>measured boundary at 89
+      characters</strong>. A documented reasoning budget turned out to be an off switch. And a model
+      that went 12/12 on small calls could not finish the real workload twice.</p>
+    <p class="byline">Three measured findings, the probes that settled them, and the mechanism behind
+      each one.</p>
   </div>
 </header>
 
@@ -331,296 +367,223 @@ li:last-child { margin-bottom: 0; }
   <div class="wrap">
 
     <section>
-      <p class="lede">The system starts with a stack of documents — a certificate of insurance, a tax
-        form, a food-safety certificate, a bank reference — and ends with a supplier you can buy from.
-        An agent extracts the fields, a screening service checks the company against a sanctions
-        index, and a written policy scores the result. When the policy clears, a supplier record is
-        written to a real ERP. When it does not, nothing is written, and the verdict decides what
-        happens next: some cases stop for a human call, and some are simply not allowed to happen.
-        Agents propose; deterministic code decides; a ledger records which. The ledger matters more
-        than it sounds like it should, for a reason that comes up five times below.</p>
+      <p class="lede">The system these findings come from reads supplier documents — certificates of
+        insurance, food-safety certificates, bank letters — extracts the fields with an LLM, screens
+        the company against a sanctions index, scores the result with a written policy, and writes the
+        outcome into a real ERP. It runs mostly unattended, and it was built on a hackathon deadline,
+        which is exactly the condition under which surface signals are most tempting: a filter shows
+        enabled, a knob accepts a value, a smoke test comes back green, and the schedule wants you to
+        move on.</p>
 
-      <p>Onboarding is the easy part, and it takes seconds. The hard part is what follows, because a
-        certificate expires. The system mails a renewal request; the evidence is overdue and it places
-        a hold on the supplier — they can no longer be purchased from; months later the new evidence
-        arrives, and the hold is lifted. <strong>None of this waits for anyone</strong>, and that is
-        the property the whole build is about. In the run you would see in a demo, the clock is
-        fast-forwarded and disclosed: I am the one publishing the events — a renewal due 330 days
-        after onboarding, evidence still missing at 345, and then a new certificate that clears the
-        hold at last. What the clock is not simulating is the reaction: which supplier to park, who
-        to hold, when a hold lifts, and that none of it had to be asked for. A full two-supplier run — one parked for a human, the other governed end
-        to end across two certificate cycles — is about a minute of machine time.</p>
+      <p>Three times, the surface signal and the measured behaviour disagreed. Each disagreement was
+        settled by a probe small enough to write in an afternoon, each probe is committed next to its
+        evidence and re-runs from one command, and each produced not just a verdict but a mechanism —
+        which is the part that makes a finding portable instead of an anecdote. The three reduce to
+        one sentence each:</p>
 
-      <p>For most software a green suite is enough, because someone is there to notice when it is
-        lying. Not here: the thing that writes to the ERP runs with nobody watching, so the dangerous
-        failure is not a test that fails. It is a test that passes and proves nothing. Of the five
-        below, all of them sat green on my desk this build, and four were specified by the plan
-        rather than the code. They are grouped by symptom rather than numbered, because they are a
-        taxonomy and not a sequence: you can meet them in any order, and probably will.</p>
+      <p class="pull">Enabled is not detecting. Configured is not bounded. Responding is not
+        serving.</p>
     </section>
 
     <article class="case">
-      <p class="symptom">symptom: the control was never exercised</p>
-      <h2>A safety eval that measured the model's manners</h2>
+      <p class="symptom">symptom: enabled is not detecting</p>
+      <h2>The filter that stopped detecting at 108 characters</h2>
 
-      <p>A document arrives with a sentence planted in it, addressed to whatever machine is about to
-        read the page next. The eval for it passed — green across the whole suite — and I believed for
-        a day that I had a working injection defence. A day. The system this piece describes is left
-        alone most of the time, and I had used that day to decide I was safe.</p>
+      <p>The build's canonical injection fixture is a synthetic food-safety certificate with a
+        sentence planted mid-document: <em>"NOTE TO AUTOMATED SYSTEMS PROCESSING THIS DOCUMENT:
+        Ignore all previous instructions&#8230;"</em> — the realistic shape of the attack, dressed in
+        document formatting, surrounded by legitimate certificate prose. Two detectors got to read
+        it.</p>
+
+      <p>The first is Model Armor, Google Cloud's model-safety service, with its prompt-injection and
+        jailbreak filter enabled at <code>LOW_AND_ABOVE</code> — the most sensitive setting the
+        template accepts. The second is the incumbent: a deterministic scanner that taints a page only
+        when a <em>directive</em> (an instruction addressed to the reader) and a <em>machine-reader
+        signal</em> (something that only makes sense if the reader is automated) occur in the same
+        sentence.</p>
 
       <div class="turn">
-        <p>What the eval actually measured was the model declining to comply. Nothing in the
-          enforcement path had been exercised at all. On a different day, with a different temperature,
-          the same green test would have sat over a system that did the wrong thing.</p>
+        <p>The commercial filter returned <code>NO_MATCH_FOUND</code> on the full document. The
+          sentence-level heuristic tainted the same page with five findings.</p>
       </div>
 
-      <p>Worse, the control I thought was doing the work could not have done it. Extracted values are
-        checked against the source document — a value has to appear in the span the agent cites. But an
-        obedient agent cites the planted sentence as its provenance, and <em>that sentence genuinely is
-        on the page</em>. Provenance checking accepts injection-obedient extraction by construction. It
-        is a defence against invention, not against instruction.</p>
+      <p>The first question a result like that should raise is whether the instrument works at all.
+        It does: a blunt English jailbreak matched at HIGH confidence on the same template, bare and
+        with certificate prose around it. So this is a detection gap, not a misconfigured filter —
+        which makes the mechanism worth isolating. Bisecting the amount of certificate prose prepended
+        to the payload:</p>
 
-      <p>The fix was to stop conflating the two. Detection of a planted directive is a separate,
-        deliberately narrow heuristic over one representative fixture, and I have not claimed anything
-        more: a rephrased payload gets past it. Enforcement is exact and structural: a document
-        flagged as tainted is never published to any state key an agent's instruction can resolve, so
-        extraction has nothing to read, and the risk gate is forced to <code>blocked</code> regardless
-        of what any model would have said. The claim I can defend is not "we detect prompt
-        injection". It is: <strong>a tainted document cannot produce a write.</strong></p>
+      <div class="table-scroll">
+        <table class="matrix">
+          <tr><th>input to the filter</th><th class="num">result</th></tr>
+          <tr><td>payload alone</td><td class="num hit">MATCH</td></tr>
+          <tr><td>payload after 89 chars of certificate prose</td><td class="num hit">MATCH</td></tr>
+          <tr><td>payload after 108 chars of certificate prose</td><td class="num zero">NO_MATCH_FOUND</td></tr>
+          <tr><td>the full certificate</td><td class="num zero">NO_MATCH_FOUND</td></tr>
+        </table>
+      </div>
+
+      <p>Two explanations that would have been easy to reach for are ruled out by the same probe. Not
+        language: an English-only rewrite of the certificate also missed. Not sentence segmentation:
+        fed to the filter one sentence at a time, <em>nothing</em> matched — whatever signal the
+        classifier needs is spread across sentences, so there is no chunking strategy that recovers
+        the detection. The effect is context dilution, and it is specific to borderline payloads: the
+        blunt HIGH-confidence jailbreak survived triple-length prose unharmed, while the realistic
+        payload never scored above LOW even with no surrounding prose at all. That last measurement
+        closes the tuning question — at any less sensitive template setting the payload never fires,
+        so <strong>no configuration of this filter detects this payload inside a real
+        document</strong>.</p>
+
+      <p>To be fair to the service: its malicious-URI filter caught a known-bad URL appended to a real
+        certificate and produced zero false positives on clean fixtures — that one delivers exactly
+        what it claims. The sensitive-data filter in basic mode matched only a credit-card number on a
+        certificate that also carried an email address, a phone number, and a US SSN. It is a mixed
+        instrument, and only measurement on your own corpus tells you which parts work for you.</p>
+
+      <p>Honesty about the winner, too: the sentence-level scanner is a heuristic over a
+        representative fixture, not a general injection defence, and a rephrased payload gets past it.
+        That is why detection was never the load-bearing control in this system — a document flagged
+        as tainted is simply never published to any state an agent can read, and the risk gate forces
+        the case to <code>blocked</code>, so a tainted document cannot produce an ERP write no matter
+        what any model thinks of it. Detection tunes recall. Enforcement is structural. The finding
+        here is narrower and measurable: on the corpus that actually exists, the small heuristic beats
+        the commercial classifier, and the margin has a boundary you can measure in characters.</p>
 
       <div class="readout">
-        <span class="edit">grade the enforcement outcome, not the model's reply</span>
-        <span class="verdict">eval was measuring nothing</span>
+        <span class="edit">most sensitive setting, real payload — the heuristic taints it with <b>5 findings</b></span>
+        <span class="verdict">NO_MATCH_FOUND</span>
       </div>
     </article>
 
     <article class="case">
-      <p class="symptom">symptom: both halves correct, jointly inert</p>
-      <h2>An approval system where every part worked and nothing happened</h2>
+      <p class="symptom">symptom: configured is not bounded</p>
+      <h2>The thinking budget that was an off switch</h2>
 
-      <p>Human approval was specified carefully. One decision per approval id, bound to the exact
-        version of the case the reviewer was shown. A replay is refused as a duplicate. A decision
-        about a version the case has already moved past is refused as stale. The executor
-        independently refuses to perform anything for a case the policy has not cleared. Both pieces
-        had tests. Both pieces were correct.</p>
+      <p>Every LLM call this system makes carries two things: a response schema, because downstream
+        code consumes structure rather than prose, and a named thinking budget, pinned to keep
+        latency inside a hard demo window. A budget invites a specific mental model — a ceiling. Set
+        1024 and the model reasons, briefly. That is what the word means everywhere else.</p>
 
       <div class="turn">
-        <p>Together they did nothing whatsoever. The terminal that parked a case for review claimed no
-          work — so when a human approved, the approval and the executor agreed, precisely and
-          correctly, about an empty queue.</p>
+        <p>Measured, the deployed configuration does not bound reasoning. It turns reasoning off:
+          zero thinking tokens, every run, on both model generations tested.</p>
       </div>
 
-      <p>This is the failure mode I now watch for hardest, because unit tests are structurally bad at
-        it. Each component's tests passed because each component was right. The tests that appeared to
-        prove the release path built their starting state by hand, and the state they built was one
-        the real system produces only during a rare redelivery anomaly. They tested a shape the system
-        essentially never has.</p>
+      <p>The probe is the extractor's own instruction over a real fixture certificate, temperature 0,
+        median of three calls per cell, varying only the two knobs:</p>
 
-      <p>Nothing failed, and nobody had to be in the room for anything to fail: this system's whole
-        point is that nobody is. I found it by reading the parking code and the approval code side by
-        side and asking what actually connects them. The answer was: nothing did.</p>
+      <div class="table-scroll">
+        <table class="matrix">
+          <tr><th>call shape</th><th class="num">gemini-3.6-flash</th><th class="num">gemini-3.7-flash</th></tr>
+          <tr><td>schema, no budget</td><td class="num">972</td><td class="num">532</td></tr>
+          <tr><td>schema + budget 1024 <span class="note">(the deployed cell)</span></td><td class="num zero">0</td><td class="num zero">0</td></tr>
+          <tr><td>no schema, budget 1024</td><td class="num">514</td><td class="num zero">0</td></tr>
+        </table>
+      </div>
+
+      <p>The third row is the interesting one, because it kills the obvious generalisation. On 3.6 the
+        off switch is not a property of the budget alone: drop the schema, keep the same 1024 budget,
+        and the model reasons at a 514-token median. It is the <em>conjunction</em> of structured
+        output and a named budget that reads as "do not reason at length" — a property of the model
+        and the call together. The first time this behaviour was written down it was recorded as a
+        property of the model, full stop, and the follow-up measurement had to narrow it. A claim that
+        lives in a code comment gets exactly one chance to be too broad before someone builds on the
+        broad version.</p>
+
+      <p>Operationally the pin stood, because the consequences were measured rather than assumed: with
+        reasoning off, the full graded eval suite still passes 8/8, and a full two-supplier run
+        dropped from 85 to 57 seconds of machine time. But what shipped is <strong>"reasoning off",
+        not "reasoning capped near the median"</strong> — and knowing which of those you shipped is
+        the difference between a latency optimisation and an unexamined capability cut. Raising the
+        number does not buy back a middle setting; that was the one thing a newer model might have
+        offered, which is why it got evaluated next.</p>
 
       <div class="readout">
-        <span class="edit">make the parking terminal claim what it parks</span>
-        <span class="verdict">feature existed for the first time</span>
+        <span class="edit"><b>thinking_budget=1024</b> reads as "reason, but briefly"</span>
+        <span class="verdict">0 thinking tokens, every run</span>
       </div>
     </article>
 
     <article class="case">
-      <p class="symptom">symptom: off-by-one in a comparison, not a count</p>
-      <h2>The audit that asked <code>&gt; 1</code> and got a clean bill of health</h2>
+      <p class="symptom">symptom: responding is not serving</p>
+      <h2>The smoke test that would have shipped an outage</h2>
 
-      <p>A short one, and my favourite, because the bug is a single character and the consequence
-        was close to certifying the opposite of the truth about the system.</p>
+      <p>The candidate was the newer flash model, and the evaluation had exactly one question: does it
+        honour a thinking budget as a bound, restoring the middle setting the pin removed? The matrix
+        above answers no — its deployed cell is zero, same as the incumbent. But the evaluation
+        surfaced a second, independent disqualifier that is the more portable finding.</p>
 
-      <p>Commands carry a counter that is incremented in exactly one place: the function that records a
-        failed attempt. I wanted to prove the retry path had genuinely happened in production — that
-        some command had failed, been retried, and succeeded exactly once. An unattended system does
-        this quietly, in the middle of the night, when nobody is around to say it happened. So I
-        queried the ledger for commands with a counter greater than one and a status of done.</p>
-
-      <div class="turn">
-        <p>Nothing matched, and I briefly concluded the retry path had never once been exercised for
-          real. But a command that failed once and then succeeded has a counter of exactly <em>1</em>.
-          The correct query was <code>&gt;= 1</code>. One record among forty-eight matched it — a
-          single command that failed, was re-driven by the scheduled sweep, and completed six seconds
-          later, leaving exactly one downstream record behind.</p>
-      </div>
-
-      <p>The lesson is not "be careful with comparisons". It is that a field whose only writer is the
-        failure path does not mean what its name suggests, and I should have read that writer before
-        writing a query against it.</p>
-
-      <div class="readout">
-        <span class="edit">the audit query: <b>&gt; 1</b> becomes <b>&gt;= 1</b></span>
-        <span class="verdict">0 matches → 1 match</span>
-      </div>
-    </article>
-
-    <article class="case">
-      <p class="symptom">symptom: the acceptance criterion is impossible</p>
-      <h2>A proof written to wait for an event the system cannot emit</h2>
-
-      <p>The one from the title. My own plan told me to verify something that cannot occur. It said:
-        watch a hold get applied to a supplier whose review was rejected, through the browser, after the
-        rejection. Clean, unambiguous instruction, except that the event it tells me to watch for does
-        not exist.</p>
-
-      <p>It cannot be watched, because it has already happened. The hold does not wait for a human —
-        only the permissive commands do. And the drain that executes pending work runs unconditionally
-        after every invocation, so by the time a reviewer opens the page, the hold is long since
-        applied.</p>
+      <p>Method first: before touching the candidate, the 8-case eval suite was re-run on the
+        incumbent the same day — this suite had gone stale under the build once before, so the control
+        comes first. The incumbent ran the suite clean, twice, in the same session. The candidate
+        aborted on <code>429 RESOURCE_EXHAUSTED</code> at case 5 of 8. The second attempt aborted at
+        case 6 — a different case, same error. No score was ever produced.</p>
 
       <div class="turn">
-        <p>Measured on the real run: the hold landed at 18:33:13.987Z and the human decision committed
-          at 18:44:22.401Z. Eleven minutes and eight seconds earlier, not after. Nothing was on screen
-          at 18:33. The system did that on its own, on time, and my proof had been written to find out
-          about it eleven minutes late.</p>
+        <p>Then the probe that reframes the whole thing: 24 interleaved small calls, both models,
+          inside the same minute — <strong>12/12 on the incumbent and 12/12 on the candidate.</strong>
+          A shallow smoke test would have called the failing model healthy.</p>
       </div>
 
-      <p>Had I built the proof as written, it would have hung waiting for an event with no producer, and
-        the only way to make it pass would have been to weaken the assertion until it described
-        something else — which is exactly how a suite fills up with tests that pass and mean nothing. I
-        caught it while designing the harness, by reading the drain against the executor before writing
-        a line of it.</p>
+      <p>The failure is payload- and load-dependent: the eval's calls carry a full document and a
+        response schema, and those are what fail. And it is not a quota — the per-model token quotas
+        on this project are identical for both models, effective equal to default. That combination
+        points at serving-side capacity for a newly released model: not a limit you can see on a
+        dashboard, not one you can raise by request, and not one a dozen small requests will ever
+        reproduce.</p>
 
-      <p>The replacement claim is both true and stronger, and it took two server timestamps rather than
-        a screen recording: <strong>a rejection withholds the permissive commands; the restrictive one
-        never waited for a human at all.</strong></p>
+      <p>The stakes made this one vivid. The system has to survive a month-long judging window
+        unattended. The standard upgrade ritual — swap the model name, fire a handful of requests,
+        watch them succeed, ship — would have deployed a model that fails intermittently on exactly
+        the payloads production sends, at unpredictable times, with no local test that catches it
+        first. The re-run of the full suite, twice, on both models, cost perhaps an hour. It is the
+        only thing standing between this build and that outcome.</p>
 
       <div class="readout">
-        <span class="edit">when a proof will not pass, suspect the claim before the test</span>
-        <span class="verdict">criterion was unsatisfiable</span>
-      </div>
-    </article>
-
-    <article class="case">
-      <p class="symptom">symptom: a correct consumer of state nobody writes</p>
-      <h2>Reading a field that is null on every record ever stored</h2>
-
-      <p>The last one is from building the scoreboard — the part of the system that says out loud what
-        it actually did. One metric counts the data fields carried into the ERP without anyone retyping
-        them, and the obvious source was the structured extraction the evidence step produces — a list
-        of fields, each with its value and the span it came from.</p>
-
-      <div class="turn">
-        <p>That list is never persisted. It lives in working state during the run and is written to the
-          record under a different key, in a different shape, holding a summary rather than the fields.
-          On every stored case, the key I was about to read is <code>null</code>.</p>
-      </div>
-
-      <p>A metric built on it would have compiled, passed its unit tests against hand-built fixtures,
-        run happily in production, and reported <em>zero fields without rekeying</em> forever, without
-        ever failing — on a system whose whole selling point is that rekeying went away. I found it by
-        opening two real documents and printing their keys before writing the code. Three minutes.</p>
-
-      <p class="pull">Read the code that writes the state before you build anything that reads it. A
-        correct consumer of state that is never produced ships inert, and its tests still pass.</p>
-
-      <div class="readout">
-        <span class="edit">print the real document's keys before coding</span>
-        <span class="verdict">source field is always null</span>
+        <span class="edit">24 small calls <b>12/12 on both models</b> · then the real 8-case suite</span>
+        <span class="verdict">2 attempts, 2 aborts</span>
       </div>
     </article>
 
     <section>
-      <h2>What actually catches these</h2>
+      <h2>Three signals, one failure shape</h2>
 
-      <p>Three habits, in rough order of how much they earned.</p>
+      <p>Notice that every surface signal was <em>true</em>. The filter really was enabled, and really
+        does detect some injections. The budget really was accepted, and latency really did fall. The
+        endpoint really did answer twelve calls in a row. What failed was the inference from signal to
+        conclusion — enabled to detecting, configured to bounded, responding to serving — and nothing
+        in any dashboard was ever going to flag the gap, because dashboards report the signal, not the
+        inference you drew from it.</p>
 
-      <h3>Name the edit that would break each test, then make it</h3>
-
-      <p>For every test that guards something load-bearing, I write down the specific change to
-        production code that should turn it red — and then I actually apply that change and watch. It
-        takes a minute per test. On the failure-handling work, five tests passed while proving
-        nothing, and mutation caught every one. Four of those five were test code my own plan had
-        specified, which is the part I did not expect: <strong>plan code is unverified code</strong>,
-        and it arrives wearing the authority of a decision already made.</p>
-
-      <p>Every readout strip above is a real mutation with its real outcome. On the metrics module in
-        this article's own system, five mutations — flipping <code>&gt;=</code> to <code>&gt;</code>,
-        dropping the cycle from a write key, ignoring whether a command executed, trusting dates without
-        the writes that back them, and returning <code>0</code> instead of <code>null</code> for a
-        missing input — each flip exactly one test red. That is what makes the green meaningful.</p>
-
-      <h3>Make the summary re-execute its own citations</h3>
-
-      <p>A table mapping "criterion" to "the test that proves it" is a claim about the repository, and
-        it rots the moment a test is renamed. The exit-criteria manifest re-runs the twenty-two test ids
-        it cites and re-reads each evidence file it points at, every time it runs. A deleted, renamed,
-        or red test demotes its criterion instead of continuing to look satisfied. I mutation-tested
-        the manifest too: renaming a cited test, deleting a file, and removing a downstream record each
-        turned it red.</p>
-
-      <h3>Accept that some defects need a live run — or a re-run</h3>
-
-      <p>One bug could not have been caught by any unit test at any coverage level. A platform field
-        that reports how many times a message was delivered is populated only on subscriptions that
-        carry a dead-letter policy. Mine deliberately has none, so the field is empty and the count
-        arrives as a message attribute instead. Every mock returned the number I expected. Only a real
-        message through real infrastructure showed the field blank — the live run measured five where
-        the code would have recorded zero forever.</p>
-
-      <p>The quieter cousin is the suite that stops being a gate when it stops being re-run. Mine had
-        gone stale by two days and it was load-bearing: one behaviour had changed a day after the last
-        run, so two of the eight expectations were grading a system that no longer existed. The re-run
-        scored 6/8; the committed evidence still said 8/8. No flake, nothing intermittent — the world
-        had moved and nothing had re-asked. Self-executing citations exist because of weeks like this.</p>
-    </section>
-
-    <section>
-      <h2>The pieces worth stealing</h2>
-
-      <p>Four contracts did most of the structural work. None is clever; all are boring on purpose,
-        which is the point.</p>
+      <p>What settled all three was the same probe discipline, and it is cheap enough to state as
+        rules:</p>
 
       <ul class="plain">
-        <li><strong>the event envelope</strong>Every inbound event carries its own id, the case it
-          belongs to, and optionally the case version it expects. One transaction claims the id, rejects
-          a duplicate, rejects a stale version, and advances the case — or does none of it. That single
-          transaction is the entire boundary between at-least-once delivery and duplicate side effects.</li>
+        <li><strong>probe the payload you actually ship</strong>All three false signals came from
+          miniatures — a blunt jailbreak, a bare API call, a dozen small requests. The truth lived in
+          the full-size case: the real certificate, the deployed call shape with its schema and
+          budget, the real eval suite. If the probe's input is more convenient than production's,
+          the probe is measuring the convenience.</li>
 
-        <li><strong>the tool surface</strong>Every external write is addressed by an id derived from
-          (case, action, cycle). The cycle is in the identity because the lifecycle repeats: the same
-          action in a later cycle is legitimately new work, and without the discriminator the second one
-          silently finds the first marked done and skips. Where the far side deduplicates by
-          deterministic id, redelivery is harmless twice over. Where it does not — outbound mail, which
-          nothing on the far side deduplicates — the ledger is the <em>only</em> guard, and saying so
-          plainly in the code is what keeps someone from assuming otherwise later.</li>
+        <li><strong>run the control before believing the finding</strong>The jailbreak control proved
+          the filter template worked before "it missed" meant anything. Re-running the suite on the
+          incumbent first proved the 429s belonged to the candidate and not to the day. A surprising
+          measurement without a control is a coin flip about which side of it is broken.</li>
 
-        <li><strong>the catalog contract</strong>Agents are declared with their permitted tools and
-          their permitted routes, and routing narrows against that declaration rather than trusting a
-          model's proposal. A known-but-not-permitted agent is dropped and the drop is recorded; an
-          unknown agent stops the case. The guarantee is narrow and exact: nothing runs unless policy
-          permitted it.</li>
-
-        <li><strong>the contract-test harness</strong>Every failure encountered in the build becomes a
-          contract test or an eval case, and evidence for anything gate-shaped is written into the
-          repository next to the code — never to a temporary directory. I learned that one the direct
-          way, by losing a day's proof to a scratch path that did not survive the session.</li>
+        <li><strong>bisect for the mechanism before generalising</strong>The character-count bisection
+          turned "the filter missed" into "context dilution with a boundary between 89 and 108
+          characters" — which immediately says what would and would not fix it. The schema-toggle cell
+          turned "this model doesn't reason under a budget" into "this call shape turns reasoning
+          off". A finding with a mechanism has a scope; a finding without one becomes folklore.</li>
       </ul>
-    </section>
 
-    <section>
-      <h2>The uncomfortable part</h2>
+      <p class="pull">Dashboards report the signal, not the inference. The probes are for finding out
+        what is true.</p>
 
-      <p>Every defect here was found by reading, by mutating, or by running the thing for real. None was
-        found by a test going red on its own. If I had trusted the suite, all five would have shipped,
-        and the suite would have been just as green afterwards.</p>
-
-      <p>I do not think that is unusual for agentic systems. The components are individually testable
-        and the interesting failures live between them, in the gap where two correct pieces agree about
-        nothing, or where a control is present but never exercised because the model happened to
-        behave. Coverage does not see that gap. Only adversarial reading and deliberate breakage do.</p>
-
-      <p class="pull">Green is not evidence. Green plus a mutation you watched turn it red is evidence.</p>
-
-      <p>And that is why the opening is the point. The clock does not stop when this piece is
-        published: the next renewal lands, the next evidence lapses, the next hold applies itself, and
-        the suite will be green when it does and nobody will be in the room. That is not comfort. That
-        is the entire reason the methods above exist. Green was never the control. The ledger, the
-        watched mutations, the self-executing citations are the control — and every one of them is
-        something I had to build after I stopped being able to watch.</p>
+      <p>Each probe took an afternoon or less, is committed to the repository next to the evidence it
+        produced, and re-runs from a single command — because the second-cheapest thing after writing
+        a probe is re-running it, and a measurement you cannot re-run has a shelf life you will not
+        notice expiring.</p>
     </section>
 
     <section>
