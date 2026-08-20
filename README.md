@@ -874,10 +874,33 @@ of which also affect the Cloud Run fallback:
 
 ### Secrets
 
-`agents-cli deploy` reads `.env` and injects every key as a **plaintext runtime
-env var, echoing them to stdout** — `FRAPPE_API_KEY` / `FRAPPE_API_SECRET`
-currently ship this way. Move them to `--secrets ENV=SECRET` (Secret Manager)
-when the scoped executor identity is built, and rotate.
+`agents-cli deploy` reads `.env` and injects **every** key it finds as a
+plaintext runtime env var on the engine, echoing the values to stdout as it
+goes. There is no flag to exclude a key, so the only reliable control is which
+file a secret lives in:
+
+| File | Read by | Deployed? |
+|---|---|---|
+| `.env` | local tooling, **and `agents-cli deploy`** | yes — every key becomes plaintext env |
+| `.env.secrets` | local tooling only | no — ignored by git *and* `.gcloudignore` |
+
+Anything secret goes in `.env.secrets`. Local commands pass both files, in this
+order:
+
+```bash
+uv run --env-file .env --env-file .env.secrets python scripts/erp.py audit
+```
+
+Deployed services do not use either file — Cloud Run wires `FRAPPE_API_KEY` and
+`FRAPPE_API_SECRET` from Secret Manager with `--set-secrets`, and the engine
+does not receive them at all: it has no public internet egress and its graph
+never imports the executor, so it cannot reach the ERP under any circumstances.
+A Frappe credential on the engine is therefore both unused and readable.
+
+`scripts/doctor.sh` enforces all three of these — no secret-shaped key in
+`.env`, both env files excluded by `.gcloudignore` (which **replaces**
+`.gitignore` at deploy time, so being gitignored proves nothing), and no
+secret-shaped plaintext env var on the deployed engine.
 
 ## Case console and review service
 

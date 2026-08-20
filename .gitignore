@@ -11,6 +11,7 @@ wheels/
 
 # Environment / secrets
 .env
+.env.secrets
 
 # Local worktrees (superpowers SDD)
 .worktrees/

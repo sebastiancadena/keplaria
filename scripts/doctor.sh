@@ -26,9 +26,9 @@ command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 \
   && ok "gh authenticated" || meh "gh not authenticated"; }
 # Offline presence check only — no API call. The key is needed solely to edit
 # the published dev.to article (id 4437730) from docs/build-piece/article.dev.md.
-grep -q '^DEVTO_API_KEY=.\+' .env 2>/dev/null \
-  && ok "DEVTO_API_KEY present in .env (can edit the published dev.to article)" \
-  || meh "DEVTO_API_KEY absent from .env (only needed to edit dev.to article 4437730)"
+grep -q '^DEVTO_API_KEY=.\+' .env.secrets 2>/dev/null \
+  && ok "DEVTO_API_KEY present in .env.secrets (can edit the published dev.to article)" \
+  || meh "DEVTO_API_KEY absent from .env.secrets (only needed to edit dev.to article 4437730)"
 
 echo "== ERP maintenance tooling =="
 [ -x scripts/erp.py ] \
@@ -549,6 +549,96 @@ sys.exit(1)
 ' 2>/dev/null \
   && ok "BigQuery billing export still wired to keplaria:billing_export" \
   || bad "billing export service account has no access to keplaria:billing_export — the export is off, and it is forward-only so the gap is unrecoverable"
+
+# The kill switch detaching billing takes the whole project down, including the
+# judge-facing path, and it does not recover on its own. Before 2026-08-20 it
+# announced this only by printing to a log nobody reads. The alert policy is the
+# difference between noticing in minutes and noticing when someone opens the
+# demo — so its existence, and its having somewhere to send to, are checked.
+alert_state="$(gcloud alpha monitoring policies list --project=keplaria \
+  --format=json 2>/dev/null \
+  | python3 -c '
+import json, sys
+try:
+    policies = json.load(sys.stdin)
+except Exception:
+    print("ERR"); raise SystemExit
+for p in policies:
+    conds = p.get("conditions", [])
+    if not any("conditionMatchedLog" in c and "BILLING DETACHED" in
+               c.get("conditionMatchedLog", {}).get("filter", "") for c in conds):
+        continue
+    if not p.get("enabled", False):
+        print("DISABLED")
+    elif not p.get("notificationChannels"):
+        print("NOCHANNEL")
+    else:
+        print("OK")
+    raise SystemExit
+print("MISSING")
+' 2>/dev/null)"
+case "$alert_state" in
+  OK)        ok "billing-detach alert exists, enabled, with a notification channel" ;;
+  MISSING)   bad "no alert policy watches for BILLING DETACHED — the kill switch would take the project down silently (infra/monitoring/alert-billing-detached.json)" ;;
+  DISABLED)  bad "the billing-detach alert policy is DISABLED — a detach would go unannounced" ;;
+  NOCHANNEL) bad "the billing-detach alert policy has no notification channel — it would fire into nothing" ;;
+  ERR)       warn "could not list alert policies to check the billing-detach alert" ;;
+esac
+
+
+echo "== deploy-time secret hygiene =="
+# `agents-cli deploy` reads .env and injects EVERY key in it as a PLAINTEXT
+# runtime env var on the engine, echoing the values to stdout as it goes. There
+# is no flag to exclude one, so the only control is which file a secret lives
+# in: .env ships, .env.secrets does not. A secret added to .env leaks on the
+# next deploy and nothing fails at the time — the deploy succeeds, and the
+# value simply becomes readable to anyone with viewer access on the engine.
+#
+# Matched on key NAME, not on the value, so a rotated credential is still
+# caught. Add new secret-shaped names here as they appear.
+if [ -f .env ]; then
+  leaked="$(grep -oE '^[[:space:]]*[A-Z0-9_]*(SECRET|API_KEY|TOKEN|PASSWORD|CREDENTIAL)[A-Z0-9_]*[[:space:]]*=' .env \
+    | tr -d ' =' | sort -u | paste -sd, - || true)"
+  [ -z "$leaked" ] \
+    && ok ".env carries no secret-shaped keys (agents-cli would deploy them as plaintext)" \
+    || bad ".env contains secret-shaped key(s): ${leaked} — the next agents-cli deploy injects these as plaintext env on the engine and echoes them to stdout; move them to .env.secrets"
+else
+  warn ".env not found — skipping the deploy-time secret check"
+fi
+
+# .gcloudignore REPLACES .gitignore at deploy time, so a file being gitignored
+# says nothing about whether it is uploaded into the container.
+if [ -f .gcloudignore ]; then
+  missing=""
+  for f in .env .env.secrets; do
+    grep -qxF "$f" .gcloudignore || missing="${missing}${f} "
+  done
+  [ -z "$missing" ] \
+    && ok ".gcloudignore excludes .env and .env.secrets from the deployed container" \
+    || bad ".gcloudignore does not exclude: ${missing}— it REPLACES .gitignore at deploy time, so these ship inside the image"
+fi
+
+# The engine has no public internet egress and its graph never imports the
+# executor, so it cannot reach the ERP at all. Any Frappe credential on it is
+# both unused and readable — belt and braces against a redeploy putting them back.
+engine_env="$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://us-central1-aiplatform.googleapis.com/v1/projects/keplaria/locations/us-central1/reasoningEngines/2127503872455868416" 2>/dev/null \
+  | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("ERR"); raise SystemExit
+env = d.get("spec", {}).get("deploymentSpec", {}).get("env", []) or []
+bad = [e["name"] for e in env
+       if any(t in e["name"] for t in ("SECRET", "API_KEY", "TOKEN", "PASSWORD"))]
+print(",".join(bad))
+' 2>/dev/null)"
+case "$engine_env" in
+  ERR) warn "could not read the engine deployment spec to check for plaintext secrets" ;;
+  "")  ok "deployed engine carries no secret-shaped plaintext env vars" ;;
+  *)   bad "deployed engine carries plaintext secret env var(s): ${engine_env} — readable by anyone with viewer access on the engine; the graph does not use them (no public egress, executor runs on Cloud Run)" ;;
+esac
 
 echo
 printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"

@@ -1,0 +1,25 @@
+{
+  "displayName": "Billing detached — the whole project is down",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "The billing kill switch detached the billing account from `keplaria`. **Everything stops when this happens**, including the judge-facing hosted path, and it does not recover on its own.\n\nThis is deliberate — it is the hard spend cap doing its job — but the blast radius is the entire project, so it needs a human immediately.\n\n**Recover:** re-attach the billing account in the Cloud console (Billing → Link a billing account). Nothing else restores service. Then find out what spent the money before re-arming, because the cap will simply fire again.\n\nSee `infra/billing-killswitch/` for the function and `spikes/cost_posture/` for the measured burn rate it is guarding against."
+  },
+  "conditions": [
+    {
+      "displayName": "kill switch logged a detach",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"billing-killswitch\" AND textPayload:\"BILLING DETACHED\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "300s"
+    }
+  },
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [
+    "projects/keplaria/notificationChannels/7657081549501251235"
+  ]
+}
