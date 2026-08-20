@@ -307,6 +307,23 @@ if [ -n "$review_url" ]; then
     | grep -c IAP_AUDIENCE)
   [ "$aud" -ge 1 ] && ok "review service has IAP_AUDIENCE set" \
     || bad "review service missing IAP_AUDIENCE — it will refuse every decision"
+
+  # The two accounts the organizers gave repository access must also be able
+  # to open the review console for themselves, without asking anyone. Read the
+  # live IAP policy rather than trusting the runbook — a grant made by hand is
+  # exactly the kind that gets lost in a re-provision. testing@ is a Google
+  # GROUP (gcloud rejects `user:` for it); cloudhackathons@ is matched on the
+  # address alone so the check survives either principal type.
+  iap_policy=$(gcloud iap web get-iam-policy --resource-type=cloud-run \
+    --region=us-central1 --service=keplaria-review --project=keplaria \
+    --format='value(bindings.members)' 2>/dev/null)
+  missing=""
+  for judge in testing@devpost.com cloudhackathons@google.com; do
+    echo "$iap_policy" | grep -q "$judge" || missing="$missing $judge"
+  done
+  [ -z "$missing" ] \
+    && ok "both judging accounts hold IAP access to the review console" \
+    || bad "judging accounts missing IAP access:$missing — a judge gets a Google sign-in they cannot pass"
 else
   meh "keplaria-review not deployed yet"
 fi

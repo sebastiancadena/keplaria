@@ -23,6 +23,43 @@ way everywhere it is used.
 Live case console (no sign-in):
 <https://keplaria-console-bklu5jcdea-uc.a.run.app>
 
+## Access for judges and testers
+
+Nothing in this repository needs a credential to evaluate. The evidence files
+are committed, `bash scripts/doctor.sh` is read-only and prints its own
+pass/fail summary, and the case console below opens in a logged-out browser.
+Two hosted surfaces exist, and only one of them asks who you are.
+
+| Surface | Sign-in | What it is |
+|---|---|---|
+| [Case console](https://keplaria-console-bklu5jcdea-uc.a.run.app) | None | Read-only. Renders a case as it was scored and its current band. The service account behind it holds a Firestore *viewer* role, so read-only is an IAM fact rather than a promise about the route table. |
+| [Review console](https://keplaria-review-bklu5jcdea-uc.a.run.app/review) | Google, through Cloud IAP | Lists cases parked for a human and commits the decision that releases the queued ERP write. |
+
+**Signing in to the review console.** Cloud IAP admits the two addresses the
+organizers gave repository access — `testing@devpost.com` and
+`cloudhackathons@google.com` — plus the author. Open the link in a browser
+signed in to one of those Google accounts; there is no password to request and
+no separate account to create. Two behaviours are the system working, not
+failing:
+
+- **An anonymous request is redirected to `accounts.google.com`.** IAP bounces
+  a browser to sign-in rather than answering 401, so a redirect is the refusal.
+  `curl` sees the same 302.
+- **A signed-in account outside those three gets 403 from IAP.** The reviewer's
+  identity is read from a signed IAP assertion, never from a forwarded header,
+  so there is no way to assert an identity into this service from outside.
+
+**A decision is final for the case version it was taken against.** The approval
+id is derived from the case and its version, so a double click or a resubmitted
+form is refused as a duplicate rather than applied twice. If a later event
+advances the case, an earlier decision stops applying and the case comes back
+for a fresh look.
+
+If sign-in fails for an address listed above, that is a misconfiguration on our
+side rather than an intended refusal — please note it in the submission
+feedback. `bash scripts/doctor.sh` reports the same grant from the outside and
+will say so plainly.
+
 ## Judging criteria → proof
 
 Every row points at a file in this repository that was produced by running the
