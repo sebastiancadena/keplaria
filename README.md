@@ -902,6 +902,32 @@ A Frappe credential on the engine is therefore both unused and readable.
 `.gitignore` at deploy time, so being gitignored proves nothing), and no
 secret-shaped plaintext env var on the deployed engine.
 
+The last of those three currently reports **red**, and that is accurate rather
+than a bug: an engine deployed before this split still carries the old values
+as plaintext. They are **dead credentials** — the Frappe API secret was rotated
+on 2026-08-20 and Secret Manager holds the replacement — so what remains is
+stale text, not a usable key. It clears on the next `agents-cli deploy`, which
+now produces a clean engine because `.env` no longer carries secrets.
+
+Removing them in place, without a redeploy, is what
+`infra/strip-engine-secrets.sh` is for. It does not currently work: see the
+comment block at the top of that script for what was tried, what is ruled out,
+and why the operation is documented as supported even though it fails here.
+
+Rotating the Frappe secret is four steps, and the middle two are what deployed
+services actually read:
+
+1. Regenerate — Frappe UI (User → API Access → Generate Keys), or
+   `frappe.core.doctype.user.user.generate_keys` over the API. Only
+   `api_secret` changes; `api_key` is kept.
+2. `gcloud secrets versions add frappe-api-secret --data-file=-`
+3. New revisions for `keplaria-ingress` and `keplaria-review` so `:latest`
+   re-resolves — an existing revision holds the version it resolved at deploy
+   time, so ERP writes fail between steps 1 and 3.
+4. Update `.env.secrets` for local tooling.
+
+The engine needs nothing in step 3. It never reads these.
+
 ## Case console and review service
 
 Two Cloud Run services, built from one image (`console/Dockerfile`, entry
