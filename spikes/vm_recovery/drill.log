@@ -1,0 +1,263 @@
+19:08:34  === preflight ===
+19:08:38  live keplaria-yente is RUNNING at 10.10.0.2
+19:08:52  restoring from keplaria-yente-us-central1-c-20260820061423-l7xe8fr2 (created 2026-08-19T23:14:24.051-07:00)
+19:08:52  === restore ===
+Created [https://www.googleapis.com/compute/v1/projects/keplaria/zones/us-central1-c/disks/keplaria-yente-drill].
+NAME                  ZONE           SIZE_GB  TYPE    STATUS
+keplaria-yente-drill  us-central1-c  60       pd-ssd  READY
+19:09:26    disk restored in us-central1-c (34s)
+19:09:26  creating instance on e2-standard-4 in us-central1-c ...
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+---
+code: ZONE_RESOURCE_POOL_EXHAUSTED
+errorDetails:
+- help:
+    links:
+    - description: Troubleshooting documentation
+      url: https://cloud.google.com/compute/docs/resource-error
+- localizedMessage:
+    locale: en-US
+    message: A e2-standard-4 VM instance is currently unavailable in the us-central1-c
+      zone. Alternatively, you can try your request again with a different VM hardware
+      configuration or at a later time. For more information, see the troubleshooting
+      documentation.
+- errorInfo:
+    domain: compute.googleapis.com
+    metadatas:
+      attachment: ''
+      vmType: e2-standard-4
+      zone: us-central1-c
+      zonesAvailable: ''
+    reason: resource_availability
+message: The zone 'projects/keplaria/zones/us-central1-c' does not have enough resources
+  available to fulfill the request.  Try a different zone, or try again later.
+
+19:09:36    e2-standard-4 refused in us-central1-c — trying the next family
+19:09:38  creating instance on n2-standard-4 in us-central1-c ...
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+---
+code: ZONE_RESOURCE_POOL_EXHAUSTED
+errorDetails:
+- help:
+    links:
+    - description: Troubleshooting documentation
+      url: https://cloud.google.com/compute/docs/resource-error
+- localizedMessage:
+    locale: en-US
+    message: A n2-standard-4 VM instance is currently unavailable in the us-central1-c
+      zone. Alternatively, you can try your request again with a different VM hardware
+      configuration or at a later time. For more information, see the troubleshooting
+      documentation.
+- errorInfo:
+    domain: compute.googleapis.com
+    metadatas:
+      attachment: ''
+      vmType: n2-standard-4
+      zone: us-central1-c
+      zonesAvailable: ''
+    reason: resource_availability
+message: The zone 'projects/keplaria/zones/us-central1-c' does not have enough resources
+  available to fulfill the request.  Try a different zone, or try again later.
+
+19:09:50    n2-standard-4 refused in us-central1-c — trying the next family
+19:09:52  creating instance on t2d-standard-4 in us-central1-c ...
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+---
+code: ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS
+errorDetails:
+- help:
+    links:
+    - description: Troubleshooting documentation
+      url: https://cloud.google.com/compute/docs/resource-error
+- localizedMessage:
+    locale: en-US
+    message: A t2d-standard-4 VM instance is currently unavailable in the us-central1-c
+      zone. Try requesting the VM in another zone. For more information, view the
+      troubleshooting documentation.
+- errorInfo:
+    domain: compute.googleapis.com
+    metadatas:
+      attachment: ''
+      vmType: t2d-standard-4
+      zone: us-central1-c
+      zonesAvailable: ''
+    reason: stockout
+message: The zone 'projects/keplaria/zones/us-central1-c' does not have enough resources
+  available to fulfill the request.  '(resource type:compute)'.
+
+19:10:04    t2d-standard-4 refused in us-central1-c — trying the next family
+19:10:04    all families exhausted in us-central1-c — trying the next zone
+Created [https://www.googleapis.com/compute/v1/projects/keplaria/zones/us-central1-a/disks/keplaria-yente-drill].
+NAME                  ZONE           SIZE_GB  TYPE    STATUS
+keplaria-yente-drill  us-central1-a  60       pd-ssd  READY
+19:10:47    disk restored in us-central1-a (115s)
+19:10:47  creating instance on e2-standard-4 in us-central1-a ...
+Created [https://www.googleapis.com/compute/v1/projects/keplaria/zones/us-central1-a/instances/keplaria-yente-drill].
+NAME                  ZONE           MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP  STATUS
+keplaria-yente-drill  us-central1-a  e2-standard-4               10.10.0.3                 RUNNING
+19:11:00  NOTE: home zone us-central1-c had no capacity; restored into us-central1-a
+19:11:00  instance up on e2-standard-4 in us-central1-a (128s from restore start)
+19:11:00  === waiting for SERVING (budget 300s) ===
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+ERROR: [0] Error during local connection to [stdin]: Error while connecting [4047: 'Failed to lookup instance'].
+Traceback (most recent call last):
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/command_lib/compute/iap_tunnel.py", line 805, in RunReceiveLocalData
+    websocket_conn = self._InitiateConnection(
+        conn,
+    ...<4 lines>...
+        conn_id=conn_id,
+    )
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/command_lib/compute/iap_tunnel.py", line 771, in _InitiateConnection
+    new_websocket.InitiateConnection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/compute/iap_tunnel_websocket.py", line 158, in InitiateConnection
+    self._WaitForOpenOrRaiseError()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/compute/iap_tunnel_websocket.py", line 512, in _WaitForOpenOrRaiseError
+    raise ConnectionCreationError(error_msg)
+googlecloudsdk.api_lib.compute.iap_tunnel_websocket.ConnectionCreationError: Error while connecting [4047: 'Failed to lookup instance'].
+Connection closed by UNKNOWN port 65535
+
+Recommendation: To check for possible causes of SSH connectivity issues and get
+recommendations, rerun the ssh command with the --troubleshoot option.
+
+gcloud compute ssh keplaria-yente-drill --project=keplaria --zone=us-central1-a --troubleshoot
+
+Or, to investigate an IAP tunneling issue:
+
+gcloud compute ssh keplaria-yente-drill --project=keplaria --zone=us-central1-a --troubleshoot --tunnel-through-iap
+
+ERROR: (gcloud.compute.ssh) [/usr/bin/ssh] exited with return code [255].
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+ERROR: [0] Error during local connection to [stdin]: Error while connecting [4047: 'Failed to lookup instance'].
+Traceback (most recent call last):
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/command_lib/compute/iap_tunnel.py", line 805, in RunReceiveLocalData
+    websocket_conn = self._InitiateConnection(
+        conn,
+    ...<4 lines>...
+        conn_id=conn_id,
+    )
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/command_lib/compute/iap_tunnel.py", line 771, in _InitiateConnection
+    new_websocket.InitiateConnection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/compute/iap_tunnel_websocket.py", line 158, in InitiateConnection
+    self._WaitForOpenOrRaiseError()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/bin/../lib/google-cloud-sdk/lib/googlecloudsdk/api_lib/compute/iap_tunnel_websocket.py", line 512, in _WaitForOpenOrRaiseError
+    raise ConnectionCreationError(error_msg)
+googlecloudsdk.api_lib.compute.iap_tunnel_websocket.ConnectionCreationError: Error while connecting [4047: 'Failed to lookup instance'].
+Connection closed by UNKNOWN port 65535
+
+Recommendation: To check for possible causes of SSH connectivity issues and get
+recommendations, rerun the ssh command with the --troubleshoot option.
+
+gcloud compute ssh keplaria-yente-drill --project=keplaria --zone=us-central1-a --troubleshoot
+
+Or, to investigate an IAP tunneling issue:
+
+gcloud compute ssh keplaria-yente-drill --project=keplaria --zone=us-central1-a --troubleshoot --tunnel-through-iap
+
+ERROR: (gcloud.compute.ssh) [/usr/bin/ssh] exited with return code [255].
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+Warning: Permanently added 'compute.1623063827738980309' (ED25519) to the list of known hosts.
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+19:13:06  SERVING after 254s total
+yente-app	Up About a minute (healthy)
+yente-index	Up About a minute (healthy)
+readyz=200
+19:13:06  === screening assertions on the restored host ===
+WARNING: 
+
+To increase the performance of the tunnel, consider installing NumPy. For instructions,
+please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+=== 1. health ===
+PASS  /healthz reachable
+
+=== 2. catalog ===
+      datasets: ['keplaria_synthetic']
+PASS  only keplaria_synthetic is indexed  — got ['keplaria_synthetic']
+
+=== 3. sanctioned company, near-exact name ===
+      1.000  match=True  syn-co-001   Comercializadora Andes Verde S.A.S.  topics=['sanction']
+PASS  top hit is syn-co-001 and is flagged  — top=syn-co-001
+
+=== 4. fuzzy person: decoy ranks below the true hit ===
+      1.000  match=True  syn-pe-001   Aurelio Betancur Salgado  topics=['sanction']
+PASS  at default cutoff, only syn-pe-001 is returned  — got ['syn-pe-001']
+      -- same query at cutoff=0.0 --
+      1.000  match=True  syn-pe-001   Aurelio Betancur Salgado  topics=['sanction']
+      0.606  match=False syn-pe-006   Aurelio Betancur Salgar  topics=['poi']
+PASS  decoy syn-pe-006 surfaces as a sub-threshold candidate  — got ['syn-pe-001', 'syn-pe-006']
+PASS  decoy scores strictly below the true hit  — 0.606 vs 1.000
+PASS  decoy is not auto-flagged as a match
+
+=== 5. clean supplier, no match ===
+      (no results)
+PASS  nothing flagged as a match  — flagged []
+
+ALL CHECKS PASSED
+
+=== 6. egress: no OpenSanctions host contacted since startup ===
+PASS  no OpenSanctions fetch in app logs
+19:13:13  === PASS — restored and serving in 254s ===
+19:13:13  --- teardown ---
+ERROR: (gcloud.compute.instances.delete) Could not fetch resource:
+ - The resource 'projects/keplaria/zones/us-central1-c/instances/keplaria-yente-drill' was not found
+
+Deleted [https://www.googleapis.com/compute/v1/projects/keplaria/zones/us-central1-c/disks/keplaria-yente-drill].
+19:13:19  deleted disk keplaria-yente-drill in us-central1-c
+Deleted [https://www.googleapis.com/compute/v1/projects/keplaria/zones/us-central1-a/instances/keplaria-yente-drill].
+19:14:12  deleted instance keplaria-yente-drill in us-central1-a
+Deleted [https://www.googleapis.com/compute/v1/projects/keplaria/zones/us-central1-a/disks/keplaria-yente-drill].
+19:14:15  deleted disk keplaria-yente-drill in us-central1-a
+ERROR: (gcloud.compute.instances.delete) Could not fetch resource:
+ - The resource 'projects/keplaria/zones/us-central1-b/instances/keplaria-yente-drill' was not found
+
+ERROR: (gcloud.compute.disks.delete) Could not fetch resource:
+ - The resource 'projects/keplaria/zones/us-central1-b/disks/keplaria-yente-drill' was not found
+
+ERROR: (gcloud.compute.instances.delete) Could not fetch resource:
+ - The resource 'projects/keplaria/zones/us-central1-f/instances/keplaria-yente-drill' was not found
+
+ERROR: (gcloud.compute.disks.delete) Could not fetch resource:
+ - The resource 'projects/keplaria/zones/us-central1-f/disks/keplaria-yente-drill' was not found
+
+19:14:23  === residue check ===
+19:14:30  no residue

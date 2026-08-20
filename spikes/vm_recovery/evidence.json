@@ -1,0 +1,27 @@
+{
+  "spike": "vm_recovery",
+  "criterion": "the yente VM can be rebuilt from its daily snapshot and serve screening again, with the index intact",
+  "result": "PASS",
+  "date": "2026-08-20T19:14:30Z",
+  "commit": "7db88ac",
+  "method": "restore-beside \u2014 snapshot restored into a throwaway instance at 10.10.0.3 while the live VM kept serving 10.10.0.2; torn down after",
+  "source_snapshot": "keplaria-yente-us-central1-c-20260820061423-l7xe8fr2",
+  "snapshot_created": "2026-08-19T23:14:24.051-07:00",
+  "machine_family_used": "e2-standard-4",
+  "zone_used": "us-central1-a",
+  "home_zone": "us-central1-c",
+  "zone_fallback_exercised": true,
+  "restore_to_serving_seconds": 254,
+  "timing_breakdown": {
+    "snapshot_to_running_instance_seconds": 128,
+    "running_instance_to_serving_seconds": 126,
+    "note": "the total includes every refused create attempt and, when the zone fallback fires, a cross-zone snapshot restore (~117s measured) rather than the ~25s a same-zone restore takes. Read the total as an observed worst case, not a floor."
+  },
+  "capacity_refusals": 3,
+  "serving_definition": "both containers (healthy) AND /readyz 200, probed over IAP SSH \u2014 RUNNING is not SERVING and nothing outside the VPC can reach the service",
+  "index_survived": true,
+  "index_evidence": "infra/yente/verify.sh ALL CHECKS PASSED on the restored host: catalog is keplaria_synthetic only, syn-co-001 hits and is flagged, decoy syn-pe-006 surfaces sub-threshold below the true hit, clean supplier flags nothing, no OpenSanctions egress in the app log",
+  "residue": null,
+  "log": "spikes/vm_recovery/drill.log",
+  "runbook": "infra/yente/RECOVERY.md"
+}

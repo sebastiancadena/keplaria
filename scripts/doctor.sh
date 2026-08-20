@@ -55,7 +55,11 @@ echo "== judge-visibility (private planning layer must not leak) =="
 # 'feature-admission' added 2026-08-20: a private filename reached a draft of
 # spikes/run_streak/harness.py and this grep did not catch it, because the
 # pattern listed every other file in that directory but not this one.
-LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|feature-admission|\bR[1-9][0-9]?\b'
+# Dated GATE LABELS added 2026-08-20 for the same reason as the line above:
+# 'day-14 scope lock' reached scripts/doctor.sh and a spike evidence file
+# while this grep watched only for filenames and risk ids. A gate name
+# tells a reader the private plan's shape as surely as its filename does.
+LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|feature-admission|scope lock|feature freeze|ambition gate|\bR[1-9][0-9]?\b'
 # -I skips binary files; the risk-id alternative can match arbitrary bytes in
 # vendored binaries. We only care about text leaks from our own writing.
 # The generated architecture.svg is excluded because its base64 font payloads
@@ -135,6 +139,36 @@ esac
 gcloud compute firewall-rules describe keplaria-allow-internal --project=keplaria \
   --format='value(allowed[].map().firewall_rule().list())' 2>/dev/null | grep -q 'tcp:8000' \
   && ok "yente port 8000 open inside keplaria-vpc" || bad "keplaria-allow-internal missing tcp:8000 (PSC-I → yente will fail)"
+
+# --- yente recovery posture (drill: spikes/vm_recovery, runbook: infra/yente/RECOVERY.md) ---
+# Two invariants that only matter on the worst day, which is exactly why they
+# need a check: neither is visible in normal operation and both were absent
+# until 2026-08-20.
+#
+# 1. The boot disk must OUTLIVE the instance. It shipped with autoDelete=true,
+#    so deleting the VM -- the very first thing anyone does in a rebuild --
+#    would have destroyed the disk, leaving only the last 06:00 snapshot.
+auto_del=$(gcloud compute instances describe keplaria-yente --zone=us-central1-c \
+  --project=keplaria --format='value(disks[0].autoDelete)' 2>/dev/null)
+case "$auto_del" in
+  False) ok "yente boot disk survives an instance delete (autoDelete=false)" ;;
+  True)  bad "yente boot disk has autoDelete=TRUE — deleting the VM destroys the disk and the index with it; gcloud compute instances set-disk-auto-delete keplaria-yente --zone us-central1-c --disk keplaria-yente --no-auto-delete" ;;
+  *)     meh "could not read yente boot-disk autoDelete flag" ;;
+esac
+# 2. 10.10.0.2 must be RESERVED, not ephemeral. app/nodes.py defaults
+#    YENTE_BASE_URL to that address and the deployed engine carries it in its
+#    environment, so a rebuild that cannot reclaim the address is invisible to
+#    the graph and the only fix is redeploying the engine mid-incident.
+addr=$(gcloud compute addresses describe keplaria-yente-ip --region=us-central1 \
+  --project=keplaria --format='value(address,status)' 2>/dev/null)
+if printf '%s' "$addr" | grep -q '10\.10\.0\.2'; then
+  ok "10.10.0.2 reserved as keplaria-yente-ip (a rebuild can reclaim it)"
+else
+  bad "10.10.0.2 is NOT reserved — an ephemeral address can be handed to another VM while yente is down, and the graph reaches yente by that literal address"
+fi
+[ -f spikes/vm_recovery/evidence.json ] \
+  && ok "VM recovery drill evidence present (spikes/vm_recovery/evidence.json)" \
+  || bad "no VM recovery drill evidence — screening has no managed fallback, so the snapshot restore must be a tested path, not an assumed one; bash spikes/vm_recovery/drill.sh"
 
 echo "== Agent Runtime deploy preconditions =="
 [ -f .gcloudignore ] && grep -q '^strategy$' .gcloudignore \

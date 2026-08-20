@@ -77,17 +77,30 @@ stop/start cycle.
 
 **The VM itself does not auto-start.** `keplaria-nightly-stop` is a stop-only
 schedule (`0 1 * * *`, America/Bogota) with no matching start, so every morning
-the VM must be started by hand, and `us-central1-c` returns capacity errors on
-start often enough to need a retry loop:
+the VM must be started by hand, and `us-central1-c` regularly refuses the start
+with a capacity error.
+
+**A retry loop is the wrong fix.** The stockout is per machine *family*, not
+per zone, so retrying the same family spins for ten minutes and then fails
+anyway. The disk is zonal, so swapping family is one command on the stopped VM:
 
 ```bash
-until gcloud compute instances start keplaria-yente \
-  --zone us-central1-c 2>/dev/null; do sleep 20; done
+gcloud compute instances set-machine-type keplaria-yente \
+  --zone us-central1-c --machine-type n2-standard-4   # or e2-, t2d-standard-4
+gcloud compute instances start keplaria-yente --zone us-central1-c
 ```
 
-This is fine during the build phase but is **incompatible with the
+All three are 4 vCPU / 16 GB and yente does not care which it runs on. Do not
+hardcode a family — the direction reverses over time (`e2` was out region-wide
+on creation day, which is why this VM was originally `t2d`).
+
+The manual start is fine during the build phase but is **incompatible with the
 judging-window continuity requirement** (no manual VM start between Sept 1 and
 Oct 1). Resolve before recording week — see the risk register.
+
+**If the VM is gone rather than stopped, see [RECOVERY.md](RECOVERY.md)** — the
+rebuild-from-snapshot path, what a snapshot does and does not carry, and the
+non-destructive drill that proves it.
 
 ## Match semantics worth knowing
 

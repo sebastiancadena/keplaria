@@ -294,7 +294,7 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 57 read-only checks (one fewer when the yente VM is
+- `scripts/doctor.sh` — 62 read-only checks (one fewer when the yente VM is
   stopped, since the serving probe only runs against a running VM) covering
   toolchain, auth,
   provisioned infra, the event-flow wiring (topic, push subscription
@@ -545,10 +545,31 @@ Vertex AI API under its current name, not a separate product.
   gcloud compute instances start keplaria-yente --zone us-central1-c
   ```
 
-  Changing **zone** is the expensive fallback and rarely the right first move:
-  the disk would have to be imaged and the VM rebuilt. After any start, wait
-  for SERVING — the index takes ~90s to load and the VM reports `RUNNING`
-  throughout; `scripts/doctor.sh` probes for it.
+  Changing **zone** is the expensive fallback *for a stopped VM* and rarely the
+  right first move there: the disk is zonal, so it would have to be imaged and
+  the VM rebuilt. **This is not true of a rebuild from snapshot** — see the
+  next bullet. After any start, wait for SERVING — the index takes ~90s to
+  load and the VM reports `RUNNING` throughout; `scripts/doctor.sh` probes for
+  it.
+- **If the VM is gone rather than stopped, the family swap does not help and
+  the zone is free.** Measured 2026-08-20 by the recovery drill: all three
+  families refused *new instance creation* in `us-central1-c` — a stockout
+  that a running VM never notices, because its capacity is already allocated.
+  Restoring the snapshot into another `us-central1` zone costs nothing,
+  because a snapshot is a global resource and everything else the VM needs is
+  **regional**: the subnet `keplaria-uscentral1` (`10.10.0.0/24`), the PSC
+  attachment `keplaria-psc2`, and firewall rules scoped by source range rather
+  than by target tag. The rebuilt VM keeps `10.10.0.2` in any of the four
+  zones. Path, preconditions, and the non-destructive drill:
+  [`infra/yente/RECOVERY.md`](infra/yente/RECOVERY.md).
+- **Two recovery invariants, both added 2026-08-20 and both checked by
+  `scripts/doctor.sh`.** The boot disk is `autoDelete=false`, so deleting the
+  instance — the first step of any rebuild — no longer destroys the disk and
+  its index. And `10.10.0.2` is reserved as the static internal address
+  `keplaria-yente-ip`, so nothing else can be handed it while the VM is down;
+  `app/nodes.py` defaults `YENTE_BASE_URL` to that literal address and the
+  deployed engine carries it in its environment, so a rebuild that could not
+  reclaim it would be invisible to the graph.
 - **Screening service** on that VM: yente + Elasticsearch, serving
   `10.10.0.2:8000` inside the VPC. Runbook, network posture, and the
   `/match` cutoff/threshold gotcha are in
