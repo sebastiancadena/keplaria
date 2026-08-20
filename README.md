@@ -257,7 +257,7 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 56 read-only checks (one fewer when the yente VM is
+- `scripts/doctor.sh` — 57 read-only checks (one fewer when the yente VM is
   stopped, since the serving probe only runs against a running VM) covering
   toolchain, auth,
   provisioned infra, the event-flow wiring (topic, push subscription
@@ -327,6 +327,37 @@ and is reported rather than retried blindly.
   Writes `spikes/hitl_reject/evidence.json`.
 - `spikes/hitl_release/harness.py` — the approval half, same two-phase shape.
   Writes `spikes/hitl_release/evidence.json`.
+- `spikes/run_streak/harness.py` — runs the judge rehearsal back to back,
+  unattended, and grades the streak: ten consecutive runs under the 130s
+  budget, two of them cold starts. `--runs/--cold/--idle-minutes` are
+  arguments, so the real attempt is one command. Three things it does
+  deliberately. It drives the approval **in process**, through the same
+  `commit_approval` + `execute_pending_commands` pair the review route calls
+  once IAP has admitted a reviewer, because that route is reachable only
+  behind an assertion IAP injects server-side and ten browser approvals would
+  make a failure at run nine cost the hour twice — the evidence file names the
+  four things that leaves unexercised, in a required field, and the browser
+  path stays proven by `spikes/hitl_release`. It treats a run as cold only
+  when `keplaria-ingress` is **observed** at zero instances, never because an
+  idle gap was waited out, and an unreadable metric counts as not cold. And a
+  broken streak zeroes the cold count as well as the run count, since a cold
+  start observed before a failure was observed on a streak that no longer
+  exists. Evidence is rewritten after every run rather than at the end, so a
+  crash at run nine still leaves nine measured runs on disk. Writes
+  `spikes/run_streak/evidence.json`.
+- `spikes/approval_contention/probe.py` — measures what concurrent approvals
+  of the same case actually do, against the `keplaria-test` database. It
+  exists because the unit tests drive the retry through a fake transaction
+  factory, which pins the contract but cannot tell you what real Firestore
+  hands the caller. What it found: `google-cloud-firestore`'s
+  `@transactional` retries an `Aborted` raised by `transaction._commit()` and
+  **only** that, so an `Aborted` raised by the reads inside the transaction
+  escaped on the first attempt — 9 of 48 contended calls, out of
+  `batch_get_documents`. Exactly one commit won every round throughout, so
+  nothing was ever double-approved; the damage was that a reviewer
+  double-clicking Approve could get a 500 where the code means to answer
+  "already decided". 0 of 48 since. Re-run it after any change to
+  `app/state/approvals.py`.
 - `spikes/thin_vertical/verify.py` — the narrower single-event vertical
   (event → route → screen → ERP write), superseded by the lifecycle harness
   as the post-deploy check but still runnable.
