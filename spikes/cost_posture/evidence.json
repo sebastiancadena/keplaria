@@ -132,12 +132,12 @@
     }
   ],
   "cloud_run_pinned_above_zero": "none",
-  "commit": "c530165",
+  "commit": "47f5ba1",
   "credit_expiry": "2026-11-04",
   "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry.",
   "credit_remaining_usd": 138.09,
   "criterion": "the judging window running cost is measured, not estimated, and the alerting that guards it is known to watch the right project",
-  "date": "2026-08-20T19:57:40Z",
+  "date": "2026-08-20T20:19:32Z",
   "disks": [
     {
       "name": "keplaria-yente",
@@ -157,7 +157,7 @@
       "memory": "4Gi"
     }
   },
-  "gross_cost_month_to_date_usd": null,
+  "gross_cost_month_to_date_usd": 13.15,
   "gross_cost_note": "month-to-date before credits, from the keplaria-gross-observe budget. null means no notification had been published yet at collection time.",
   "instances": [
     {
