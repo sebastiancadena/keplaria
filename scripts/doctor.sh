@@ -473,6 +473,83 @@ done
   && ok "outbox/status COLLECTION_GROUP index READY in (default) and keplaria-test (the sweep's query needs it)" \
   || bad "no READY outbox/status COLLECTION_GROUP index in: ${missing_index}— the sweep query and /review/failures FailedPrecondition there; the emulator hides this because it auto-indexes"
 
+
+echo "== cost observability (a budget that watches nothing reports 0.00 forever) =="
+# Two ways the spend numbers can go quietly wrong, both of which look like good
+# news rather than like breakage:
+#
+#   1. A budget scoped to the wrong project reports 0.0 on every notification.
+#      Nothing errors; the alert simply never fires. So the project filter is
+#      verified rather than assumed.
+#   2. Every alerting budget here includes credits, so all of them read 0.0
+#      while a credit covers the account. `keplaria-gross-observe` is the only
+#      one that excludes credits and therefore the only source of the real burn
+#      rate. If it is deleted or flipped to include credits, gross visibility
+#      disappears silently.
+billing_account="$(gcloud billing projects describe keplaria \
+  --format='value(billingAccountName)' 2>/dev/null | sed 's|billingAccounts/||')"
+if [ -z "$billing_account" ]; then
+  bad "project keplaria has no billing account attached (the kill switch detaches it — re-attach in the console)"
+else
+  budget_report="$(gcloud billing budgets list --billing-account="$billing_account" \
+    --format=json 2>/dev/null \
+    | python3 -c '
+import json, sys
+try:
+    budgets = json.load(sys.stdin)
+except Exception:
+    print("ERR"); sys.exit(0)
+want = "584548214478"
+misscoped, observer = [], None
+for b in budgets:
+    f = b.get("budgetFilter", {})
+    projects = f.get("projects") or []
+    name = b.get("displayName", "?")
+    if projects and not any(p.endswith(want) for p in projects):
+        misscoped.append(name)
+    if name == "keplaria-gross-observe":
+        observer = f.get("creditTypesTreatment")
+print("MISSCOPED=" + ",".join(misscoped))
+print("OBSERVER=" + str(observer))
+' 2>/dev/null)"
+  case "$budget_report" in
+    *ERR*) bad "could not list budgets on $billing_account" ;;
+    *)
+      misscoped="$(printf '%s\n' "$budget_report" | sed -n 's/^MISSCOPED=//p')"
+      observer="$(printf '%s\n' "$budget_report" | sed -n 's/^OBSERVER=//p')"
+      [ -z "$misscoped" ] \
+        && ok "every project-scoped budget points at keplaria (584548214478)" \
+        || bad "budget(s) scoped to another project: ${misscoped} — these report 0.00 forever and can never fire"
+      case "$observer" in
+        EXCLUDE_ALL_CREDITS)
+          ok "keplaria-gross-observe excludes credits (the only source of gross burn rate)" ;;
+        None)
+          bad "budget keplaria-gross-observe is missing — gross burn is unobservable; every other budget nets out credits and reads 0.00" ;;
+        *)
+          bad "keplaria-gross-observe has creditTypesTreatment=${observer}, not EXCLUDE_ALL_CREDITS — it now reports the same netted 0.00 as the others" ;;
+      esac ;;
+  esac
+fi
+
+# The BigQuery billing export is the only per-SKU source, and it is forward-only:
+# if it is switched off, the gap in the data can never be backfilled. The console
+# grants this service account OWNER on the dataset when the export is saved, so
+# the grant is the honest signal that the export is still configured.
+bq --project_id=keplaria show --format=prettyjson keplaria:billing_export 2>/dev/null \
+  | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for a in d.get("access", []):
+    if a.get("userByEmail") == "billing-export-bigquery@system.gserviceaccount.com":
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null \
+  && ok "BigQuery billing export still wired to keplaria:billing_export" \
+  || bad "billing export service account has no access to keplaria:billing_export — the export is off, and it is forward-only so the gap is unrecoverable"
+
 echo
 printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
 [ "$fail" -eq 0 ]

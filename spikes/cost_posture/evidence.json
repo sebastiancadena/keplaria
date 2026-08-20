@@ -1,0 +1,177 @@
+{
+  "addresses": [
+    {
+      "address": "10.10.0.2",
+      "addressType": "INTERNAL",
+      "name": "keplaria-yente-ip",
+      "status": "IN_USE"
+    },
+    {
+      "address": "136.65.72.206",
+      "addressType": "EXTERNAL",
+      "name": "nat-auto-ip-4730972-10-1786636207062682",
+      "status": "IN_USE"
+    }
+  ],
+  "billing_account": "006252-CAF71A-EC72B9",
+  "budgets": [
+    {
+      "amount": {
+        "specifiedAmount": {
+          "currencyCode": "USD",
+          "units": "1000"
+        }
+      },
+      "budgetFilter": {
+        "calendarPeriod": "MONTH",
+        "creditTypesTreatment": "EXCLUDE_ALL_CREDITS",
+        "projects": [
+          "projects/584548214478"
+        ]
+      },
+      "displayName": "keplaria-gross-observe",
+      "etag": "1787254983887887",
+      "name": "billingAccounts/006252-CAF71A-EC72B9/budgets/2344b3b6-3526-4b94-aad3-f3115efde63c",
+      "notificationsRule": {
+        "pubsubTopic": "projects/keplaria/topics/billing-observe",
+        "schemaVersion": "1.0"
+      },
+      "thresholdRules": [
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 1.0
+        }
+      ]
+    },
+    {
+      "amount": {
+        "specifiedAmount": {
+          "currencyCode": "USD",
+          "units": "200"
+        }
+      },
+      "budgetFilter": {
+        "calendarPeriod": "MONTH",
+        "creditTypesTreatment": "INCLUDE_ALL_CREDITS",
+        "projects": [
+          "projects/584548214478"
+        ]
+      },
+      "displayName": "keplaria-killswitch",
+      "etag": "1786573930466479",
+      "name": "billingAccounts/006252-CAF71A-EC72B9/budgets/5acebb0e-a2a1-4f91-96a4-5cb949a9d12e",
+      "notificationsRule": {
+        "pubsubTopic": "projects/keplaria/topics/billing-killswitch",
+        "schemaVersion": "1.0"
+      },
+      "thresholdRules": [
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 1.0
+        }
+      ]
+    },
+    {
+      "amount": {
+        "specifiedAmount": {
+          "currencyCode": "USD",
+          "units": "18"
+        }
+      },
+      "budgetFilter": {
+        "calendarPeriod": "MONTH",
+        "creditTypesTreatment": "INCLUDE_ALL_CREDITS"
+      },
+      "displayName": "my-initial-budget",
+      "etag": "1663056405550815",
+      "name": "billingAccounts/006252-CAF71A-EC72B9/budgets/5bf28183-31a4-41e9-99e2-eb84c88435ec",
+      "notificationsRule": {},
+      "thresholdRules": [
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 0.5
+        },
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 0.9
+        },
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 1.0
+        }
+      ]
+    },
+    {
+      "amount": {
+        "specifiedAmount": {
+          "currencyCode": "USD",
+          "units": "100"
+        }
+      },
+      "budgetFilter": {
+        "calendarPeriod": "MONTH",
+        "creditTypesTreatment": "INCLUDE_ALL_CREDITS",
+        "projects": [
+          "projects/584548214478"
+        ]
+      },
+      "displayName": "keplaria-build",
+      "etag": "1786572881234527",
+      "name": "billingAccounts/006252-CAF71A-EC72B9/budgets/5d955ff1-fcbb-41c8-9f75-336de6d8b0e9",
+      "notificationsRule": {},
+      "thresholdRules": [
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 1.0
+        },
+        {
+          "spendBasis": "CURRENT_SPEND",
+          "thresholdPercent": 1.3
+        }
+      ]
+    }
+  ],
+  "cloud_run_pinned_above_zero": "none",
+  "commit": "c530165",
+  "credit_expiry": "2026-11-04",
+  "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry.",
+  "credit_remaining_usd": 138.09,
+  "criterion": "the judging window running cost is measured, not estimated, and the alerting that guards it is known to watch the right project",
+  "date": "2026-08-20T19:57:40Z",
+  "disks": [
+    {
+      "name": "keplaria-yente",
+      "sizeGb": "60",
+      "type": "pd-ssd"
+    }
+  ],
+  "engine_deployment_spec": {
+    "containerConcurrency": 8,
+    "maxInstances": 10,
+    "minInstances": 1,
+    "pscInterfaceConfig": {
+      "networkAttachment": "projects/keplaria/regions/us-central1/networkAttachments/keplaria-psc2"
+    },
+    "resourceLimits": {
+      "cpu": "1",
+      "memory": "4Gi"
+    }
+  },
+  "gross_cost_month_to_date_usd": null,
+  "gross_cost_note": "month-to-date before credits, from the keplaria-gross-observe budget. null means no notification had been published yet at collection time.",
+  "instances": [
+    {
+      "machineType": "e2-standard-4",
+      "name": "keplaria-yente",
+      "status": "RUNNING",
+      "zone": "us-central1-c"
+    }
+  ],
+  "measured_vm_uptime_hours_per_day": {
+    "keplaria-yente": 6.1
+  },
+  "net_cost_month_to_date_usd": 0.0,
+  "net_cost_note": "month-to-date after all credits; this is what is actually owed. Read from the newest kill-switch notification.",
+  "project_number": "584548214478",
+  "spike": "cost_posture"
+}
