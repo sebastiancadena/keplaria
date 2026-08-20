@@ -8,10 +8,15 @@ human actually saw" true rather than merely likely.
 
 from __future__ import annotations
 
+import pytest
+from google.api_core.exceptions import Aborted
+
 from app.state.approvals import (
     APPROVALS,
     APPROVED,
     REJECTED,
+    ApprovalResult,
+    _commit_with_abort_retry,
     commit_approval,
 )
 from app.state.firestore import CASES
@@ -168,3 +173,55 @@ def test_two_concurrent_commits_of_the_same_approval_admit_exactly_one(db, case_
     assert sum(1 for r in results if r.committed) == 1, (
         f"exactly one commit must win, got {[(r.committed, r.reason) for r in results]}"
     )
+
+
+# --- contention ---------------------------------------------------------------
+#
+# google-cloud-firestore's @transactional retries Aborted raised by _commit(),
+# and ONLY that. An Aborted raised by the reads inside the transaction escapes
+# on the first attempt (transaction.py: retryable_exceptions guards the commit
+# call alone). Measured 2026-08-20: 9 of 48 contended calls raised
+# "409 Aborted due to cross-transaction contention" out of batch_get_documents.
+# Exactly one commit still won every round, so this is not a correctness bug --
+# it is a caller-visible one, and this path has no retry behind it: a reviewer
+# double-clicking Approve gets a 500 instead of the duplicate refusal, and an
+# unattended run records a failure the system did not actually have.
+
+
+class _Aborting:
+    """A transaction factory whose first `n` transactions abort on read."""
+
+    def __init__(self, failures: int):
+        self.failures = failures
+        self.handed_out = 0
+
+    def transaction(self):
+        self.handed_out += 1
+        return self.handed_out
+
+
+def _commit_that_aborts(aborting: _Aborting):
+    def _commit(txn):
+        if txn <= aborting.failures:
+            raise Aborted("409 Aborted due to cross-transaction contention.")
+        return ApprovalResult(False, 3, "duplicate_approval")
+    return _commit
+
+
+def test_a_contended_read_is_retried_instead_of_raised():
+    db = _Aborting(failures=2)
+
+    result = _commit_with_abort_retry(db, _commit_that_aborts(db))
+
+    assert result.reason == "duplicate_approval"
+    assert db.handed_out == 3, "each attempt needs its own transaction"
+
+
+def test_unrelenting_contention_is_raised_rather_than_swallowed():
+    """A cap, not a loop. If Firestore is genuinely unable to serialise this
+    case, the caller has to see it -- swallowing it would report a refusal
+    that never happened."""
+    db = _Aborting(failures=99)
+
+    with pytest.raises(Aborted):
+        _commit_with_abort_retry(db, _commit_that_aborts(db))

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from google.api_core import exceptions
 from google.cloud import firestore
 
 from app.state.firestore import CASES
@@ -43,6 +44,45 @@ class ApprovalResult:
     committed: bool
     case_version: int
     reason: str = ""
+
+
+# Firestore aborts one of two transactions that touch the same case at the
+# same moment, and google-cloud-firestore does NOT retry all of them: its
+# @transactional loop guards `transaction._commit()` only, so an Aborted
+# raised by the READS inside the transaction escapes on the first attempt
+# (firestore_v1/transaction.py, `retryable_exceptions`). Measured 2026-08-20
+# against the test database: 9 of 48 contended calls raised "409 Aborted due
+# to cross-transaction contention" out of batch_get_documents.
+#
+# Nothing was ever committed twice -- exactly one commit won every round -- so
+# this is not a correctness hole. It is a caller-visible one, and this is the
+# one transaction in the system with no retry behind it: claim_event and the
+# command sweep are re-driven by Pub/Sub and the scheduler, while an approval
+# is a human pressing a button once. A double-click that lands as an Aborted
+# gives that human a 500 where the code means to say "already decided".
+_ABORT_ATTEMPTS = 5
+
+
+def _commit_with_abort_retry(db, _commit):
+    """Run `_commit` in a fresh transaction, retrying cross-transaction aborts.
+
+    A fresh transaction per attempt, deliberately: a transaction that has
+    aborted cannot be reused, and the retry has to re-READ before deciding,
+    which is what turns the loser of a race into a clean `duplicate_approval`
+    rather than an exception.
+
+    No backoff. Contention here is a double-click, not a thundering herd, and
+    the second attempt reads a case the winner has already written. Capped
+    rather than looping: if Firestore genuinely cannot serialise this case,
+    the caller must see that instead of a refusal that never happened.
+    """
+    for attempt in range(_ABORT_ATTEMPTS):
+        try:
+            return _commit(db.transaction())
+        except exceptions.Aborted:
+            if attempt == _ABORT_ATTEMPTS - 1:
+                raise
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def commit_approval(
@@ -110,4 +150,4 @@ def commit_approval(
         )
         return ApprovalResult(True, current_version)
 
-    return _commit(db.transaction())
+    return _commit_with_abort_retry(db, _commit)
