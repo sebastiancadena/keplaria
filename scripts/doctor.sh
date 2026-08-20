@@ -311,15 +311,25 @@ if [ -n "$review_url" ]; then
   # The two accounts the organizers gave repository access must also be able
   # to open the review console for themselves, without asking anyone. Read the
   # live IAP policy rather than trusting the runbook — a grant made by hand is
-  # exactly the kind that gets lost in a re-provision. testing@ is a Google
-  # GROUP (gcloud rejects `user:` for it); cloudhackathons@ is matched on the
-  # address alone so the check survives either principal type.
+  # exactly the kind that gets lost in a re-provision.
+  #
+  # Each account is matched by REGEX, not by the address the rules quote, and
+  # not by principal type. Both reasons were observed on 2026-08-20 while
+  # making the grant: testing@ is a Google GROUP, so `user:` is rejected
+  # outright with a type error — and IAM then stored it under Devpost's older
+  # challengepost.com domain, because devpost.com is an alias of it. A grep for
+  # the quoted address would report a binding missing while it sits in the
+  # policy under its canonical name, which is the same false refusal this
+  # check exists to catch.
   iap_policy=$(gcloud iap web get-iam-policy --resource-type=cloud-run \
     --region=us-central1 --service=keplaria-review --project=keplaria \
     --format='value(bindings.members)' 2>/dev/null)
   missing=""
-  for judge in testing@devpost.com cloudhackathons@google.com; do
-    echo "$iap_policy" | grep -q "$judge" || missing="$missing $judge"
+  for judge in 'Devpost testing:testing@(devpost|challengepost)\.com' \
+               'Google hackathons:cloudhackathons@google\.com'; do
+    label=${judge%%:*}
+    pattern=${judge#*:}
+    echo "$iap_policy" | grep -qE "$pattern" || missing="$missing $label"
   done
   [ -z "$missing" ] \
     && ok "both judging accounts hold IAP access to the review console" \
