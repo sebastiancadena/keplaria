@@ -296,7 +296,23 @@ if [ -n "$review_url" ]; then
       loc=$(curl -sI "$review_url/review" | tr -d '\r' | sed -n 's/^[Ll]ocation: //p')
       case "$loc" in
         https://accounts.google.com/*)
-          ok "review service bounces anonymous callers to Google sign-in ($code)" ;;
+          ok "review service bounces anonymous callers to Google sign-in ($code)"
+          # The scopes in that redirect decide whether a judge can sign in at
+          # all. Google requires OAuth verification only for SENSITIVE or
+          # RESTRICTED scopes; on 2026-08-20 IAP asked for `openid email`,
+          # both non-sensitive, which is why the console's standing "your app
+          # requires verification" banner does not gate access — proven the
+          # same day by an outside Workspace account clearing consent and
+          # being refused by IAP's access list instead. Anything beyond these
+          # three would make verification mandatory and lock every judge out
+          # of a service that still looks healthy from here.
+          scopes=$(printf '%s' "$loc" | sed -n 's/.*[?&]scope=\([^&]*\).*/\1/p' \
+            | sed 's/%20/ /g; s/+/ /g')
+          extra=$(printf '%s' "$scopes" | tr ' ' '\n' \
+            | grep -vE '^(openid|email|profile)$' | tr '\n' ' ')
+          [ -z "$extra" ] \
+            && ok "IAP requests only non-sensitive scopes (${scopes:-none}) — no OAuth verification needed" \
+            || bad "IAP now requests sensitive scopes ($extra) — verification becomes mandatory and judges are blocked at consent" ;;
         *)
           bad "review service redirected ($code) somewhere other than Google sign-in: ${loc:-<none>}" ;;
       esac ;;
