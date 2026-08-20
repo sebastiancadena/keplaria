@@ -20,8 +20,19 @@ echo "== auth =="
   && ok "gcloud project = keplaria" || bad "gcloud project != keplaria"
 gcloud auth application-default print-access-token >/dev/null 2>&1 \
   && ok "ADC token mints" || bad "ADC broken (do NOT fix by re-running gcloud init blindly)"
-command -v wrangler >/dev/null && { wrangler whoami >/dev/null 2>&1 \
-  && ok "wrangler authenticated" || meh "wrangler not authenticated"; }
+# `wrangler whoami` is a network call, so a blip reads as "not authenticated" —
+# which points at exactly the wrong remedy, since re-running the OAuth login
+# would disturb working credentials. Retry once and separate the two cases.
+if command -v wrangler >/dev/null; then
+  if wrangler whoami >/dev/null 2>&1 || wrangler whoami >/dev/null 2>&1; then
+    ok "wrangler authenticated"
+  elif curl -sf -o /dev/null --max-time 10 https://api.cloudflare.com/client/v4/user 2>/dev/null \
+       || curl -s -o /dev/null --max-time 10 -w '%{http_code}' https://api.cloudflare.com 2>/dev/null | grep -q '^[2345]'; then
+    meh "wrangler not authenticated (Cloudflare reachable, so this is the token — re-run 'wrangler login')"
+  else
+    meh "wrangler whoami failed AND api.cloudflare.com is unreachable — likely network, NOT the token; do not re-run 'wrangler login' on this alone"
+  fi
+fi
 command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 \
   && ok "gh authenticated" || meh "gh not authenticated"; }
 # Offline presence check only — no API call. The key is needed solely to edit
