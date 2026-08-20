@@ -651,6 +651,21 @@ case "$engine_env" in
   *)   bad "deployed engine carries plaintext secret env var(s): ${engine_env} — readable by anyone with viewer access on the engine; the graph does not use them (no public egress, executor runs on Cloud Run)" ;;
 esac
 
+echo "== public claims =="
+# A number in the README that no longer matches the run that produced it is a
+# metric-honesty failure, so this is a FAIL and not a warning. But a script
+# that could not RUN is a third outcome: reporting that as a stale claim would
+# repeat the mistake the wrangler check made, where an inability to answer
+# read as a bad answer.
+ledger_out="$(uv run python scripts/claim_ledger.py --check 2>&1)"; ledger_rc=$?
+if ! printf '%s' "$ledger_out" | grep -q 'claims:'; then
+  meh "claim ledger did not run, so no public number was checked (uv run python scripts/claim_ledger.py --check)"
+elif [ "$ledger_rc" -eq 0 ]; then
+  ok "public claims match their evidence ($(printf '%s' "$ledger_out" | tail -1))"
+else
+  bad "a public number no longer matches the run that produced it, or lost the evidence it cited: $(printf '%s' "$ledger_out" | grep -E 'MISMATCH|EVIDENCE GONE' | sed 's/^ *//' | tr '\n' ' ') — regenerate with --render after fixing the prose"
+fi
+
 echo
 printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
 [ "$fail" -eq 0 ]

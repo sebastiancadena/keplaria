@@ -294,7 +294,7 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 62 read-only checks (one fewer when the yente VM is
+- `scripts/doctor.sh` — 70 read-only checks (one fewer when the yente VM is
   stopped, since the serving probe only runs against a running VM) covering
   toolchain, auth,
   provisioned infra, the event-flow wiring (topic, push subscription
@@ -329,6 +329,20 @@ and is reported rather than retried blindly.
   were: a routine ERP cleanup deleted the records the retry check named and
   took the criterion with them, and the cataloging claim rested on a note in
   the manifest rather than on anything a re-read could check.
+- `scripts/claim_ledger.py` — the other direction: `core_contracts` asks
+  whether the proofs still hold, this asks whether the **prose still matches
+  them**. Every public number is listed in `docs/proof/claims.toml` with the
+  evidence file and field that produces it; `--check` re-reads each one and
+  renders it the way the prose states it, so a number that has drifted is
+  reported as a mismatch rather than read past. `--render` regenerates
+  [`docs/proof/claims.md`](docs/proof/claims.md) from the same data, which is
+  why that page is generated and not written by hand. Claims no machine check
+  can settle — a rounded comparison, a historical statement — are marked
+  manual **with the reason stated**, because a false green is worse than an
+  admitted gap. A number whose copy is not written yet is reported as pending,
+  so the ledger doubles as the checklist for writing it. `doctor.sh` runs the
+  check, and treats "the check could not run" as a warning rather than as a
+  failed claim.
 - `spikes/core_contracts/redrill_retry.py` — re-makes the retry proof when
   the ledger holds none. Some criteria assert things about *deployed state*,
   so their evidence is a pair of live records rather than a committed file,

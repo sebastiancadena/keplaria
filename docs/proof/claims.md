@@ -1,0 +1,33 @@
+# Claim → source ledger
+
+Every number Keplaria states in public, and the run that produced it. This page
+is **generated** by `scripts/claim_ledger.py` from `docs/proof/claims.toml`; it
+is not written by hand, and the same command re-reads each evidence file rather
+than trusting this table. A row marked MISMATCH means the prose and the
+evidence disagree — the evidence is right.
+
+| Claim | Value | Evidence | Stated in | Qualifier | Status |
+|---|---|---|---|---|---|
+| Machine time for one deployed run of the whole lifecycle | 85.1 s of machine time | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md` | machine time only; the human approval is timed separately and excluded | MISMATCH |
+| The single human approval the same run required | 23.0 s human approval | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md` | — | MISMATCH |
+| The budget one deployed run must finish inside | 130s | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md` | — | verified |
+| The same work done by hand, timed | 663.5 s | [`spikes/manual_baseline/evidence.json`](../../spikes/manual_baseline/evidence.json) | `README.md` | author-timed, not practitioner-reviewed | verified |
+| Steps in the hand-done walkthrough | 20 steps | [`spikes/manual_baseline/evidence.json`](../../spikes/manual_baseline/evidence.json) | `README.md` | author-timed, not practitioner-reviewed | verified |
+| Steps of that walkthrough the run removes | 19 of which the run removes | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md` | measured against an author-timed baseline, not a practitioner-reviewed one | verified |
+| Business days the two cases span | 380 simulated business days | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md` | the lifecycle clock is compressed, and the compression is disclosed on screen | verified |
+| Contracts re-verified at capture time | nine contracts | [`spikes/core_contracts/evidence.json`](../../spikes/core_contracts/evidence.json) | `README.md` | — | verified |
+| Graded domain cases, all passing | 24/24 | [`spikes/domain_evals/evidence.json`](../../spikes/domain_evals/evidence.json) | `README.md` | a deterministic pass metric; re-run the suite before citing it | verified |
+| Mean score across the graded domain suite | 100% | [`spikes/domain_evals/evidence.json`](../../spikes/domain_evals/evidence.json) | — | a deterministic pass metric; re-run the suite before citing it | copy not written yet |
+| Fields entered into the ERP without a human retyping them | 22 fields | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | — | — | copy not written yet |
+| Days a non-compliant supplier was actually held from purchasing | 5 days | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | — | claimed only where both the hold and its release executed in the ERP | copy not written yet |
+| Decisions policy requires a human to make | 1 | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | — | — | copy not written yet |
+| Duplicate ERP writes after a retry | 0 | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | — | — | copy not written yet |
+| Contract and unit tests re-executed by the run that reports them | 430 passed | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | — | re-executed by the harness, not quoted from a previous run | copy not written yet |
+| Gross running cost for the whole project, month to date | $13.15 | [`spikes/cost_posture/evidence.json`](../../spikes/cost_posture/evidence.json) | — | before credits, measured from the billing account rather than from published rates | copy not written yet |
+| Cloud credit remaining | $138.09 | [`spikes/cost_posture/evidence.json`](../../spikes/cost_posture/evidence.json) | — | console-only; no API exposes the balance, so it is passed in when the measurement is taken | copy not written yet |
+| Measured daily uptime of the screening VM | 6.1 h/day | [`spikes/cost_posture/evidence.json`](../../spikes/cost_posture/evidence.json) | — | — | copy not written yet |
+| The ERP hold was written minutes before the rejection committed | a delta between two Firestore server timestamps in the same evidence file, stated in the prose that reports it rather than stored as a field. Read both timestamps before repeating the interval. | [`spikes/hitl_reject/evidence.json`](../../spikes/hitl_reject/evidence.json) | `README.md` | — | read by a human |
+| The graded suite passed 8/8 when the generation pin was measured | a historical statement about the suite as it stood on the day the pin was measured. The suite has since grown to 24 cases, so the current file cannot confirm it and must not be made to look as though it does. | [`spikes/domain_evals/evidence.json`](../../spikes/domain_evals/evidence.json) | `README.md` | — | read by a human |
+| Reasoning tokens fell to effectively none and the timed sequence shortened | the medians are stored per model and per configuration under keys that contain dots, which the path syntax here cannot address; the prose also rounds them deliberately. Read the comparison table in the evidence file. | [`spikes/gemini_37_eval/evidence.json`](../../spikes/gemini_37_eval/evidence.json) | `README.md` | — | read by a human |
+| The build piece states the graded suite passed 8/8 with reasoning pinned off | published and historical. The suite held eight cases when the piece was written and holds 24 now, so the current file cannot confirm the sentence and must not be edited into agreement with it. If the piece is ever revised, say when the eight-case figure was measured rather than restating it. | [`spikes/domain_evals/evidence.json`](../../spikes/domain_evals/evidence.json) | `docs/build-piece/article.dev.md` | — | read by a human |
+| The build piece states a two-supplier run dropped from 85 to 57 seconds | published and historical, and deliberately rounded. It describes the effect of the generation pin measured on that day, not the current run time, which has since moved. Do not reconcile it against today's number. | [`spikes/gemini_37_eval/evidence.json`](../../spikes/gemini_37_eval/evidence.json) | `docs/build-piece/article.dev.md` | — | read by a human |

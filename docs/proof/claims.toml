@@ -1,0 +1,218 @@
+# Every number Keplaria states in public, bound to the run that produced it.
+#
+#   uv run python scripts/claim_ledger.py --check --render
+#
+# re-reads each evidence file, compares it against the prose that states it,
+# and regenerates claims.md from this file. A number that has drifted from its
+# evidence is reported as a mismatch: the evidence is right, the prose is not.
+#
+# verify = "manual" marks a claim no machine check can settle, and must say
+# why. A rounded or historical statement is honest prose; asserting it
+# mechanically would be a false green.
+
+[[claim]]
+id = "run_machine_seconds"
+claim = "Machine time for one deployed run of the whole lifecycle"
+evidence = "spikes/judge_run/evidence.json"
+path = "machine_seconds.total"
+render = "{:.1f} s of machine time"
+appears_in = ["README.md"]
+qualifier = "machine time only; the human approval is timed separately and excluded"
+
+[[claim]]
+id = "run_human_seconds"
+claim = "The single human approval the same run required"
+evidence = "spikes/judge_run/evidence.json"
+path = "human_seconds"
+render = "{:.1f} s human approval"
+appears_in = ["README.md"]
+
+[[claim]]
+id = "run_budget_seconds"
+claim = "The budget one deployed run must finish inside"
+evidence = "spikes/judge_run/evidence.json"
+path = "budget_seconds"
+render = "{}s"
+appears_in = ["README.md"]
+
+[[claim]]
+id = "manual_baseline_seconds"
+claim = "The same work done by hand, timed"
+evidence = "spikes/manual_baseline/evidence.json"
+path = "manual_seconds"
+render = "{:.1f} s"
+appears_in = ["README.md"]
+qualifier = "author-timed, not practitioner-reviewed"
+
+[[claim]]
+id = "manual_baseline_steps"
+claim = "Steps in the hand-done walkthrough"
+evidence = "spikes/manual_baseline/evidence.json"
+path = "manual_steps"
+render = "{} steps"
+appears_in = ["README.md"]
+qualifier = "author-timed, not practitioner-reviewed"
+
+[[claim]]
+id = "manual_steps_eliminated"
+claim = "Steps of that walkthrough the run removes"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.manual_steps_eliminated"
+render = "{} of which the run removes"
+appears_in = ["README.md"]
+qualifier = "measured against an author-timed baseline, not a practitioner-reviewed one"
+
+[[claim]]
+id = "simulated_business_days"
+claim = "Business days the two cases span"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.simulated_business_days"
+render = "{} simulated business days"
+appears_in = ["README.md"]
+qualifier = "the lifecycle clock is compressed, and the compression is disclosed on screen"
+
+[[claim]]
+id = "core_contracts_count"
+claim = "Contracts re-verified at capture time"
+evidence = "spikes/core_contracts/evidence.json"
+path = "criteria"
+length = true
+words = true
+render = "{} contracts"
+appears_in = ["README.md"]
+
+[[claim]]
+id = "domain_eval_cases"
+claim = "Graded domain cases, all passing"
+evidence = "spikes/domain_evals/evidence.json"
+path = "summary_metrics.0.num_cases_total"
+render = "{0}/{0}"
+appears_in = ["README.md"]
+qualifier = "a deterministic pass metric; re-run the suite before citing it"
+
+[[claim]]
+id = "domain_eval_mean_score"
+claim = "Mean score across the graded domain suite"
+evidence = "spikes/domain_evals/evidence.json"
+path = "summary_metrics.0.mean_score"
+render = "{:.0%}"
+qualifier = "a deterministic pass metric; re-run the suite before citing it"
+
+[[claim]]
+id = "fields_without_rekeying"
+claim = "Fields entered into the ERP without a human retyping them"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.fields_without_rekeying"
+render = "{} fields"
+
+[[claim]]
+id = "enforced_hold_days"
+claim = "Days a non-compliant supplier was actually held from purchasing"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.enforced_hold_days"
+render = "{} days"
+qualifier = "claimed only where both the hold and its release executed in the ERP"
+
+[[claim]]
+id = "policy_required_interventions"
+claim = "Decisions policy requires a human to make"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.policy_required_interventions"
+render = "{}"
+
+[[claim]]
+id = "duplicate_writes_after_retry"
+claim = "Duplicate ERP writes after a retry"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.duplicate_writes_after_retry"
+render = "{}"
+
+[[claim]]
+id = "contract_suite_passed"
+claim = "Contract and unit tests re-executed by the run that reports them"
+evidence = "spikes/judge_run/evidence.json"
+path = "scoreboard.contract_suite.passed"
+render = "{} passed"
+qualifier = "re-executed by the harness, not quoted from a previous run"
+
+[[claim]]
+id = "gross_cost_month_to_date"
+claim = "Gross running cost for the whole project, month to date"
+evidence = "spikes/cost_posture/evidence.json"
+path = "gross_cost_month_to_date_usd"
+render = "${:.2f}"
+qualifier = "before credits, measured from the billing account rather than from published rates"
+
+[[claim]]
+id = "credit_remaining"
+claim = "Cloud credit remaining"
+evidence = "spikes/cost_posture/evidence.json"
+path = "credit_remaining_usd"
+render = "${:.2f}"
+qualifier = "console-only; no API exposes the balance, so it is passed in when the measurement is taken"
+
+[[claim]]
+id = "yente_uptime_hours_per_day"
+claim = "Measured daily uptime of the screening VM"
+evidence = "spikes/cost_posture/evidence.json"
+path = "measured_vm_uptime_hours_per_day.keplaria-yente"
+render = "{} h/day"
+
+[[claim]]
+id = "hold_before_decision"
+claim = "The ERP hold was written minutes before the rejection committed"
+evidence = "spikes/hitl_reject/evidence.json"
+verify = "manual"
+reason = """a delta between two Firestore server timestamps in the same evidence \
+file, stated in the prose that reports it rather than stored as a field. Read \
+both timestamps before repeating the interval."""
+appears_in = ["README.md"]
+
+[[claim]]
+id = "eval_suite_at_the_time_of_the_pin"
+claim = "The graded suite passed 8/8 when the generation pin was measured"
+evidence = "spikes/domain_evals/evidence.json"
+verify = "manual"
+reason = """a historical statement about the suite as it stood on the day the \
+pin was measured. The suite has since grown to 24 cases, so the current file \
+cannot confirm it and must not be made to look as though it does."""
+appears_in = ["README.md"]
+
+[[claim]]
+id = "reasoning_tokens_and_timing_at_the_pin"
+claim = "Reasoning tokens fell to effectively none and the timed sequence shortened"
+evidence = "spikes/gemini_37_eval/evidence.json"
+verify = "manual"
+reason = """the medians are stored per model and per configuration under keys \
+that contain dots, which the path syntax here cannot address; the prose also \
+rounds them deliberately. Read the comparison table in the evidence file."""
+appears_in = ["README.md"]
+
+# --- Published, and therefore read-only here -------------------------------
+#
+# The build piece is already public. These rows record what it states and
+# whether the run behind it still says the same thing; they are NOT a licence
+# to edit it. A published statement that was true when it was published stays
+# true as a statement about that moment, and correcting one is a separate,
+# deliberate act.
+
+[[claim]]
+id = "article_eval_suite_at_publication"
+claim = "The build piece states the graded suite passed 8/8 with reasoning pinned off"
+evidence = "spikes/domain_evals/evidence.json"
+verify = "manual"
+reason = """published and historical. The suite held eight cases when the piece \
+was written and holds 24 now, so the current file cannot confirm the sentence \
+and must not be edited into agreement with it. If the piece is ever revised, \
+say when the eight-case figure was measured rather than restating it."""
+appears_in = ["docs/build-piece/article.dev.md"]
+
+[[claim]]
+id = "article_run_timing_at_publication"
+claim = "The build piece states a two-supplier run dropped from 85 to 57 seconds"
+evidence = "spikes/gemini_37_eval/evidence.json"
+verify = "manual"
+reason = """published and historical, and deliberately rounded. It describes \
+the effect of the generation pin measured on that day, not the current run \
+time, which has since moved. Do not reconcile it against today's number."""
+appears_in = ["docs/build-piece/article.dev.md"]
