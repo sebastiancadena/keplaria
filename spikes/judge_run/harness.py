@@ -223,7 +223,41 @@ def service_url(name: str) -> str:
     ).stdout.strip()
 
 
-def hitl_track(db, steps: list) -> tuple[str, float, float]:
+def wait_for_human_approval(db, case_id: str) -> float:
+    """Block until a human approves `case_id` through the deployed review UI.
+
+    Returns the seconds waited. That number is reported but never added to the
+    budget total: the 2:10 covers what a recording has to sit through, and a
+    reviewer deciding is a directing choice rather than a system property.
+    """
+    review = service_url("keplaria-review")
+    log("")
+    log(f"  APPROVE NOW: {review}/review/{case_id}")
+    log("  (waiting -- this is the only human beat)")
+    h0 = time.time()
+    while True:
+        case = (db.collection(CASES).document(case_id).get().to_dict() or {})
+        _, _, approval_id = effective_band(case)
+        if approval_id:
+            break
+        if time.time() - h0 > 1800:
+            raise AssertionError("no approval within 30 minutes")
+        time.sleep(3)
+    return time.time() - h0
+
+
+def default_approval():
+    """The approval strategy this harness uses when nobody supplies one.
+
+    A function rather than a default argument value so the choice is one
+    named, testable thing. spikes/run_streak drives the same tracks with an
+    unattended strategy; what must never drift is which one applies HERE,
+    because this module's evidence file is cited as an attended run.
+    """
+    return wait_for_human_approval
+
+
+def hitl_track(db, steps: list, approve=None) -> tuple[str, float, float]:
     """Park a case, wait for a human to approve it, confirm the ERP write.
 
     Returns (case_id, machine_seconds, human_seconds). The human wait is
@@ -232,6 +266,7 @@ def hitl_track(db, steps: list) -> tuple[str, float, float]:
     clicking Approve is the one beat whose duration is a directing choice
     rather than a system property.
     """
+    approve = approve or default_approval()
     case_id = f"JR-A-{uuid.uuid4().hex[:6].upper()}"
     log(f"track A (HITL): {case_id}, supplier {REVIEW_SUPPLIER!r}")
 
@@ -264,20 +299,8 @@ def hitl_track(db, steps: list) -> tuple[str, float, float]:
     if not parked_ok:
         raise AssertionError(f"track A did not park for a near-match: {steps[-1]}")
 
-    review = service_url("keplaria-review")
-    log("")
-    log(f"  APPROVE NOW: {review}/review/{case_id}")
-    log("  (waiting -- this is the only human beat)")
-    h0 = time.time()
-    while True:
-        case = (db.collection(CASES).document(case_id).get().to_dict() or {})
-        _, _, approval_id = effective_band(case)
-        if approval_id:
-            break
-        if time.time() - h0 > 1800:
-            raise AssertionError("no approval within 30 minutes")
-        time.sleep(3)
-    human_s = time.time() - h0
+    human_s = approve(db, case_id)
+    case = (db.collection(CASES).document(case_id).get().to_dict() or {})
 
     t1 = time.time()
     # decide() drains synchronously, so by the time the approval is visible
@@ -300,15 +323,15 @@ def hitl_track(db, steps: list) -> tuple[str, float, float]:
     return case_id, park_s + release_s, human_s
 
 
-def lifecycle_track(db, steps: list) -> tuple[str, float]:
+def lifecycle_track(db, steps: list, supplier: str = CLEAN_SUPPLIER) -> tuple[str, float]:
     """The four-beat station-keeping sequence on a supplier that never parks."""
     case_id = f"JR-B-{uuid.uuid4().hex[:6].upper()}"
-    log(f"track B (lifecycle): {case_id}, supplier {CLEAN_SUPPLIER!r}")
+    log(f"track B (lifecycle): {case_id}, supplier {supplier!r}")
 
     total = 0.0
     for index, (event_type, effective, ref, expected) in enumerate(LIFECYCLE, start=1):
         t0 = time.time()
-        publish(case_id, CLEAN_SUPPLIER, event_type, effective, ref)
+        publish(case_id, supplier, event_type, effective, ref)
         case = settle(db, case_id, index)
         elapsed = time.time() - t0
         total += elapsed
@@ -389,20 +412,44 @@ def build_timeline(case_a: str | None, case_b: str | None, steps: list) -> list[
     return timeline
 
 
-def main() -> int:
-    db = get_client()
-    steps: list = []
-    failure = None
-    started = datetime.now(timezone.utc)
+def run_once(db, approve=None, clean_supplier: str = CLEAN_SUPPLIER) -> dict:
+    """Both tracks, once, returning what happened instead of writing it.
 
+    Returning rather than writing is what lets spikes/run_streak execute this
+    ten times without ten of those runs overwriting this module's evidence
+    file -- which is cited as the day-10 judge-run gate and is a different
+    claim from any single run inside a streak.
+
+    A failed track is caught here and reported in the returned dict. The
+    caller decides what a failure means: one rehearsal writes FAIL and stops,
+    a streak writes FAIL and starts counting again from zero.
+    """
+    steps: list = []
     try:
-        case_a, machine_a, human_s = hitl_track(db, steps)
-        case_b, machine_b = lifecycle_track(db, steps)
+        case_a, machine_a, human_s = hitl_track(db, steps, approve=approve)
+        case_b, machine_b = lifecycle_track(db, steps, supplier=clean_supplier)
+        failure = None
     except AssertionError as exc:
         failure = str(exc)
         case_a = case_b = None
         machine_a = machine_b = human_s = 0.0
         log(f"FAILED: {exc}")
+
+    return {
+        "case_a": case_a, "case_b": case_b,
+        "machine_a": machine_a, "machine_b": machine_b,
+        "human_seconds": human_s, "steps": steps, "failure": failure,
+    }
+
+
+def main() -> int:
+    db = get_client()
+    started = datetime.now(timezone.utc)
+
+    run = run_once(db)
+    case_a, case_b = run["case_a"], run["case_b"]
+    machine_a, machine_b = run["machine_a"], run["machine_b"]
+    human_s, steps, failure = run["human_seconds"], run["steps"], run["failure"]
 
     machine_total = machine_a + machine_b
     result = "PASS" if failure is None else "FAIL"

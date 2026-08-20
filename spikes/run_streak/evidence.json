@@ -1,0 +1,388 @@
+{
+  "captured_at": "2026-08-20T16:03:35.222803+00:00",
+  "what_this_is": "Consecutive unattended rehearsals of the deployed judge run, graded against the ten-consecutive-runs-under-2:10 criterion.",
+  "budget_note": "`machine_seconds` is the timed total each run is graded against and EXCLUDES `approval_seconds`, which is reported per run alongside it. This matches how the attended baseline was measured -- there the same work sat inside a human's think time -- so the two are comparable. It is not zero; add the two fields for a run's full wall clock.",
+  "approval_path": {
+    "driven_by": "console.store.commit_approval + app.executor.runner.execute_pending_commands",
+    "not_exercised": [
+      "IAP identity assertion (console.iap.require_reviewer)",
+      "the review form's cross-site refusal",
+      "the review templates",
+      "the keplaria-review service itself"
+    ],
+    "why": "require_reviewer verifies an assertion IAP injects server-side, which no script can produce. The browser approval path is proven separately by spikes/hitl_release and by the attended judge run in spikes/judge_run."
+  },
+  "deployment": {
+    "engine": {
+      "resource": "projects/keplaria/locations/us-central1/reasoningEngines/2127503872455868416",
+      "update_time": "2026-08-19T13:28:25.146505Z",
+      "min_instances": 1,
+      "max_instances": 10
+    },
+    "cold_service": "keplaria-ingress",
+    "cold_service_revision": "keplaria-ingress-00009-bvv"
+  },
+  "verdict": {
+    "consecutive": 2,
+    "cold_confirmed": 0,
+    "green": false,
+    "why": "2/10 consecutive runs; 0/2 observed cold starts",
+    "required_runs": 10,
+    "required_cold": 2,
+    "budget_seconds": 130
+  },
+  "runs": [
+    {
+      "run": 1,
+      "result": "PASS",
+      "machine_seconds": 52.2,
+      "cold": false,
+      "cold_confirmed": false,
+      "cold_observation": "warm run; not a cold-start slot",
+      "approval_seconds": 4.1,
+      "case_ids": {
+        "hitl": "JR-A-DCBAB5",
+        "lifecycle": "JR-B-E7806E"
+      },
+      "failure": null,
+      "steps": [
+        {
+          "track": "A",
+          "beat": "event -> parked for review",
+          "seconds": 13.4,
+          "ok": true,
+          "phase": "awaiting_approval",
+          "band": "review",
+          "score": 0.25,
+          "factors": [
+            "SUBTHRESHOLD_CANDIDATE"
+          ],
+          "lifecycle": {
+            "state": "active",
+            "cycle": 1
+          },
+          "commands_parked": [
+            "attach_evidence",
+            "create_supplier"
+          ]
+        },
+        {
+          "track": "A",
+          "beat": "human approval -> ERP write",
+          "seconds": 0.2,
+          "ok": true,
+          "human_seconds": 4.1,
+          "decision": "approved",
+          "actor": "unattended-streak-runner@keplaria.invalid",
+          "executed": [
+            "attach_evidence",
+            "create_supplier"
+          ]
+        },
+        {
+          "track": "B",
+          "beat": "1. new_supplier_packet",
+          "seconds": 15.3,
+          "ok": true,
+          "expected": {
+            "state": "active",
+            "cycle": 1
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "active",
+            "cycle": 1,
+            "reason": "ONBOARDED"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "2. renewal_due",
+          "seconds": 4.6,
+          "ok": true,
+          "expected": {
+            "state": "active",
+            "reason": "NOT_DUE"
+          },
+          "phase": "no_action",
+          "lifecycle": {
+            "state": "active",
+            "cycle": 1,
+            "reason": "NOT_DUE"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "3. renewal_due",
+          "seconds": 4.9,
+          "ok": true,
+          "expected": {
+            "state": "renewal_requested"
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "renewal_requested",
+            "cycle": 1,
+            "reason": "RENEWAL_REQUESTED"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "4. evidence_overdue",
+          "seconds": 4.6,
+          "ok": true,
+          "expected": {
+            "state": "held"
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "held",
+            "cycle": 1,
+            "reason": "HELD_OVERDUE"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "5. certificate_received",
+          "seconds": 9.2,
+          "ok": true,
+          "expected": {
+            "state": "active",
+            "cycle": 2
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "active",
+            "cycle": 2,
+            "reason": "RENEWED"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "final command ledger",
+          "seconds": 0.0,
+          "ok": true,
+          "commands": {
+            "JR-B-E7806E:apply_hold:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "apply_hold",
+              "external_id": "Distribuidora Llanos Azules SAS"
+            },
+            "JR-B-E7806E:attach_evidence:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "attach_evidence",
+              "external_id": "9161a08a96"
+            },
+            "JR-B-E7806E:attach_evidence:c2": {
+              "status": "done",
+              "cycle": 2,
+              "action": "attach_evidence",
+              "external_id": "fc302b6f7d"
+            },
+            "JR-B-E7806E:clear_hold:c2": {
+              "status": "done",
+              "cycle": 2,
+              "action": "clear_hold",
+              "external_id": "Distribuidora Llanos Azules SAS"
+            },
+            "JR-B-E7806E:create_supplier:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "create_supplier",
+              "external_id": "Distribuidora Llanos Azules SAS"
+            },
+            "JR-B-E7806E:request_renewal:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "request_renewal",
+              "external_id": "9tqbfu3q0m"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "result": "PASS",
+      "machine_seconds": 47.6,
+      "cold": false,
+      "cold_confirmed": false,
+      "cold_observation": "warm run; not a cold-start slot",
+      "approval_seconds": 5.0,
+      "case_ids": {
+        "hitl": "JR-A-F64D90",
+        "lifecycle": "JR-B-6663AA"
+      },
+      "failure": null,
+      "steps": [
+        {
+          "track": "A",
+          "beat": "event -> parked for review",
+          "seconds": 11.8,
+          "ok": true,
+          "phase": "awaiting_approval",
+          "band": "review",
+          "score": 0.25,
+          "factors": [
+            "SUBTHRESHOLD_CANDIDATE"
+          ],
+          "lifecycle": {
+            "state": "active",
+            "cycle": 1
+          },
+          "commands_parked": [
+            "attach_evidence",
+            "create_supplier"
+          ]
+        },
+        {
+          "track": "A",
+          "beat": "human approval -> ERP write",
+          "seconds": 0.2,
+          "ok": true,
+          "human_seconds": 5.0,
+          "decision": "approved",
+          "actor": "unattended-streak-runner@keplaria.invalid",
+          "executed": [
+            "attach_evidence",
+            "create_supplier"
+          ]
+        },
+        {
+          "track": "B",
+          "beat": "1. new_supplier_packet",
+          "seconds": 11.9,
+          "ok": true,
+          "expected": {
+            "state": "active",
+            "cycle": 1
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "active",
+            "cycle": 1,
+            "reason": "ONBOARDED"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "2. renewal_due",
+          "seconds": 4.9,
+          "ok": true,
+          "expected": {
+            "state": "active",
+            "reason": "NOT_DUE"
+          },
+          "phase": "no_action",
+          "lifecycle": {
+            "state": "active",
+            "cycle": 1,
+            "reason": "NOT_DUE"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "3. renewal_due",
+          "seconds": 4.0,
+          "ok": true,
+          "expected": {
+            "state": "renewal_requested"
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "renewal_requested",
+            "cycle": 1,
+            "reason": "RENEWAL_REQUESTED"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "4. evidence_overdue",
+          "seconds": 6.2,
+          "ok": true,
+          "expected": {
+            "state": "held"
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "held",
+            "cycle": 1,
+            "reason": "HELD_OVERDUE"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "5. certificate_received",
+          "seconds": 8.6,
+          "ok": true,
+          "expected": {
+            "state": "active",
+            "cycle": 2
+          },
+          "phase": "committed",
+          "lifecycle": {
+            "state": "active",
+            "cycle": 2,
+            "reason": "RENEWED"
+          },
+          "band": "clear"
+        },
+        {
+          "track": "B",
+          "beat": "final command ledger",
+          "seconds": 0.0,
+          "ok": true,
+          "commands": {
+            "JR-B-6663AA:apply_hold:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "apply_hold",
+              "external_id": "Distribuidora Llanos Azules SAS"
+            },
+            "JR-B-6663AA:attach_evidence:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "attach_evidence",
+              "external_id": "9161a08a96"
+            },
+            "JR-B-6663AA:attach_evidence:c2": {
+              "status": "done",
+              "cycle": 2,
+              "action": "attach_evidence",
+              "external_id": "fc302b6f7d"
+            },
+            "JR-B-6663AA:clear_hold:c2": {
+              "status": "done",
+              "cycle": 2,
+              "action": "clear_hold",
+              "external_id": "Distribuidora Llanos Azules SAS"
+            },
+            "JR-B-6663AA:create_supplier:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "create_supplier",
+              "external_id": "Distribuidora Llanos Azules SAS"
+            },
+            "JR-B-6663AA:request_renewal:c1": {
+              "status": "done",
+              "cycle": 1,
+              "action": "request_renewal",
+              "external_id": "cuaqetnkrn"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

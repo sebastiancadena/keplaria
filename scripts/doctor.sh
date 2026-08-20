@@ -52,7 +52,10 @@ echo "== judge-visibility (private planning layer must not leak) =="
 # the architecture diagram is its sanctioned use. The internal-only terms
 # (Launch, Constellation, Docking, Debris shield, Splashdown) never appeared
 # here because they never leaked; add one only if it does.
-LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|\bR[1-9][0-9]?\b'
+# 'feature-admission' added 2026-08-20: a private filename reached a draft of
+# spikes/run_streak/harness.py and this grep did not catch it, because the
+# pattern listed every other file in that directory but not this one.
+LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|feature-admission|\bR[1-9][0-9]?\b'
 # -I skips binary files; the risk-id alternative can match arbitrary bytes in
 # vendored binaries. We only care about text leaks from our own writing.
 # The generated architecture.svg is excluded because its base64 font payloads
