@@ -53,6 +53,17 @@
 </ul>
 {% endif %}
 
+{% if case.refused_commands %}
+<h2>Refused commands</h2>
+<p>Outside the case's department scope — refused and recorded at claim time.
+   No outbox row exists for these; approving this case cannot release them.</p>
+<ul>
+{% for command in case.refused_commands %}
+  <li class="mono">{{ command.action }} (cycle {{ command.cycle }})</li>
+{% endfor %}
+</ul>
+{% endif %}
+
 {% if decided %}
 <p>This case already has a recorded decision:
    <span class="band--{{ 'clear' if case.approval.decision == 'approved' else 'blocked' }}">

@@ -424,6 +424,35 @@ def test_the_review_page_shows_a_department_denial(db, case_id, client):
     assert "finance" in response.text
 
 
+def test_the_review_page_shows_a_command_refused_by_department(db, case_id, client):
+    """A department-scope refusal at claim time leaves no outbox row, but it
+    must still reach the reviewer: app.nodes._claim_lifecycle_commands
+    persists it onto the case document, and this page reads the raw case
+    document directly (see console/review.py's review_case, which does not
+    go through console.projection.public_case)."""
+    ctx = _StubContext({
+        "case": {
+            "case_id": case_id,
+            "event_type": "new_supplier_packet",
+            "supplier": "Andes Foods",
+            "effective_date": "2026-08-16",
+            "department": "compliance",
+        },
+        "case_state": {},
+        "screening": {"endpoint": "http://10.10.0.2:8000", "supplier": "Andes Foods",
+                      "reachable": True, "error": None, "flagged": [], "candidates": []},
+        "policy": {"policy_id": "supplier_risk", "policy_version": 2, "score": 0.25,
+                   "band": "review", "factors_fired": [], "reasons": []},
+    })
+    park_case(None, ctx)
+
+    response = client.get(f"/review/{case_id}")
+
+    assert response.status_code == 200
+    assert "create_supplier" in response.text
+    assert "refused and recorded" in response.text
+
+
 def test_failures_page_shows_a_dead_command_and_a_dead_event(client, monkeypatch):
     import console.review as review
 
