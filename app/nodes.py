@@ -20,7 +20,7 @@ from app.documents import DocumentUnavailable, load_document
 from app.grounding import RedactedDerivative, validate as grounding_validate
 from app.injection import scan as scan_for_injection
 from app.lifecycle import decide
-from app.policy import CLOCK_EVENTS, PolicyError, validate_route
+from app.policy import CLOCK_EVENTS, PolicyError, resolve_department, validate_route
 from app.risk import BLOCKED, CLEAR, REVIEW, RiskVerdict, assess_case, lifecycle_timing
 from app.schemas import CanonicalEvent, ComplianceAssessment, ScreeningResult
 from app.state.commands import DONE, claim_command
@@ -393,21 +393,39 @@ def apply_route(node_input, ctx: Context) -> Event:
     proposed = list((node_input or {}).get("route", []))
     reason = (node_input or {}).get("reason", "")
 
+    # Effective department: the event's own claim, or the catalog's v1
+    # grandfather value. Resolution happens HERE, not in the schema, so
+    # the persisted routing decision records which source it came from.
+    # The department is a producer-asserted policy-and-audit label; the
+    # guarantee below is that an out-of-scope proposal is refused and
+    # recorded, never that a mislabeled producer is prevented.
+    raw_department = case.get("department") or None
     try:
-        route = validate_route(event_type, proposed)
-        refused = None
-        dropped = [agent for agent in dict.fromkeys(proposed) if agent not in route]
+        department, department_source = resolve_department(raw_department)
     except PolicyError as exc:
-        # A rejected proposal is a policy outcome the trace must show, and it
-        # must never fall through to a side effect — quarantine_case is the
-        # only node this can reach next.
+        department = raw_department or ""
+        department_source = "unresolved"
         route, refused, dropped = [], str(exc), []
+    else:
+        try:
+            route = validate_route(event_type, proposed, department)
+            refused = None
+            dropped = [
+                agent for agent in dict.fromkeys(proposed) if agent not in route
+            ]
+        except PolicyError as exc:
+            # A rejected proposal is a policy outcome the trace must show,
+            # and it must never fall through to a side effect —
+            # quarantine_case is the only node this can reach next.
+            route, refused, dropped = [], str(exc), []
 
     evidence_skipped_no_document = "evidence" in route and not has_document
     evidence_skipped_tainted_document = "evidence" in route and has_document and tainted
 
     decision = {
         "proposed": proposed,
+        "department": department,
+        "department_source": department_source,
         "route": route,
         "dropped": dropped,
         "reason": reason,

@@ -119,6 +119,39 @@ def test_evidence_only_with_no_document_falls_through_to_skip():
     assert result.output["evidence_skipped_no_document"] is True
 
 
+def test_apply_route_records_the_department_and_source():
+    """A v1 case with no department resolves the catalog's legacy value,
+    and the decision says so — the record distinguishes an event that
+    claimed a department from one that was grandfathered."""
+    ctx = _StubContext({
+        "case": _case("CASE-D1", "new_supplier_packet", document_ref="fixture:x"),
+    })
+    node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["department"] == "procurement"
+    assert result.output["department_source"] == "legacy_default"
+    assert result.output["refused"] is None
+
+
+def test_a_department_refusal_routes_to_blocked_and_is_recorded():
+    """The new refusal takes the SAME path as every existing refusal:
+    blocked -> quarantine, zero claims. Matched on the code, not on mere
+    non-None-ness, so this cannot pass for the wrong refusal."""
+    case = _case("CASE-D2", "new_supplier_packet", document_ref="fixture:x")
+    case["department"] = "finance"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["evidence"], "reason": "finance reaching for evidence"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "DEPARTMENT_FORBIDS_AGENT" in (result.output["refused"] or "")
+    assert result.output["department"] == "finance"
+    assert result.output["department_source"] == "event"
+
+
 def test_unknown_agent_name_is_blocked_not_skipped():
     ctx = _StubContext({"case": _case("CASE-3", "new_supplier_packet")})
     node_input = {"route": ["finance_bot"], "reason": "hallucinated agent"}

@@ -219,4 +219,4 @@ def test_catalog_load_failure_fails_closed_in_validate_route(install_catalog):
     from app.policy import PolicyError, validate_route
     install_catalog(None, missing=True)
     with pytest.raises(PolicyError, match="CATALOG_UNAVAILABLE"):
-        validate_route("new_supplier_packet", ["evidence"])
+        validate_route("new_supplier_packet", ["evidence"], "procurement")
