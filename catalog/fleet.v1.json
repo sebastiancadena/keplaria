@@ -1,0 +1,84 @@
+{
+  "catalog_id": "fleet",
+  "catalog_version": 1,
+  "agents": [
+    {
+      "id": "coordinator",
+      "routable": false,
+      "version": 1,
+      "owner": "workflow-platform",
+      "purpose": "Proposes which specialist agents an event should engage; policy validates the proposal before anything runs.",
+      "input_schema": "app.schemas:CanonicalEvent",
+      "output_schema": "app.schemas:RoutingDecision",
+      "approved_tools": [],
+      "data_classes": ["event_metadata"],
+      "deployment": "deployed",
+      "evals": {
+        "suite": "tests/eval/run_domain_evals.sh",
+        "metric": "domain_case_pass",
+        "evidence": "spikes/domain_evals/evidence.json"
+      }
+    },
+    {
+      "id": "evidence",
+      "routable": true,
+      "version": 1,
+      "owner": "workflow-platform",
+      "purpose": "Extracts grounded corporate fields from a submitted document; every value must resolve to a verbatim span or the case quarantines.",
+      "input_schema": "app.documents:RedactedDerivative",
+      "output_schema": "app.schemas:EvidenceResult",
+      "approved_tools": [],
+      "data_classes": ["document_derivative", "entity_identifiers"],
+      "deployment": "deployed",
+      "evals": {
+        "suite": "tests/eval/run_domain_evals.sh",
+        "metric": "domain_case_pass",
+        "evidence": "spikes/domain_evals/evidence.json"
+      }
+    },
+    {
+      "id": "compliance",
+      "routable": true,
+      "version": 1,
+      "owner": "workflow-platform",
+      "purpose": "Interprets sanctions-screening candidates; a deterministic check holds every referenced candidate id to the actual screen.",
+      "input_schema": "app.schemas:ScreeningResult",
+      "output_schema": "app.schemas:ComplianceAssessment",
+      "approved_tools": [],
+      "data_classes": ["screening_candidates", "entity_identifiers"],
+      "deployment": "deployed",
+      "evals": {
+        "suite": "tests/eval/run_domain_evals.sh",
+        "metric": "domain_case_pass",
+        "evidence": "spikes/domain_evals/evidence.json"
+      }
+    }
+  ],
+  "event_routes": {
+    "new_supplier_packet": ["evidence", "compliance"],
+    "certificate_received": ["evidence"],
+    "renewal_due": [],
+    "evidence_overdue": []
+  },
+  "departments": {
+    "procurement": {
+      "description": "Onboards and maintains suppliers. Supplier onboarding inherently screens, so both specialist agents are in scope.",
+      "permitted_agents": ["evidence", "compliance"],
+      "permitted_commands": [
+        "create_supplier", "attach_evidence",
+        "request_renewal", "apply_hold", "clear_hold"
+      ]
+    },
+    "compliance": {
+      "description": "Reviews screening outcomes and evidence provenance. May restrict a supplier; never originates one.",
+      "permitted_agents": ["evidence", "compliance"],
+      "permitted_commands": ["apply_hold", "clear_hold"]
+    },
+    "finance": {
+      "description": "Consumes approved supplier records. Its events engage no agents and originate no supplier writes; a finance event proposing either is refused and recorded.",
+      "permitted_agents": [],
+      "permitted_commands": []
+    }
+  },
+  "legacy": { "v1_department": "procurement" }
+}
