@@ -6,7 +6,7 @@ malformed event is rejected at the edge rather than halfway through a workflow.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CanonicalEvent(BaseModel):
@@ -17,6 +17,17 @@ class CanonicalEvent(BaseModel):
     event_type: str
     supplier: str
     schema_version: int = 1
+    # The originating department. Required from schema_version 2; a v1
+    # event without one is grandfathered onto the catalog's
+    # legacy.v1_department at routing time (app/nodes.py::apply_route) —
+    # resolution deliberately does NOT happen here, because the schema
+    # module must not read the catalog and the routing record captures
+    # which source the department came from. Clock-event producers stamp
+    # "procurement" by convention: the scheduler acts on behalf of the
+    # supplier lifecycle procurement owns. That is a modeling convention,
+    # not a claim of human origin. The department is a policy-and-audit
+    # label asserted by the producer, not an authenticated identity.
+    department: str | None = None
     amount: float | None = None
     # When set, the event is only valid against this exact stored case version.
     expected_case_version: int | None = None
@@ -25,6 +36,14 @@ class CanonicalEvent(BaseModel):
     effective_date: str | None = None
     # Immutable payload reference; resolved by app.documents.load_document.
     document_ref: str | None = None
+
+    @model_validator(mode="after")
+    def _require_department_at_v2(self) -> "CanonicalEvent":
+        if self.schema_version >= 2 and not self.department:
+            raise ValueError(
+                "schema_version >= 2 requires a non-empty department"
+            )
+        return self
 
 
 class EvidenceField(BaseModel):
