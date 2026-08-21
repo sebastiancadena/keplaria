@@ -348,18 +348,24 @@ def apply_route(node_input, ctx: Context) -> Event:
 
     A remaining PolicyError still blocks the case rather than skipping it: a
     refused proposal must never reach commit_commands. But validate_route no
-    longer raises just because the coordinator over-proposed — a known agent
-    the event type doesn't permit (e.g. `compliance` on `certificate_received`)
-    is silently dropped from the route it returns, not refused. `refused`
-    here is therefore reserved for what validate_route still does raise on:
-    an unknown agent name, or a genuinely empty proposal on an event type
-    that requires one. `dropped` records the narrowing separately, so the
-    persisted case still shows exactly what the coordinator asked for versus
-    what policy actually ran — an audit trail the earlier all-or-nothing
-    refusal didn't need, because a refusal already carried `proposed` and an
-    empty `route` was self-explanatory. A narrowed route needs the diff
-    spelled out or a reviewer can't tell "coordinator proposed exactly this"
-    from "coordinator proposed more and policy trimmed it."
+    longer raises just because the coordinator over-proposed — a known,
+    department-permitted agent the event type doesn't permit (e.g.
+    `compliance` on `certificate_received`) is silently dropped from the
+    route it returns, not refused. `refused` here covers everything
+    validate_route (and its own precondition, resolve_department) still
+    raise on: an unknown event type, an unknown agent name, an unknown
+    department, an agent outside the calling department's scope
+    (DEPARTMENT_FORBIDS_AGENT), a genuinely empty proposal on an event type
+    that requires one, a catalog that cannot load, or — before validate_route
+    is ever reached — a v1 event with no department and a sunset (null)
+    legacy default (resolve_department's own UNKNOWN_DEPARTMENT). `dropped`
+    records the narrowing separately, so the persisted case still shows
+    exactly what the coordinator asked for versus what policy actually ran —
+    an audit trail the earlier all-or-nothing refusal didn't need, because a
+    refusal already carried `proposed` and an empty `route` was
+    self-explanatory. A narrowed route needs the diff spelled out or a
+    reviewer can't tell "coordinator proposed exactly this" from
+    "coordinator proposed more and policy trimmed it."
 
     Evidence only has a document to extract from when the event actually
     carries a `document_ref`. A packet with no document is not a failure —

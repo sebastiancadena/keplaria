@@ -152,6 +152,64 @@ def test_a_department_refusal_routes_to_blocked_and_is_recorded():
     assert result.output["department_source"] == "event"
 
 
+def test_an_undeclared_department_is_refused_but_recorded_as_claimed():
+    """resolve_department's docstring promises it does NOT verify that a
+    producer-supplied department is declared — that is validate_route's own
+    check, so the refusal lands in the routing record with the department
+    that claimed it. An event claiming a department the catalog has never
+    heard of must still be refused (via validate_route's own
+    UNKNOWN_DEPARTMENT check), and the record must keep showing exactly what
+    was claimed rather than erasing or substituting it."""
+    case = _case("CASE-D3", "new_supplier_packet", document_ref="fixture:x")
+    case["department"] = "warehouse"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["evidence"], "reason": "warehouse reaching for evidence"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "UNKNOWN_DEPARTMENT" in (result.output["refused"] or "")
+    assert result.output["department"] == "warehouse"
+    assert result.output["department_source"] == "event"
+
+
+def test_a_null_legacy_department_is_refused_and_recorded_as_unresolved(
+    tmp_path, monkeypatch
+):
+    """The sunset state must be auditable: a v1 case with no department
+    claim, against a catalog whose grandfather clause has been retired
+    (legacy.v1_department is null), must be refused before validate_route is
+    even reached, and the record must say exactly that — 'unresolved', an
+    empty department, and the coded refusal — not merely 'refused' with any
+    other shape."""
+    import copy
+    import json
+
+    import app.catalog as catalog_module
+    from tests.unit.test_catalog import _catalog_dict
+
+    catalog = copy.deepcopy(_catalog_dict())
+    catalog["legacy"]["v1_department"] = None
+    path = tmp_path / "fleet.test.json"
+    path.write_text(json.dumps(catalog))
+    monkeypatch.setattr(catalog_module, "DEFAULT_CATALOG_PATH", path)
+    catalog_module.reset_catalog_cache()
+    try:
+        ctx = _StubContext({
+            "case": _case("CASE-D4", "new_supplier_packet", document_ref="fixture:x"),
+        })
+        node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
+
+        result = apply_route(node_input, ctx)
+
+        assert result.actions.route == "blocked"
+        assert result.output["department_source"] == "unresolved"
+        assert result.output["department"] == ""
+        assert "UNKNOWN_DEPARTMENT" in (result.output["refused"] or "")
+    finally:
+        catalog_module.reset_catalog_cache()
+
+
 def test_unknown_agent_name_is_blocked_not_skipped():
     ctx = _StubContext({"case": _case("CASE-3", "new_supplier_packet")})
     node_input = {"route": ["finance_bot"], "reason": "hallucinated agent"}

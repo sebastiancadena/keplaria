@@ -139,6 +139,12 @@ def test_an_unknown_department_is_refused():
 def test_resolve_department_prefers_the_event_value():
     from app.policy import resolve_department
     assert resolve_department("compliance") == ("compliance", "event")
+    # resolve_department deliberately does NOT check that the department is
+    # declared in the catalog — that is validate_route's own job, so the
+    # refusal lands in the routing record with the department that claimed
+    # it. An undeclared department must still pass through as source
+    # "event", not get silently swapped for something else here.
+    assert resolve_department("warehouse") == ("warehouse", "event")
 
 
 def test_resolve_department_falls_back_to_the_catalog_legacy_value():
