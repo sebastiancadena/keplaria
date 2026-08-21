@@ -38,6 +38,17 @@ def _park_a_real_case(db, case_id: str) -> int:
             "supplier": "Andes Foods",
             "effective_date": "2026-08-16",
         },
+        "routing": {
+            "proposed": ["evidence", "compliance"],
+            "route": ["evidence", "compliance"],
+            "dropped": [],
+            "reason": "new supplier",
+            "refused": None,
+            "department": "dept-sentinel-7",
+            "department_source": "event",
+            "evidence_skipped_no_document": False,
+            "evidence_skipped_tainted_document": False,
+        },
         "screening": {
             "endpoint": "http://10.10.0.2:8000", "supplier": "Andes Foods",
             "reachable": True, "error": None, "flagged": [],
@@ -127,6 +138,15 @@ def test_a_subthreshold_candidate_is_shown(db, case_id, client):
     response = client.get(f"/cases/{case_id}")
     assert "syn-co-008" in response.text
     assert "0.526" in response.text
+
+
+def test_the_detail_page_shows_the_department_chip(db, case_id, client):
+    """Sentinel value, not a real department name — 'procurement' appears
+    in enough other copy that asserting it could pass vacuously."""
+    _park_a_real_case(db, case_id)
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "dept-sentinel-7" in response.text
 
 
 def test_an_unknown_case_is_a_404(client):

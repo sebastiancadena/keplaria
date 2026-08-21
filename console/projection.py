@@ -27,6 +27,8 @@ def _routing(routing: dict | None) -> dict | None:
         "dropped": list(routing.get("dropped") or []),
         "reason": routing.get("reason"),
         "refused": routing.get("refused"),
+        "department": routing.get("department"),
+        "department_source": routing.get("department_source"),
         "evidence_skipped_no_document": bool(
             routing.get("evidence_skipped_no_document")
         ),

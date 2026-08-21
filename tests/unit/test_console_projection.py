@@ -20,6 +20,8 @@ RAW_CASE = {
         "dropped": [],
         "reason": "New supplier packet requires screening.",
         "refused": None,
+        "department": "procurement",
+        "department_source": "event",
         "evidence_skipped_no_document": False,
         "evidence_skipped_tainted_document": False,
     },
@@ -120,6 +122,12 @@ def test_commands_emit_only_action_status_and_cycle():
         {"action": "create_supplier", "status": "pending", "cycle": 1}
     ]
     assert "0001234567" not in repr(view)
+
+
+def test_the_projection_emits_the_routing_department_fields():
+    projected = public_case(RAW_CASE)
+    assert projected["routing"]["department"] == "procurement"
+    assert projected["routing"]["department_source"] == "event"
 
 
 def test_a_case_with_no_optional_blocks_does_not_raise():

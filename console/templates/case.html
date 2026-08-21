@@ -28,6 +28,10 @@
 <section class="panel">
   <div class="panel__header"><h2>Routing</h2></div>
   <p>{{ case.routing.reason }}</p>
+  {% if case.routing.department %}
+  <p>Department: <span class="mono">{{ case.routing.department }}</span>
+     <span class="caption">({{ case.routing.department_source }})</span></p>
+  {% endif %}
   <p>Engaged: <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span></p>
   {% if case.routing.dropped %}
   <p>Dropped by policy: <span class="mono">{{ case.routing.dropped|join(', ') }}</span></p>
