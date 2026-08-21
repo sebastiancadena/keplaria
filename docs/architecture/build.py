@@ -473,7 +473,7 @@ S.append(
 # pipeline pills — cols x828/1010/1192, w170
 S.append(pill(828, 452, 170, 40, "parse + document gate", "extraction · provenance", "Evidence agent", badge_n=3, sparked=True))
 S.append(pill(1010, 452, 170, 40, "coordinator", "routing proposal", "Coordinator agent", sparked=True))
-S.append(pill(1192, 452, 170, 40, "route validation", "fail-closed · narrows", "code, not model", badge_n=4))
+S.append(pill(1192, 452, 170, 40, "route validation", "fleet.v1.json · fail-closed", "code, not model", badge_n=4))
 S.append(pill(828, 512, 170, 40, "risk gate", "policy v2 · three bands", "code, not model", badge_n=5))
 S.append(pill(1010, 512, 170, 40, "compliance analysis", "independently re-checked", "Compliance agent", sparked=True))
 S.append(pill(1192, 512, 170, 40, "sanctions screening", "yente fuzzy match", "code · PSC-I"))
