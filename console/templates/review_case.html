@@ -13,6 +13,22 @@
 {% endfor %}
 {% for reason in case.policy.reasons %}<p>{{ reason }}</p>{% endfor %}
 
+{% if case.routing %}
+<h2>Routing</h2>
+{% if case.routing.department %}
+<p>Department: <span class="mono">{{ case.routing.department }}</span>
+   <span class="caption">({{ case.routing.department_source }})</span></p>
+{% endif %}
+<p>Proposed: <span class="mono">{{ case.routing.proposed|join(', ') or 'none' }}</span>
+   — engaged: <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span></p>
+{% if case.routing.dropped %}
+<p>Dropped by policy: <span class="mono">{{ case.routing.dropped|join(', ') }}</span></p>
+{% endif %}
+{% if case.routing.refused %}
+<p><span class="band--blocked">Refused</span> {{ case.routing.refused }}</p>
+{% endif %}
+{% endif %}
+
 <h2>Screening</h2>
 <table>
   <thead><tr><th>Entity</th><th>Score</th><th>Flagged</th></tr></thead>

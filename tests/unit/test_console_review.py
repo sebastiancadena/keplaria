@@ -389,6 +389,41 @@ def test_failures_page_is_not_swallowed_by_the_case_route(client, monkeypatch):
     assert "no such case" not in response.text.lower()
 
 
+def test_the_review_page_shows_a_department_denial(db, case_id, client):
+    """A quarantined-style routing record with a refusal must render.
+    Sentinel refusal string, deliberately distinctive: a generic substring
+    ('refused', a department name) matches unrelated template text and
+    would pass vacuously."""
+    from app.state.firestore import CASES
+
+    db.collection(CASES).document(case_id).set({
+        "case_id": case_id,
+        "case_version": 1,
+        "phase": "awaiting_approval",
+        "supplier": "Andes Foods",
+        "policy": {"policy_id": "supplier_risk", "policy_version": 2,
+                   "score": 0.25, "band": "review",
+                   "factors_fired": [], "reasons": []},
+        "screening": {"reachable": True, "flagged": [],
+                      "candidate_count": 0, "candidates": []},
+        "routing": {
+            "proposed": ["evidence"],
+            "route": [],
+            "dropped": [],
+            "reason": "over-reach",
+            "refused": "DEPARTMENT_FORBIDS_AGENT: sentinel-denial-42",
+            "department": "finance",
+            "department_source": "event",
+        },
+    })
+
+    response = client.get(f"/review/{case_id}")
+
+    assert response.status_code == 200
+    assert "sentinel-denial-42" in response.text
+    assert "finance" in response.text
+
+
 def test_failures_page_shows_a_dead_command_and_a_dead_event(client, monkeypatch):
     import console.review as review
 
