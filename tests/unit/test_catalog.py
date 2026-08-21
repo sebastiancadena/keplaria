@@ -203,10 +203,10 @@ def install_catalog(tmp_path, monkeypatch):
 
 
 def test_canonical_order_follows_catalog_agent_order(install_catalog):
-    """The returned route order is the catalog's declaration order, not a
-    hardcoded tuple. Uses two agents whose alphabetical and declaration
-    orders differ from today's, minus the evidence/compliance pair (whose
-    relative order the loader pins), by checking the derived tuple itself."""
+    """The returned route order is the catalog's declaration order, not an
+    alphabetical sort: `evidence` is declared before `compliance`, but
+    `compliance` sorts before `evidence` alphabetically, so this would catch
+    `routable_ids()` being reimplemented to sort its result alphabetically."""
     from app.catalog import get_catalog
     install_catalog(_catalog_dict())
     assert get_catalog().routable_ids() == ("evidence", "compliance")

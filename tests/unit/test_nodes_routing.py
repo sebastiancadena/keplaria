@@ -232,7 +232,7 @@ def test_empty_route_when_agents_are_required_is_blocked_not_skipped():
 
 def test_empty_route_when_no_agents_are_required_skips_not_blocked():
     """The crux of the fix: 'no agents required' must not collapse into
-    'refused'. evidence_overdue maps to an empty ALLOWED_ROUTES set, so an
+    'refused'. evidence_overdue maps to an empty allowed_routes() set, so an
     empty proposal is legitimate and must reach commit_commands via 'skip',
     not be quarantined."""
     ctx = _StubContext({"case": _case("CASE-5", "evidence_overdue")})

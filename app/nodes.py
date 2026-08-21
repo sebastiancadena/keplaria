@@ -803,7 +803,7 @@ def assess_risk(node_input, ctx: Context) -> Event:
     to coincide with "no screening" for every clock event but silently
     stopped coinciding the moment an agentic event could also reach this
     node with no fresh screening of its own: certificate_received's route is
-    `{evidence}` only (see app/policy.py's ALLOWED_ROUTES), so it never
+    `{evidence}` only (see app/policy.py's allowed_routes()), so it never
     engages compliance and never populates `screening`. Scoring that fresh
     from `screening=None` would land `clear` regardless of what the last
     real screening found — laundering a previously blocked supplier via a

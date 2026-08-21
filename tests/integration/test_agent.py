@@ -55,7 +55,7 @@ def test_agent_stream() -> None:
 
     case_id = f"TEST-{uuid.uuid4().hex[:12]}"
     # certificate_received never populates `screening` (see app/policy.py's
-    # ALLOWED_ROUTES), so assess_risk carries the case's stored verdict
+    # allowed_routes()), so assess_risk carries the case's stored verdict
     # forward instead of scoring fresh from screening=None — correct
     # (re-scoring fresh would launder a blocked supplier via a mailed-in
     # certificate), but it means a case with no prior verdict at all fails

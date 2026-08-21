@@ -84,7 +84,7 @@ def test_new_supplier_packet_always_carries_real_screening(case_id):
     longer matches production and, worse, no longer matches what this gate
     is supposed to do: `new_supplier_packet`'s permitted route is
     {evidence, compliance} on both the with-document and no-document paths
-    (see app/policy.py's ALLOWED_ROUTES and app/nodes.py's apply_route), so
+    (see app/policy.py's allowed_routes() and app/nodes.py's apply_route), so
     it always reaches screen_supplier and always has a fresh `screening`
     dict by the time it reaches this gate. See
     test_certificate_received_with_no_screening_carries_forward_instead_of_clear
