@@ -119,6 +119,7 @@ def main() -> int:
         "event_id": f"evt-{uuid.uuid4().hex[:10]}",
         "case_id": case_id,
         "event_type": "new_supplier_packet",
+        "department": "procurement",
         "supplier": SUPPLIER,
         "schema_version": 1,
     }

@@ -170,6 +170,7 @@ def main() -> None:
                 "event_id": f"{CASE_ID}-{index}",
                 "case_id": CASE_ID,
                 "event_type": event_type,
+                "department": "procurement",
                 "supplier": SUPPLIER,
                 "effective_date": effective_date,
             }
@@ -186,6 +187,7 @@ def main() -> None:
             steps.append({
                 "step": index,
                 "event_type": event_type,
+                "department": "procurement",
                 "effective_date": effective_date,
                 "expected": expected,
                 "phase": case.get("phase"),

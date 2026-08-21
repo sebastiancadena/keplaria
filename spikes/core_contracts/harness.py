@@ -113,6 +113,8 @@ CRITERIA = [
             "tests/unit/test_nodes_routing.py::test_unknown_agent_name_is_blocked_not_skipped",
             "tests/unit/test_nodes_routing.py::test_unknown_event_type_is_blocked",
             "tests/unit/test_graph_wiring.py::test_a_clock_event_never_reaches_an_llm_agent",
+            "tests/unit/test_policy.py::test_a_cross_department_agent_is_refused",
+            "tests/unit/test_policy.py::test_department_refusal_precedes_event_type_drop",
         ],
     },
     {

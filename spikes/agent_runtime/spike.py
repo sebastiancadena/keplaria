@@ -38,6 +38,7 @@ EVIDENCE_PATH = os.environ.get("EVIDENCE_PATH", "agent_runtime_spike_evidence.js
 CASE = {
     "case_id": "RUNTIME-SPIKE-001",
     "event_type": "new_supplier_packet",
+    "department": "procurement",
     "supplier": "Comercializadora Andes Verde SAS",
     "amount": 4200.0,
 }

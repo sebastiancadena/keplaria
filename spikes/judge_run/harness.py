@@ -149,6 +149,7 @@ def publish(case_id: str, supplier: str, event_type: str, effective: str,
         "event_id": f"evt-{uuid.uuid4().hex[:10]}",
         "case_id": case_id,
         "event_type": event_type,
+        "department": "procurement",
         "supplier": supplier,
         "schema_version": 1,
         "effective_date": effective,
@@ -396,6 +397,7 @@ def build_timeline(case_a: str | None, case_b: str | None, steps: list) -> list[
     beat_ok = {step.get("beat"): step.get("ok") for step in steps}
     timeline = [{
         "event_type": "new_supplier_packet",
+        "department": "procurement",
         "effective_date": "2026-01-05",
         "case_id": case_a,
         "ok": beat_ok.get("event -> parked for review", False),
@@ -405,6 +407,7 @@ def build_timeline(case_a: str | None, case_b: str | None, steps: list) -> list[
         for index, (event_type, effective, _ref, _expected) in enumerate(LIFECYCLE, start=1):
             timeline.append({
                 "event_type": event_type,
+                "department": "procurement",
                 "effective_date": effective,
                 "case_id": case_b,
                 "ok": beat_ok.get(f"{index}. {event_type}", False),
