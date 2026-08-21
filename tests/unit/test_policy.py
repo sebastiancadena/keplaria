@@ -5,7 +5,7 @@ The model never gets the last word on which agents may run for an event type.
 
 import pytest
 
-from app.policy import ALLOWED_ROUTES, PolicyError, validate_route
+from app.policy import PolicyError, allowed_routes, validate_route
 
 
 def test_permitted_route_is_returned_normalised():
@@ -58,7 +58,7 @@ def test_duplicate_entries_are_collapsed():
 
 
 def test_allowlist_covers_every_supported_event_type():
-    assert set(ALLOWED_ROUTES) == {
+    assert set(allowed_routes()) == {
         "new_supplier_packet",
         "certificate_received",
         "evidence_overdue",
@@ -67,8 +67,8 @@ def test_allowlist_covers_every_supported_event_type():
 
 
 def test_clock_events_engage_no_agents():
-    assert ALLOWED_ROUTES["renewal_due"] == set()
-    assert ALLOWED_ROUTES["evidence_overdue"] == set()
+    assert allowed_routes()["renewal_due"] == set()
+    assert allowed_routes()["evidence_overdue"] == set()
     assert validate_route("renewal_due", []) == []
 
 
@@ -85,3 +85,14 @@ def test_a_clock_event_may_not_engage_an_agent():
     for a clock event either way, which is the guarantee that actually
     matters here."""
     assert validate_route("renewal_due", ["compliance"]) == []
+
+
+def test_the_catalog_route_map_matches_the_expected_allowlist():
+    """Spelled as literals, deliberately — comparing the derivation to the
+    artifact it derives from would only prove the code ran."""
+    assert allowed_routes() == {
+        "new_supplier_packet": {"evidence", "compliance"},
+        "certificate_received": {"evidence"},
+        "evidence_overdue": set(),
+        "renewal_due": set(),
+    }

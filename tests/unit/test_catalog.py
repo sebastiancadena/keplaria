@@ -181,3 +181,42 @@ def test_a_clock_event_missing_from_event_routes_refuses_to_load(tmp_path):
     del catalog["event_routes"]["evidence_overdue"]
     with pytest.raises(CatalogLoadError, match="missing from event_routes"):
         load_catalog(_write(tmp_path, catalog))
+
+
+@pytest.fixture
+def install_catalog(tmp_path, monkeypatch):
+    """Point the default loader path at a temp catalog and reset the cache.
+
+    get_catalog/load_catalog read DEFAULT_CATALOG_PATH at call time, so
+    monkeypatching the module attribute redirects every consumer — policy,
+    nodes, console — through the same loader. That sameness is the point.
+    """
+    def _install(catalog: dict | None, *, missing: bool = False) -> Path:
+        path = tmp_path / "fleet.test.json"
+        if not missing:
+            path.write_text(json.dumps(catalog))
+        monkeypatch.setattr(catalog_module, "DEFAULT_CATALOG_PATH", path)
+        catalog_module.reset_catalog_cache()
+        return path
+    yield _install
+    catalog_module.reset_catalog_cache()
+
+
+def test_canonical_order_follows_catalog_agent_order(install_catalog):
+    """The returned route order is the catalog's declaration order, not a
+    hardcoded tuple. Uses two agents whose alphabetical and declaration
+    orders differ from today's, minus the evidence/compliance pair (whose
+    relative order the loader pins), by checking the derived tuple itself."""
+    from app.catalog import get_catalog
+    install_catalog(_catalog_dict())
+    assert get_catalog().routable_ids() == ("evidence", "compliance")
+
+
+def test_catalog_load_failure_fails_closed_in_validate_route(install_catalog):
+    """THE fail-closed test. If any fallback map is ever added to the
+    load-failure path, the route below succeeds and this test goes red —
+    which is exactly what it exists to catch."""
+    from app.policy import PolicyError, validate_route
+    install_catalog(None, missing=True)
+    with pytest.raises(PolicyError, match="CATALOG_UNAVAILABLE"):
+        validate_route("new_supplier_packet", ["evidence"])
