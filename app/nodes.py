@@ -987,6 +987,15 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
     Returns (decision, claimed) where `claimed` is one dict per command with
     its action, cycle, queued/already_done/dead status, and any external_id a
     previous completed claim recorded.
+
+    A department-refused entry in `claimed` deliberately leaves no outbox
+    row (see the loop below), but it is not left with zero durable trace
+    either: it is also persisted onto the case document as
+    `refused_commands`, in the same `update` this function already writes.
+    Without that, the refusal is real — no outbox row, so the executor
+    never sees it — but nothing survives to show a reviewer it happened,
+    while the fleet page and this module's own docstrings say "refused and
+    recorded."
     """
     case_state = ctx.state.get("case_state") or {}
 
@@ -1051,6 +1060,15 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
     update = {"lifecycle": lifecycle_block, "updated_at": firestore.SERVER_TIMESTAMP}
     if decision.certificate is not None:
         update["certificate"] = decision.certificate
+    # Only when non-empty, same absence discipline as `certificate` above:
+    # a pass that refuses nothing must not overwrite an earlier refusal
+    # record with an empty list. (There is no code path today that clears a
+    # department's scope back open mid-case, so a stale entry here is not
+    # currently reachable — but "no key at all" is the correct write either
+    # way, matching every other conditional field in this update.)
+    refused_commands = [c for c in claimed if c["status"] == REFUSED_BY_DEPARTMENT]
+    if refused_commands:
+        update["refused_commands"] = refused_commands
 
     db.collection(CASES).document(case_id).set(update, merge=True)
     return decision, claimed
@@ -1093,6 +1111,14 @@ def commit_commands(node_input, ctx: Context) -> Event:
     must write nothing to the outbox: only the lifecycle/certificate blocks
     and the outcome summary are persisted, exactly like quarantine_case and
     park_case.
+
+    The status word is derived from `claimed`, not from `decision.commands`:
+    `decision.commands` is decide()'s proposal, taken before the department
+    scope ever filters it, so a case whose every command was refused at
+    claim time would otherwise still read "committed" — indistinguishable
+    on the case list from a real commit the executor has not drained yet.
+    Only a claim that actually reached the outbox (anything other than
+    REFUSED_BY_DEPARTMENT) counts as committed.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
@@ -1109,10 +1135,13 @@ def commit_commands(node_input, ctx: Context) -> Event:
             "keplaria.commands", [c["action"] for c in claimed]
         )
 
+        committed = any(c["status"] != REFUSED_BY_DEPARTMENT for c in claimed)
+        status = "committed" if committed else "no_action"
+
         _record_outcome(
             db,
             case_id,
-            "committed" if decision.commands else "no_action",
+            status,
             ctx.state.get("routing"),
             ctx.state.get("screening"),
             ctx.state.get("policy"),
@@ -1122,7 +1151,7 @@ def commit_commands(node_input, ctx: Context) -> Event:
 
     return Event(
         output={
-            "status": "committed" if decision.commands else "no_action",
+            "status": status,
             "case_id": case_id,
             "reason": decision.reason,
             "state": decision.state,

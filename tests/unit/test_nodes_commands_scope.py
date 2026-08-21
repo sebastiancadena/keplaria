@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from app.nodes import REFUSED_BY_DEPARTMENT, commit_commands
 from app.state.commands import get_command
+from app.state.firestore import CASES
 
 
 class _StubContext:
@@ -50,6 +51,35 @@ def test_a_clock_command_outside_the_department_scope_is_refused_at_claim(
     assert [c["action"] for c in commands] == ["request_renewal"]
     assert commands[0]["status"] == REFUSED_BY_DEPARTMENT
     assert get_command(db, case_id, "request_renewal", 1) is None
+
+
+def test_a_fully_refused_case_persists_as_no_action_not_committed(db, case_id):
+    """decision.commands (decide()'s proposal) is non-empty here — the
+    renewal is genuinely due — but every one of those commands is refused
+    at claim time, so the persisted phase must read `no_action`, not
+    `committed`: `committed` would be indistinguishable on the case list
+    from a real commit the executor simply has not drained yet."""
+    result = commit_commands(None, _clock_ctx(case_id, "finance"))
+
+    assert result.output["status"] == "no_action"
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    assert stored["phase"] == "no_action"
+
+
+def test_a_refused_command_is_persisted_on_the_case_document(db, case_id):
+    """The claim-time refusal must leave a durable trace even though it
+    creates no outbox row: console/store.py's load_case builds the
+    console's command list from the outbox subcollection alone, so a
+    refusal that lived only in the returned Event would be invisible to
+    every console page. `refused_commands` is written onto the case
+    document in the same write `_claim_lifecycle_commands` already makes."""
+    commit_commands(None, _clock_ctx(case_id, "finance"))
+
+    stored = db.collection(CASES).document(case_id).get().to_dict()
+    refused = stored.get("refused_commands")
+    assert refused is not None, "the refusal must be persisted, not only returned"
+    assert [c["action"] for c in refused] == ["request_renewal"]
+    assert refused[0]["status"] == REFUSED_BY_DEPARTMENT
 
 
 def test_command_scopes_distinguish_procurement_from_compliance(db, case_id):
