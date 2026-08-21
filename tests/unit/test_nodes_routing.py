@@ -210,6 +210,28 @@ def test_a_null_legacy_department_is_refused_and_recorded_as_unresolved(
         catalog_module.reset_catalog_cache()
 
 
+def test_a_department_permitted_agent_the_event_type_disallows_is_dropped_not_refused():
+    """The drop half of refuse/drop, asserted above the pure-function level
+    (app.policy.validate_route already covers this in isolation): a known,
+    department-permitted agent the event type doesn't allow must be
+    silently narrowed out of the route, not refused. `certificate_received`
+    permits only 'evidence' (see catalog/fleet.v1.json's event_routes);
+    'compliance' is inside procurement's permitted_agents but outside this
+    event type's own allowed set, so it must land in `dropped`, not trigger
+    a `refused` outcome or a 'blocked' branch."""
+    case = _case("CASE-DROP-1", "certificate_received", document_ref="fixture:x")
+    case["department"] = "procurement"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["evidence", "compliance"], "reason": "over-proposed"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["route"] == ["evidence"]
+    assert result.output["dropped"] == ["compliance"]
+    assert result.output["refused"] is None
+    assert result.actions.route == "evidence"
+
+
 def test_unknown_agent_name_is_blocked_not_skipped():
     ctx = _StubContext({"case": _case("CASE-3", "new_supplier_packet")})
     node_input = {"route": ["finance_bot"], "reason": "hallucinated agent"}

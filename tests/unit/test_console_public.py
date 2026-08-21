@@ -41,7 +41,7 @@ def _park_a_real_case(db, case_id: str) -> int:
         "routing": {
             "proposed": ["evidence", "compliance"],
             "route": ["evidence", "compliance"],
-            "dropped": [],
+            "dropped": ["compliance"],
             "reason": "new supplier",
             "refused": None,
             "department": "dept-sentinel-7",
@@ -75,6 +75,19 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     assert response.status_code == 200
     assert "Gate: review" in response.text
     assert "create_supplier" in response.text
+
+
+def test_the_detail_page_shows_a_dropped_agent_distinctly_from_a_refusal(
+    db, case_id, client
+):
+    """The 'drop' half of refuse/drop, asserted at the template layer: the
+    fixture's routing.dropped (see _park_a_real_case) is non-empty while
+    routing.refused stays None, so this pins the narrowing line as a thing
+    that renders independent of a refusal, not merely alongside one."""
+    _park_a_real_case(db, case_id)
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "Dropped by policy" in response.text
 
 
 def test_the_templates_refuse_a_withheld_field_the_view_model_hands_them(
