@@ -24,8 +24,16 @@
   </div>
   {% for agent in shared_agents %}
   <div>
-    <h3 class="mono">{{ agent.id }}</h3>
+    <h3 class="mono">{{ agent.id }}
+      <span class="caption">v{{ agent.version }} · {{ agent.deployment }}</span></h3>
     <p>{{ agent.purpose }}</p>
+    <p class="body-small">Owner: {{ agent.owner }} ·
+       In: <span class="mono">{{ agent.input_schema }}</span> ·
+       Out: <span class="mono">{{ agent.output_schema }}</span></p>
+    <p class="body-small">Tools:
+       <span class="mono">{{ agent.approved_tools|join(', ') or 'none' }}</span> ·
+       Data: <span class="mono">{{ agent.data_classes|join(', ') }}</span></p>
+    <p class="caption">Evals: {{ agent.evals.metric }} — {{ agent.evals.evidence }}</p>
   </div>
   {% endfor %}
 </section>
@@ -37,8 +45,16 @@
   {% if department.agents %}
     {% for agent in department.agents %}
     <div>
-      <h3 class="mono">{{ agent.id }}</h3>
+      <h3 class="mono">{{ agent.id }}
+        <span class="caption">v{{ agent.version }} · {{ agent.deployment }}</span></h3>
       <p>{{ agent.purpose }}</p>
+      <p class="body-small">Owner: {{ agent.owner }} ·
+         In: <span class="mono">{{ agent.input_schema }}</span> ·
+         Out: <span class="mono">{{ agent.output_schema }}</span></p>
+      <p class="body-small">Tools:
+         <span class="mono">{{ agent.approved_tools|join(', ') or 'none' }}</span> ·
+         Data: <span class="mono">{{ agent.data_classes|join(', ') }}</span></p>
+      <p class="caption">Evals: {{ agent.evals.metric }} — {{ agent.evals.evidence }}</p>
     </div>
     {% endfor %}
   {% else %}
