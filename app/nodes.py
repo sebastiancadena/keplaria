@@ -16,6 +16,7 @@ from google.cloud import firestore
 from opentelemetry import trace
 from pydantic import ValidationError
 
+from app.catalog import CatalogLoadError, get_catalog
 from app.documents import DocumentUnavailable, load_document
 from app.grounding import RedactedDerivative, validate as grounding_validate
 from app.injection import scan as scan_for_injection
@@ -937,6 +938,37 @@ def assess_risk(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"policy": payload}, route=verdict.band)
 
 
+REFUSED_BY_DEPARTMENT = "refused_by_department"
+
+
+def _department_command_scope(case: dict) -> frozenset[str] | None:
+    """The effective department's permitted commands, or None to refuse all.
+
+    None — not an empty set — is returned when the department cannot be
+    resolved, is not declared, or the catalog cannot load: absence
+    withholds, the same direction as every other guard in this module.
+    Deliberately never raises: this runs inside graph terminals, and the
+    serving platform allows one concurrent query, so an exception here
+    becomes retry pressure instead of a decision.
+
+    This is the only place the CLOCK path consults the department at all —
+    clock events never pass validate_route. The department is a
+    producer-asserted policy-and-audit label (clock producers stamp
+    "procurement" by convention — the scheduler acts on behalf of the
+    lifecycle procurement owns, not on behalf of a person); the guarantee
+    is that an out-of-scope command is refused and durably recorded, with
+    no outbox row for the executor to ever see.
+    """
+    try:
+        department, _ = resolve_department(case.get("department") or None)
+        scope = get_catalog().departments.get(department)
+    except (PolicyError, CatalogLoadError):
+        return None
+    if scope is None:
+        return None
+    return frozenset(scope.permitted_commands)
+
+
 def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tuple:
     """Run decide() and claim every command it names; persist lifecycle state.
 
@@ -965,8 +997,21 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
         timing=lifecycle_timing(),
     )
 
+    permitted_commands = _department_command_scope(case)
     claimed: list[dict] = []
     for command in decision.commands:
+        # Refused BEFORE claim_command: an out-of-scope command must leave
+        # no outbox row at all, so there is nothing downstream to drain,
+        # refuse again, or retry — only this durable record that the
+        # department's scope withheld it.
+        if permitted_commands is None or command.action not in permitted_commands:
+            claimed.append({
+                "action": command.action,
+                "cycle": decision.cycle,
+                "status": REFUSED_BY_DEPARTMENT,
+                "external_id": None,
+            })
+            continue
         claim = claim_command(
             db, case_id, command.action, decision.cycle, command.payload
         )
