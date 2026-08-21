@@ -11,9 +11,11 @@ reversible hold when the certificate lapses, validates the renewal against the
 source document, and releases the hold. Work that a person otherwise does by hand,
 on a calendar reminder, if they remember.
 
-One deployed run of that whole loop: **61.5 s of machine time and a single
-25.5 s human approval**, against an author-timed manual walkthrough of the work
-that took **663.5 s over 20 steps** — 19 of which the run removes, the twentieth
+One deployed run of that whole loop: **85.1 s of machine time** — a figure that
+carries a 43.9 s cold start rather than hiding one — and a single
+**23.0 s human approval**, timed separately because it is a person's time, not
+the system's. Against an author-timed manual walkthrough of the same work that
+took **663.5 s over 20 steps** — 19 of which the run removes, the twentieth
 being the approval that policy requires a human to make. Numbers and method:
 [`spikes/judge_run/evidence.json`](spikes/judge_run/evidence.json) and
 [`spikes/manual_baseline/evidence.json`](spikes/manual_baseline/evidence.json).

@@ -16,7 +16,7 @@ claim = "Machine time for one deployed run of the whole lifecycle"
 evidence = "spikes/judge_run/evidence.json"
 path = "machine_seconds.total"
 render = "{:.1f} s of machine time"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 qualifier = "machine time only; the human approval is timed separately and excluded"
 
 [[claim]]
@@ -25,7 +25,7 @@ claim = "The single human approval the same run required"
 evidence = "spikes/judge_run/evidence.json"
 path = "human_seconds"
 render = "{:.1f} s human approval"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 
 [[claim]]
 id = "run_budget_seconds"
@@ -33,7 +33,7 @@ claim = "The budget one deployed run must finish inside"
 evidence = "spikes/judge_run/evidence.json"
 path = "budget_seconds"
 render = "{}s"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 
 [[claim]]
 id = "manual_baseline_seconds"
@@ -41,7 +41,7 @@ claim = "The same work done by hand, timed"
 evidence = "spikes/manual_baseline/evidence.json"
 path = "manual_seconds"
 render = "{:.1f} s"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 qualifier = "author-timed, not practitioner-reviewed"
 
 [[claim]]
@@ -50,7 +50,7 @@ claim = "Steps in the hand-done walkthrough"
 evidence = "spikes/manual_baseline/evidence.json"
 path = "manual_steps"
 render = "{} steps"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 qualifier = "author-timed, not practitioner-reviewed"
 
 [[claim]]
@@ -59,7 +59,7 @@ claim = "Steps of that walkthrough the run removes"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.manual_steps_eliminated"
 render = "{} of which the run removes"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 qualifier = "measured against an author-timed baseline, not a practitioner-reviewed one"
 
 [[claim]]
@@ -68,7 +68,7 @@ claim = "Business days the two cases span"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.simulated_business_days"
 render = "{} simulated business days"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 qualifier = "the lifecycle clock is compressed, and the compression is disclosed on screen"
 
 [[claim]]
@@ -79,7 +79,7 @@ path = "criteria"
 length = true
 words = true
 render = "{} contracts"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 
 [[claim]]
 id = "domain_eval_cases"
@@ -87,7 +87,7 @@ claim = "Graded domain cases, all passing"
 evidence = "spikes/domain_evals/evidence.json"
 path = "summary_metrics.0.num_cases_total"
 render = "{0}/{0}"
-appears_in = ["README.md"]
+appears_in = ["README.md", "docs/submission/devpost.md"]
 qualifier = "a deterministic pass metric; re-run the suite before citing it"
 
 [[claim]]
@@ -96,6 +96,7 @@ claim = "Mean score across the graded domain suite"
 evidence = "spikes/domain_evals/evidence.json"
 path = "summary_metrics.0.mean_score"
 render = "{:.0%}"
+appears_in = ["docs/submission/devpost.md"]
 qualifier = "a deterministic pass metric; re-run the suite before citing it"
 
 [[claim]]
@@ -104,13 +105,15 @@ claim = "Fields entered into the ERP without a human retyping them"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.fields_without_rekeying"
 render = "{} fields"
+appears_in = ["docs/submission/devpost.md"]
 
 [[claim]]
 id = "enforced_hold_days"
 claim = "Days a non-compliant supplier was actually held from purchasing"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.enforced_hold_days"
-render = "{} days"
+render = "{} enforced hold days"
+appears_in = ["docs/submission/devpost.md"]
 qualifier = "claimed only where both the hold and its release executed in the ERP"
 
 [[claim]]
@@ -118,14 +121,16 @@ id = "policy_required_interventions"
 claim = "Decisions policy requires a human to make"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.policy_required_interventions"
-render = "{}"
+render = "{} policy-required intervention"
+appears_in = ["docs/submission/devpost.md"]
 
 [[claim]]
 id = "duplicate_writes_after_retry"
 claim = "Duplicate ERP writes after a retry"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.duplicate_writes_after_retry"
-render = "{}"
+render = "{} duplicate writes after a retry"
+appears_in = ["docs/submission/devpost.md"]
 
 [[claim]]
 id = "contract_suite_passed"
@@ -133,7 +138,17 @@ claim = "Contract and unit tests re-executed by the run that reports them"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.contract_suite.passed"
 render = "{} passed"
+appears_in = ["docs/submission/devpost.md"]
 qualifier = "re-executed by the harness, not quoted from a previous run"
+
+# The three cost figures below are deliberately not public, and that is why
+# they report as awaiting copy rather than being a gap someone forgot to fill.
+# They are inputs to an internal posture decision, not proof about the product:
+# gross burn and the credit balance say what the build cost, not what it does,
+# and the screening VM's measured uptime reads from outside as an availability
+# admission when it is really a statement that the VM is started for runs rather
+# than left running. Decided 2026-08-21 while writing the submission text. If a
+# cost claim is ever made in public, bind it here and say when it was measured.
 
 [[claim]]
 id = "gross_cost_month_to_date"
