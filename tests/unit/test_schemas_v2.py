@@ -29,3 +29,19 @@ def test_a_v1_event_without_a_department_still_parses():
 def test_a_v1_event_with_a_department_is_honored():
     event = CanonicalEvent(**_BASE, department="compliance")
     assert event.department == "compliance"
+
+
+def test_a_v1_event_with_a_blank_department_is_refused():
+    """A config-defaulted producer that has adopted `department` before
+    bumping schema_version emits "" here, not an absent field. Left
+    unrejected, `case.get("department") or None` (app/nodes.py) folds ""
+    back to None and grandfathers onto the catalog's widest legacy scope —
+    the one permissive path in this branch. Only a present blank string is
+    refused; a genuinely absent department (tested above) still parses."""
+    with pytest.raises(ValidationError, match="department"):
+        CanonicalEvent(**_BASE, department="")
+
+
+def test_a_v1_event_with_a_whitespace_only_department_is_refused():
+    with pytest.raises(ValidationError, match="department"):
+        CanonicalEvent(**_BASE, department="   ")
