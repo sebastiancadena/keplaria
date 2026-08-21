@@ -160,3 +160,24 @@ def test_a_legacy_department_not_declared_refuses_to_load(tmp_path):
     catalog["legacy"]["v1_department"] = "warehouse"
     with pytest.raises(CatalogLoadError, match="not a declared department"):
         load_catalog(_write(tmp_path, catalog))
+
+
+def test_duplicate_agent_ids_refuses_to_load(tmp_path):
+    catalog = copy.deepcopy(_catalog_dict())
+    catalog["agents"][2]["id"] = "evidence"  # compliance now collides with evidence
+    with pytest.raises(CatalogLoadError, match="duplicate agent ids"):
+        load_catalog(_write(tmp_path, catalog))
+
+
+def test_an_unknown_deployment_state_refuses_to_load(tmp_path):
+    catalog = copy.deepcopy(_catalog_dict())
+    catalog["agents"][1]["deployment"] = "active"
+    with pytest.raises(CatalogLoadError, match="unknown deployment state"):
+        load_catalog(_write(tmp_path, catalog))
+
+
+def test_a_clock_event_missing_from_event_routes_refuses_to_load(tmp_path):
+    catalog = copy.deepcopy(_catalog_dict())
+    del catalog["event_routes"]["evidence_overdue"]
+    with pytest.raises(CatalogLoadError, match="missing from event_routes"):
+        load_catalog(_write(tmp_path, catalog))
