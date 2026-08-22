@@ -107,7 +107,7 @@ Dead-air pocket 2 lives inside this beat's 43.9-second onboarding wait.
 > Six of six steps autonomous. Twenty-two fields across the run, none rekeyed.
 > One intervention — required by policy, not failure. Eighty-five seconds against
 > six-sixty-three: a baseline I timed by hand, not yet practitioner-reviewed.
-> Keplaria. Onboarding that doesn't end. Links below.
+> Keplaria. Onboarding that doesn't end. It's all at keplaria dot com.
 
 ## 2. Shot list
 
@@ -135,7 +135,7 @@ Split-screen layout for the live segment:
 | 2f | `certificate_received` event chip carrying the renewed document; route strip "evidence only → APPROVED 1/1"; grounding view highlights the verbatim spans; ERP hold lifts; freeze on end state | "380 simulated business days · 5 enforced hold days — hold AND release both executed in ERP · 0 human touches", then "Design intent: the supplier answers an email. No portal, no login, no account." |
 | 3 | Full-screen six-box diagram, arrows animating in flow order; then a three-row department table with permitted-agent / permitted-command columns; deployment strip | "ADK + Gemini · Agent Runtime · Cloud Run · Firestore · Pub/Sub" and "10/10 deployed rehearsals under the 130 s budget" |
 | 4 | Three fast panels: (1) trace of 503 → retry → ERP count = 1; (2) document with highlighted injection and the refusal in the trace; (3) extraction output with the worker-count field flagged "no source span" → retry → parked card in Ground Control. Trace viewer labelled "Telemetry — OpenTelemetry traces" | "0 duplicate writes after a retry" · "Refusal recorded" · "0 ERP writes" |
-| 5 | Scoreboard card, judge-accessible Ground Control URL, repo link | "6/6 steps autonomous · 20 steps by hand, 19 of which the run removes · 22 fields, 0 rekeyed · 1 policy-required intervention · 85.1 s of machine time vs 663.5 s (author-timed, not practitioner-reviewed)" |
+| 5 | Scoreboard card, `keplaria.com` in frame (front door + `/proof` verification ledger), repo link | "6/6 steps autonomous · 20 steps by hand, 19 of which the run removes · 22 fields, 0 rekeyed · 1 policy-required intervention · 85.1 s of machine time vs 663.5 s (author-timed, not practitioner-reviewed)" |
 
 ## 3. Six-box diagram
 

@@ -147,6 +147,29 @@ if [ -d .venv ] && [ -f docs/architecture/build_judge_diagram.py ]; then
   rm -f "$tmp_jsvg"
 fi
 
+# The public site states every number this project makes. It is generated from
+# the claim ledger, so the failure mode is not a wrong number -- it is a page
+# built before the ledger last changed. Same byte-compare as the diagrams.
+if [ -d .venv ] && [ -f site/build_site.py ]; then
+  tmp_site=$(mktemp -d)
+  if KEPLARIA_SITE_OUT="$tmp_site" uv run python site/build_site.py >/dev/null 2>&1 \
+     && cmp -s "$tmp_site/index.html" site/dist/index.html \
+     && cmp -s "$tmp_site/proof.html" site/dist/proof.html; then
+    ok "site/dist matches build_site.py output (keplaria.com not stale)"
+  else
+    bad "site/dist is STALE — rebuild: uv run python site/build_site.py && (cd site && wrangler deploy)"
+  fi
+  rm -rf "$tmp_site"
+fi
+
+# The public site must actually be reachable: it is the URL the video shows.
+site_code=$(curl -sS -o /dev/null -w '%{http_code}' -m 12 https://keplaria.com 2>/dev/null)
+if [ "$site_code" = "200" ]; then
+  ok "keplaria.com serves 200"
+else
+  bad "keplaria.com returned '$site_code' (expected 200)"
+fi
+
 echo "== cloud infra (read-only) =="
 state=$(gcloud functions describe billing-killswitch --region=us-central1 --gen2 \
   --format='value(state,serviceConfig.environmentVariables.DRY_RUN)' --project=keplaria 2>/dev/null)

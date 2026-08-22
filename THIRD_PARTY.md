@@ -26,6 +26,8 @@ notices retained on files derived from the Google scaffold.
 | yente | OpenSanctions (opensanctions/yente) | MIT | Screening API, self-hosted via Docker on a private VM (`infra/yente/`) |
 | Elasticsearch | Elastic N.V. | Elastic License 2.0 / SSPL (free tier) | yente's index backend, same Docker stack |
 | ERPNext on Frappe Cloud | Frappe Technologies | GPL-3.0 (used as SaaS) | The ERP system of record the executor writes to; no ERPNext code in this repo |
+| Cloudflare Workers Assets | Cloudflare, Inc. | Used as SaaS | Serves the two generated static pages at `keplaria.com` (`site/dist/`). No Cloudflare code in this repo and no Worker script — assets only |
+| Google Fonts | Google LLC | The faces are SIL OFL 1.1 (see Fonts below) | `keplaria.com` links the three brand faces from `fonts.googleapis.com` rather than self-hosting them. The console self-hosts the same faces from `console/static/fonts/` |
 
 ## Data
 

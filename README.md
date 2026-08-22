@@ -121,6 +121,22 @@ rebuilds `docs/architecture/architecture.svg` from the committed sources under
 Update the build script whenever a component is added or moved — the diagram
 is part of the submission and must match the deployed system.
 
+### keplaria.com
+
+The public front door and the verification ledger are two generated static
+files served by Cloudflare Workers Assets (no Worker script — the page's whole
+job is to be reachable, and a runtime is a failure mode it does not need).
+
+```bash
+uv run python site/build_site.py        # regenerate site/dist from the ledger
+(cd site && wrangler deploy)            # publish to keplaria.com + www
+```
+
+`/proof` is generated from `docs/proof/claims.toml` and re-reads each evidence
+file, so the published numbers cannot drift from the runs that produced them —
+there is no hand-written second copy. `scripts/doctor.sh` byte-compares
+`site/dist` against the generator and checks that the domain serves 200.
+
 A second, deliberately reduced diagram exists for the submission video:
 `docs/architecture/judge-diagram.svg`, from
 `uv run python docs/architecture/build_judge_diagram.py`. It is six boxes on

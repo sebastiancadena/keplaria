@@ -1,0 +1,20 @@
+name = "keplaria-site"
+compatibility_date = "2026-08-22"
+
+# Static assets only -- there is no Worker script. The site is two generated
+# HTML files (see build_site.py); adding a runtime would add a failure mode to
+# a page whose entire job is to be reachable during the judging month.
+[assets]
+directory = "./dist"
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"
+
+# The apex and www are custom domains rather than routes: Cloudflare issues and
+# renews the certificate, and wrangler creates the DNS records itself.
+[[routes]]
+pattern = "keplaria.com"
+custom_domain = true
+
+[[routes]]
+pattern = "www.keplaria.com"
+custom_domain = true

@@ -22,9 +22,11 @@ Tick each line against the actual capture, not against intent.
 
 ### Browser chrome — the most likely leak, and the least watched
 
-- [ ] Address bar: use the **hash form** of the service URL
-      (`keplaria-console-bklu5jcdea-uc.a.run.app`), never the numeric form
-      (`keplaria-console-584548214478.us-central1.run.app`) — the second
+- [ ] Address bar: **`keplaria.com`** wherever a URL is on screen — the front
+      door and `/proof` both live there as of 2026-08-22, and neither carries a
+      cloud project identifier. When the case console itself must be shown, use
+      the **hash form** (`keplaria-console-bklu5jcdea-uc.a.run.app`), never the
+      numeric form (`keplaria-console-584548214478.us-central1.run.app`), which
       carries the cloud project number.
 - [ ] Signed-in Google account avatar / name is out of frame or the profile
       is a clean one.
