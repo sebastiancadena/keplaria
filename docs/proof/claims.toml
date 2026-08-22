@@ -157,11 +157,16 @@ evidence = "spikes/cost_posture/evidence.json"
 path = "gross_cost_month_to_date_usd"
 render = "${:.2f}"
 qualifier = "before credits, measured from the billing account rather than from published rates"
-reason = "held for the day-12 gate (2026-08-23), which decides the judging-month cost posture. Stating a burn rate before that decision would publish a number the decision may change — and the same gate rules on the engine's minInstances pin, which is a material part of it."
+appears_in = ["README.md"]
 
 [[claim]]
 id = "credit_remaining"
-reason = "held for the day-12 gate (2026-08-23) alongside gross_cost_month_to_date; it is only meaningful next to the burn rate and the length of the judging window it has to cover."
+reason = """deliberately not published. It is an account balance, not a fact \
+about the system: it moves every day, it says nothing a reader of this project \
+needs, and a figure that decays daily is the kind that gets quoted long after \
+it stopped being true. Kept in the ledger so the measurement stays traceable, \
+and carried with the date it was read (`credit_read_on`) rather than the date \
+the collector ran."""
 claim = "Cloud credit remaining"
 evidence = "spikes/cost_posture/evidence.json"
 path = "credit_remaining_usd"
@@ -170,7 +175,13 @@ qualifier = "console-only; no API exposes the balance, so it is passed in when t
 
 [[claim]]
 id = "yente_uptime_hours_per_day"
-reason = "held for the day-12 gate (2026-08-23). The VM stops nightly and is started by hand, so measured uptime is a consequence of the always-warm-vs-on-demand posture that gate decides, not an independent fact to publish first."
+reason = """superseded on 2026-08-22 and deliberately not published. This is \
+a backward-looking average over days when the VM carried a stop-only schedule \
+and waited for a human to start it. That schedule was replaced with an hourly \
+start and no stop, so the figure describes a posture the system no longer has \
+— publishing it would understate availability, and re-measuring it would only \
+reproduce the number of hours in a day. Re-point this claim at a real \
+measurement if uptime is ever claimed in public."""
 claim = "Measured daily uptime of the screening VM"
 evidence = "spikes/cost_posture/evidence.json"
 path = "measured_vm_uptime_hours_per_day.keplaria-yente"

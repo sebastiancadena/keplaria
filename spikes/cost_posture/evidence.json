@@ -132,12 +132,13 @@
     }
   ],
   "cloud_run_pinned_above_zero": "none",
-  "commit": "47f5ba1",
+  "commit": "c5765e2",
   "credit_expiry": "2026-11-04",
-  "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry.",
+  "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry, and --credit-as-of with the date it was actually read -- a balance carried forward from an earlier reading is stale by roughly the burn rate per day, and dating it to the collection run would hide that.",
+  "credit_read_on": "2026-08-20",
   "credit_remaining_usd": 138.09,
   "criterion": "the judging window running cost is measured, not estimated, and the alerting that guards it is known to watch the right project",
-  "date": "2026-08-20T20:19:32Z",
+  "date": "2026-08-22T14:52:31Z",
   "disks": [
     {
       "name": "keplaria-yente",
@@ -157,7 +158,7 @@
       "memory": "4Gi"
     }
   },
-  "gross_cost_month_to_date_usd": 13.15,
+  "gross_cost_month_to_date_usd": 15.49,
   "gross_cost_note": "month-to-date before credits, from the keplaria-gross-observe budget. null means no notification had been published yet at collection time.",
   "instances": [
     {
@@ -168,10 +169,225 @@
     }
   ],
   "measured_vm_uptime_hours_per_day": {
-    "keplaria-yente": 6.1
+    "keplaria-yente": 5.6
   },
   "net_cost_month_to_date_usd": 0.0,
   "net_cost_note": "month-to-date after all credits; this is what is actually owed. Read from the newest kill-switch notification.",
   "project_number": "584548214478",
-  "spike": "cost_posture"
+  "sku_rates": {
+    "agent_platform": {
+      "compute_seconds_by_day": {
+        "2026-08-20": 193.799998
+      },
+      "gross_usd_all_days": 0.0,
+      "note": "Agent Platform Compute meters request-processing time, not held instances: a pinned minInstances=1 would meter 86400 vCPU-seconds per day. Measured cost is the authority here, not the published per-hour rate.",
+      "skus_present": [
+        "Agent Platform Compute",
+        "Agent Platform Memory"
+      ]
+    },
+    "available": true,
+    "days_present": [
+      "2026-08-19",
+      "2026-08-20",
+      "2026-08-21"
+    ],
+    "one_off_note": "event-driven transfer (a recovery drill's snapshot restore); excluded from every daily rate",
+    "one_off_usd_on_rate_day": 0.3799,
+    "rate_day": "2026-08-20",
+    "rate_day_note": "second-newest day in the export; the newest is partial and would understate every standing rate",
+    "sku_breakdown_on_rate_day": [
+      {
+        "gross_usd": 0.717312,
+        "kind": "uptime",
+        "service": "Compute Engine",
+        "sku": "E2 Instance Core running in Americas",
+        "usage_amount": 118393.0,
+        "usage_unit": "seconds"
+      },
+      {
+        "gross_usd": 0.384584,
+        "kind": "uptime",
+        "service": "Compute Engine",
+        "sku": "E2 Instance Ram running in Americas",
+        "usage_amount": 508500505526272.0,
+        "usage_unit": "byte-seconds"
+      },
+      {
+        "gross_usd": 0.379915,
+        "kind": "one_off",
+        "service": "Compute Engine",
+        "sku": "Multi-regional Snapshot download within North America",
+        "usage_amount": 20396568230.0,
+        "usage_unit": "bytes"
+      },
+      {
+        "gross_usd": 0.332488,
+        "kind": "standing",
+        "service": "Compute Engine",
+        "sku": "SSD backed PD Capacity",
+        "usage_amount": 5625022030807040.0,
+        "usage_unit": "byte-seconds"
+      },
+      {
+        "gross_usd": 0.12,
+        "kind": "standing",
+        "service": "Networking",
+        "sku": "Networking Cloud NAT IP Usage",
+        "usage_amount": 86400.0,
+        "usage_unit": "seconds"
+      },
+      {
+        "gross_usd": 0.078761,
+        "kind": "standing",
+        "service": "Networking",
+        "sku": "Networking Cloud Nat Gateway Uptime",
+        "usage_amount": 202540.0,
+        "usage_unit": "seconds"
+      },
+      {
+        "gross_usd": 0.058063,
+        "kind": "standing",
+        "service": "Vertex AI",
+        "sku": "Gemini 3.6 Flash Global Text Output - Predictions",
+        "usage_amount": 7743.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.042319,
+        "kind": "standing",
+        "service": "Vertex AI",
+        "sku": "Gemini 3.6 Flash Global Text Input - Predictions",
+        "usage_amount": 28215.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.02737,
+        "kind": "standing",
+        "service": "App Engine",
+        "sku": "Cloud Firestore Read Ops (named databases) Iowa",
+        "usage_amount": 91263.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.010598,
+        "kind": "standing",
+        "service": "Cloud Run",
+        "sku": "Services CPU (Request-based billing)",
+        "usage_amount": 441.911675,
+        "usage_unit": "seconds"
+      },
+      {
+        "gross_usd": 0.009921,
+        "kind": "standing",
+        "service": "Compute Engine",
+        "sku": "Storage PD Snapshot in US",
+        "usage_amount": 441465950877360.0,
+        "usage_unit": "byte-seconds"
+      },
+      {
+        "gross_usd": 0.0099,
+        "kind": "standing",
+        "service": "Networking",
+        "sku": "Network Intelligence Center Topology and Google Cloud Performance Resource Hours",
+        "usage_amount": 9.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.0099,
+        "kind": "standing",
+        "service": "Networking",
+        "sku": "Network Intelligence Center Network Analyzer Resource Hours",
+        "usage_amount": 9.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.0072,
+        "kind": "standing",
+        "service": "Networking",
+        "sku": "Network Intelligence Center Internet to Google Cloud Performance Resource Hours",
+        "usage_amount": 9.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.005695,
+        "kind": "standing",
+        "service": "App Engine",
+        "sku": "Cloud Firestore Internet Data Transfer Out from the Americas to the Americas (named databases)",
+        "usage_amount": 51067491.0,
+        "usage_unit": "bytes"
+      },
+      {
+        "gross_usd": 0.003146,
+        "kind": "standing",
+        "service": "App Engine",
+        "sku": "Cloud Firestore Entity Writes (named databases) Iowa",
+        "usage_amount": 3506.0,
+        "usage_unit": "requests"
+      },
+      {
+        "gross_usd": 0.001238,
+        "kind": "standing",
+        "service": "Cloud Run Functions",
+        "sku": "Cloud Run functions CPU (Request-based billing) in us-central1",
+        "usage_amount": 51.914886,
+        "usage_unit": "seconds"
+      },
+      {
+        "gross_usd": 0.000626,
+        "kind": "standing",
+        "service": "Networking",
+        "sku": "Networking Cloud Nat Data Processing",
+        "usage_amount": 14993508.0,
+        "usage_unit": "bytes"
+      },
+      {
+        "gross_usd": 0.000422,
+        "kind": "standing",
+        "service": "Cloud Run",
+        "sku": "Services Memory (Request-based billing)",
+        "usage_amount": 186133145190.40002,
+        "usage_unit": "byte-seconds"
+      },
+      {
+        "gross_usd": 4.3e-05,
+        "kind": "standing",
+        "service": "Cloud Run Functions",
+        "sku": "Cloud Run functions Memory (Request-based billing) in us-central1",
+        "usage_amount": 20911122022.399998,
+        "usage_unit": "byte-seconds"
+      },
+      {
+        "gross_usd": 1e-05,
+        "kind": "standing",
+        "service": "Cloud Run",
+        "sku": "Cloud Run Network Internet Data Transfer Out Intercontinental (Excl Oceania, Africa and China)",
+        "usage_amount": 176275.0,
+        "usage_unit": "bytes"
+      },
+      {
+        "gross_usd": 2e-06,
+        "kind": "standing",
+        "service": "Cloud Storage",
+        "sku": "Standard Storage US Multi-region",
+        "usage_amount": 317266156544.0,
+        "usage_unit": "byte-seconds"
+      }
+    ],
+    "standing_daily_usd": 0.7177,
+    "table": "keplaria.billing_export.gcp_billing_export_resource_v1_006252_CAF71A_EC72B9",
+    "vm_hourly_usd": 0.134,
+    "vm_instance_hours_on_rate_day": 8.222,
+    "vm_vcpus": 4
+  },
+  "spike": "cost_posture",
+  "vm_schedule_note": "a schedule with a stop and no start is not availability: it guarantees the screening path goes down and then waits for a human.",
+  "vm_schedules": [
+    {
+      "name": "keplaria-always-on",
+      "start": "0 * * * *",
+      "stop": null,
+      "timeZone": "America/Bogota"
+    }
+  ]
 }

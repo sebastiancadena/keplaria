@@ -177,7 +177,7 @@ def _judge_run():
 
 
 def test_the_attended_judge_run_still_waits_for_a_human_by_default():
-    """The day-10 gate evidence is an ATTENDED run.
+    """The committed judge-run evidence is an ATTENDED run.
 
     Making auto-approval the default here would keep writing
     spikes/judge_run/evidence.json while quietly removing the human from the

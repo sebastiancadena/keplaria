@@ -7,7 +7,7 @@
 # observer subscription. The only manual input is the credit balance, which has
 # no API — read it from the console (Billing -> Credits) and pass it in.
 #
-#   bash spikes/cost_posture/collect.sh [--credit-remaining USD --credit-expiry YYYY-MM-DD]
+#   bash spikes/cost_posture/collect.sh [--credit-remaining USD --credit-expiry YYYY-MM-DD --credit-as-of YYYY-MM-DD]
 #
 # Writes spikes/cost_posture/evidence.json.
 
@@ -19,10 +19,12 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 CREDIT_REMAINING=""
 CREDIT_EXPIRY=""
+CREDIT_AS_OF=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --credit-remaining) CREDIT_REMAINING="$2"; shift 2 ;;
     --credit-expiry)    CREDIT_EXPIRY="$2";    shift 2 ;;
+    --credit-as-of)     CREDIT_AS_OF="$2";     shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -152,6 +154,74 @@ import json; print(json.dumps(out))
 ' || echo '{}')"
 echo "   measured vm uptime hours/day: $UPTIME_HOURS"
 
+echo "== per-SKU attribution (BigQuery billing export) =="
+# Month-to-date totals cannot answer the posture question -- what an hour of
+# uptime costs, and what accrues with everything stopped. Only per-SKU usage
+# can, and the VM's vCPU count is what converts metered core-seconds into
+# instance-hours. Both the instance and its machine type are discovered.
+SCHED_VM="$(VM_JSON="$VM_JSON" python3 -c '
+import os, json
+vms = json.loads(os.environ["VM_JSON"])
+print(json.dumps(vms[0] if vms else {}))')"
+VCPUS="$(SCHED_VM="$SCHED_VM" python3 -c '
+import os, json
+print(json.loads(os.environ["SCHED_VM"]).get("machineType", ""))')"
+VM_NAME="$(SCHED_VM="$SCHED_VM" python3 -c '
+import os, json
+print(json.loads(os.environ["SCHED_VM"]).get("name", ""))')"
+VM_ZONE="$(SCHED_VM="$SCHED_VM" python3 -c '
+import os, json
+print(json.loads(os.environ["SCHED_VM"]).get("zone", ""))')"
+CPU_COUNT=0
+if [[ -n "$VCPUS" ]]; then
+  CPU_COUNT="$(gcloud compute machine-types describe "$VCPUS" --zone="$VM_ZONE" \
+    --project="$PROJECT" --format='value(guestCpus)' 2>/dev/null || echo 0)"
+fi
+SKU_JSON='{"available": false, "reason": "collector did not run the query"}'
+if [[ "${CPU_COUNT:-0}" -gt 0 ]]; then
+  SKU_JSON="$(python3 "$HERE/sku_rates.py" --billing-account "$BILLING_ACCOUNT" \
+    --project "$PROJECT" --vcpus "$CPU_COUNT" 2>/dev/null \
+    || echo '{"available": false, "reason": "sku_rates.py failed"}')"
+fi
+SKU_JSON="$SKU_JSON" python3 -c '
+import os, json
+d = json.loads(os.environ["SKU_JSON"])
+if not d.get("available"):
+    print("   (unavailable: %s)" % d.get("reason"))
+else:
+    print("   rate day %s: $%s/instance-hour, $%s/day standing"
+          % (d["rate_day"], d["vm_hourly_usd"], d["standing_daily_usd"]))
+    ap = d["agent_platform"]
+    print("   agent platform metered %s over %s: $%s"
+          % (ap["compute_seconds_by_day"], d["days_present"], ap["gross_usd_all_days"]))'
+
+echo "== vm schedule posture =="
+# The screening path must stay reachable with no manual VM start through the
+# judging window (to 2026-10-01). A stop-only schedule satisfies nothing and
+# looks like a schedule, so both halves are recorded, discovered from the
+# instance.
+SCHEDULES="[]"
+if [[ -n "$VM_NAME" ]]; then
+  SCHEDULES="$(for pol in $(gcloud compute instances describe "$VM_NAME" \
+      --zone="$VM_ZONE" --project="$PROJECT" --format='value(resourcePolicies)' 2>/dev/null \
+      | tr ';,' '\n\n' | sed 's|.*/||' | grep -v '^$'); do
+      gcloud compute resource-policies describe "$pol" --region="$REGION" \
+        --project="$PROJECT" --format=json 2>/dev/null \
+        | python3 -c '
+import sys, json
+p = json.load(sys.stdin)
+isp = p.get("instanceSchedulePolicy")
+if isp:
+    print(json.dumps({
+        "name": p.get("name"),
+        "timeZone": isp.get("timeZone"),
+        "start": (isp.get("vmStartSchedule") or {}).get("schedule"),
+        "stop": (isp.get("vmStopSchedule") or {}).get("schedule"),
+    }))'
+    done | python3 -c 'import sys, json; print(json.dumps([json.loads(l) for l in sys.stdin if l.strip()]))')"
+fi
+echo "   $SCHEDULES"
+
 echo "== writing evidence =="
 COMMIT="$(git -C "$HERE/../.." rev-parse --short HEAD)"
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -161,9 +231,11 @@ NOW="$NOW" COMMIT="$COMMIT" \
 BILLING_ACCOUNT="$BILLING_ACCOUNT" PROJECT_NUMBER="$PROJECT_NUMBER" \
 NET_COST="${NET_COST:-}" GROSS_COST="${GROSS_COST:-}" \
 CREDIT_REMAINING="$CREDIT_REMAINING" CREDIT_EXPIRY="$CREDIT_EXPIRY" \
+  CREDIT_AS_OF="$CREDIT_AS_OF" \
 BUDGETS_JSON="$BUDGETS_JSON" ENGINE_SPEC="$ENGINE_SPEC" \
 PINNED_RUN="${PINNED_RUN:-none}" VM_JSON="$VM_JSON" DISK_JSON="$DISK_JSON" \
 ADDR_JSON="$ADDR_JSON" UPTIME_HOURS="$UPTIME_HOURS" \
+SKU_JSON="$SKU_JSON" SCHEDULES="$SCHEDULES" \
 python3 -c '
 import os, json
 
@@ -188,7 +260,8 @@ doc = {
   "gross_cost_note": "month-to-date before credits, from the keplaria-gross-observe budget. null means no notification had been published yet at collection time.",
   "credit_remaining_usd": num("CREDIT_REMAINING"),
   "credit_expiry": txt("CREDIT_EXPIRY"),
-  "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry.",
+  "credit_read_on": txt("CREDIT_AS_OF"),
+  "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry, and --credit-as-of with the date it was actually read -- a balance carried forward from an earlier reading is stale by roughly the burn rate per day, and dating it to the collection run would hide that.",
   "budgets": json.loads(os.environ["BUDGETS_JSON"]),
   "engine_deployment_spec": json.loads(os.environ["ENGINE_SPEC"]),
   "cloud_run_pinned_above_zero": os.environ["PINNED_RUN"],
@@ -196,6 +269,9 @@ doc = {
   "disks": json.loads(os.environ["DISK_JSON"]),
   "addresses": json.loads(os.environ["ADDR_JSON"]),
   "measured_vm_uptime_hours_per_day": json.loads(os.environ["UPTIME_HOURS"]),
+  "sku_rates": json.loads(os.environ["SKU_JSON"]),
+  "vm_schedules": json.loads(os.environ["SCHEDULES"]),
+  "vm_schedule_note": "a schedule with a stop and no start is not availability: it guarantees the screening path goes down and then waits for a human.",
 }
 with open(os.environ["OUT_PATH"], "w") as fh:
     json.dump(doc, fh, indent=2, sort_keys=True)

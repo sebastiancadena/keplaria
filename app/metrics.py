@@ -76,7 +76,7 @@ def _retried(command: dict) -> bool:
     zero. So the signature of a failed-then-succeeded command is a present value
     of at least 1, and `> 1` is the wrong test: it reads the single-failure case,
     which is the only one this system has ever actually produced, as a clean run.
-    That misreading briefly made the day-7 gate look like it had a hole in it.
+    That misreading briefly made the retry contract look like it had a hole in it.
 
     Not to be confused with `attempts`, which claim_command increments graph-side
     on every claim and which grows for reasons that have nothing to do with the

@@ -62,6 +62,25 @@ side rather than an intended refusal — please note it in the submission
 feedback. `bash scripts/doctor.sh` reports the same grant from the outside and
 will say so plainly.
 
+**These surfaces stay up, and the screening behind them does too.** The
+sanctions-screening service runs on a private VM that used to stop every night
+and wait for a human to start it, which is a poor thing to hand a reviewer who
+opens the link on a Sunday. It now carries an hourly start schedule and no stop
+schedule, so it comes back on its own within the hour whatever knocks it over.
+
+We know what that costs because we measured it rather than pricing it from a
+rate card. Gross running cost for the entire project is **$15.71** month to
+date, before any credit is applied — read from a billing budget that
+deliberately excludes credits, because every budget that includes them reports
+`$0.00` while a credit is covering the bill, which is true and tells you
+nothing. Per-SKU attribution from the billing export puts the screening VM at
+$0.134 per hour it runs and roughly $0.72 a day for everything that bills
+whether or not anything is running. The one number that had never been checked
+against a bill — the cost of keeping the agent runtime warm — turned out to be
+zero: that platform meters request-processing time, not held instances, so the
+warm pin is free. Details in
+[`spikes/cost_posture/`](spikes/cost_posture/evidence.json).
+
 ## Judging criteria → proof
 
 Every row points at a file in this repository that was produced by running the
@@ -316,7 +335,7 @@ and is reported rather than retried blindly.
 
 ### Verification
 
-- `scripts/doctor.sh` — 70 read-only checks (one fewer when the yente VM is
+- `scripts/doctor.sh` — 71 read-only checks (one fewer when the yente VM is
   stopped, since the serving probe only runs against a running VM) covering
   toolchain, auth,
   provisioned infra, the event-flow wiring (topic, push subscription
@@ -561,12 +580,20 @@ Vertex AI API under its current name, not a separate product.
   Cloud Run / local, via its find-or-create-by-display-name fallback. See
   [Deploying](#deploying-to-agent-runtime).
 - **VM `keplaria-yente`** (`us-central1-c`): `e2-standard-4`, 60 GB pd-ssd,
-  **no external IP** (10.10.0.2), service account `yente-vm@`. Nightly stop
-  01:00 America/Bogota (`keplaria-nightly-stop`), daily snapshots, 7-day
-  retention (`keplaria-daily-snap`). SSH:
-  `gcloud compute ssh keplaria-yente --zone us-central1-c --tunnel-through-iap`
-  — **the nightly stop has no matching start schedule, so the VM is
-  `TERMINATED` most mornings and must be started by hand.**
+  **no external IP** (10.10.0.2), service account `yente-vm@`. Daily snapshots,
+  7-day retention (`keplaria-daily-snap`). SSH:
+  `gcloud compute ssh keplaria-yente --zone us-central1-c --tunnel-through-iap`.
+- **The VM restarts itself, hourly, and nothing stops it** — resource policy
+  `keplaria-always-on` (`0 * * * *`, America/Bogota), attached 2026-08-22. It
+  replaced `keplaria-nightly-stop`, which stopped the VM at 01:00 and had **no
+  matching start schedule**, so screening went down every night and stayed down
+  until someone noticed and started it by hand. Starting an already-running
+  instance is a no-op, so an hourly start costs nothing and puts a ceiling of
+  one hour on how long the screening path can be down for any reason — a
+  stopped VM, a crash, a stockout that resolved. `scripts/doctor.sh` reads the
+  schedule off the instance and fails if it finds a stop without a start; the
+  old policy still exists, unattached, for the day the always-on posture is no
+  longer wanted.
 - **When the start fails with "does not have enough resources available",
   change the machine family — do not sit in a retry loop.** The stockout is
   per family and it moves: `e2` was out region-wide on creation day (hence the

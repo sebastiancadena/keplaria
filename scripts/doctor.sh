@@ -70,7 +70,12 @@ echo "== judge-visibility (private planning layer must not leak) =="
 # 'day-14 scope lock' reached scripts/doctor.sh and a spike evidence file
 # while this grep watched only for filenames and risk ids. A gate name
 # tells a reader the private plan's shape as surely as its filename does.
-LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|feature-admission|scope lock|feature freeze|ambition gate|\bR[1-9][0-9]?\b'
+# GENERIC forms added 2026-08-22, after 'the day-12 gate (2026-08-22) decided
+# always-on' and 'rules #11' were written straight into this file and the cost
+# spike. The previous list named the gates it had already seen leak, so it
+# could only ever catch a repeat -- the two shapes here catch a gate or a rule
+# clause nobody has leaked yet, which is the only kind worth checking for.
+LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-constitution|execution-plan|demo-and-video|feature-admission|scope lock|feature freeze|ambition gate|day-[0-9]+ gate|rules #[0-9]|\bR[1-9][0-9]?\b'
 # -I skips binary files; the risk-id alternative can match arbitrary bytes in
 # vendored binaries. We only care about text leaks from our own writing.
 # The generated architecture.svg is excluded because its base64 font payloads
@@ -143,13 +148,37 @@ case "$yente_status" in
       meh "keplaria-yente RUNNING but not answering on 8000 (index still loading?) — every screened beat would wait 30s and then record SCREENING_UNAVAILABLE"
     fi
     ;;
-  TERMINATED) meh "keplaria-yente VM TERMINATED — nightly stop fired, no start schedule exists; start it. On a capacity error, switch machine family (set-machine-type e2-/n2-/t2d-standard-4) rather than retrying the same one — see README" ;;
+  TERMINATED) meh "keplaria-yente VM TERMINATED — the hourly start schedule should raise it within the hour; if it does not, start it by hand. On a capacity error, switch machine family (set-machine-type e2-/n2-/t2d-standard-4) rather than retrying the same one — see README" ;;
   "")         meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)" ;;
   *)          meh "keplaria-yente VM in state $yente_status" ;;
 esac
 gcloud compute firewall-rules describe keplaria-allow-internal --project=keplaria \
   --format='value(allowed[].map().firewall_rule().list())' 2>/dev/null | grep -q 'tcp:8000' \
   && ok "yente port 8000 open inside keplaria-vpc" || bad "keplaria-allow-internal missing tcp:8000 (PSC-I → yente will fail)"
+# The screening path must come back up WITHOUT a human, through 2026-10-01.
+# Until 2026-08-22 keplaria-yente carried a STOP-ONLY schedule, so it went down
+# every night at 01:00 and stayed down until someone noticed. The schedule is
+# DISCOVERED from the instance, never named here: replacing or renaming the
+# policy must not be able to turn this green by accident, and a policy that
+# stops without starting must read as the defect it is.
+yente_start_sched=""
+yente_stop_sched=""
+for _pol in $(gcloud compute instances describe keplaria-yente --zone=us-central1-c \
+  --project=keplaria --format='value(resourcePolicies)' 2>/dev/null \
+  | tr ';,' '\n\n' | sed 's|.*/||' | grep -v '^$'); do
+  _spec=$(gcloud compute resource-policies describe "$_pol" --region=us-central1 \
+    --project=keplaria \
+    --format='value(instanceSchedulePolicy.vmStartSchedule.schedule,instanceSchedulePolicy.vmStopSchedule.schedule)' 2>/dev/null)
+  # Only instance-schedule policies answer here; snapshot schedules print nothing.
+  [ -n "$(printf '%s' "$_spec" | tr -d '[:space:]')" ] || continue
+  yente_start_sched="$(printf '%s' "$_spec" | cut -f1)"
+  yente_stop_sched="$(printf '%s' "$_spec" | cut -f2)"
+done
+if [ -n "$yente_start_sched" ]; then
+  ok "yente restarts itself without a human (start '$yente_start_sched'${yente_stop_sched:+, stop '$yente_stop_sched'})"
+else
+  bad "keplaria-yente has NO automatic start schedule — a nightly stop or a crash leaves the screening path down until a human starts it; the hosted path is committed to stay reachable through 2026-10-01"
+fi
 
 # --- yente recovery posture (drill: spikes/vm_recovery, runbook: infra/yente/RECOVERY.md) ---
 # Two invariants that only matter on the worst day, which is exactly why they
