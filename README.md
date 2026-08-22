@@ -121,6 +121,15 @@ rebuilds `docs/architecture/architecture.svg` from the committed sources under
 Update the build script whenever a component is added or moved — the diagram
 is part of the submission and must match the deployed system.
 
+A second, deliberately reduced diagram exists for the submission video:
+`docs/architecture/judge-diagram.svg`, from
+`uv run python docs/architecture/build_judge_diagram.py`. It is six boxes on
+the 1920×1080 video frame, with nothing meaningful below 28px — the dense
+diagram above is a poster you lean into, and its 10–13px labels are unreadable
+on screen. `scripts/doctor.sh` byte-compares both SVGs against their builds.
+Neither PNG is byte-checked: the judge diagram's PNG is a browser render, so
+re-export it whenever that check fires.
+
 The agent graph and its adapters run on two different runtimes:
 
 - **Agent Runtime** hosts the ADK graph — reasoning engine `keplaria`

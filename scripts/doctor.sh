@@ -81,7 +81,7 @@ LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-
 # The generated architecture.svg is excluded because its base64 font payloads
 # false-positive the risk-id pattern; every human-readable string in it comes
 # from docs/architecture/build.py, which IS grepped.
-leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' 2>/dev/null)
+leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' ':!docs/architecture/judge-diagram.svg' 2>/dev/null)
 [ -z "$leak_files" ] \
   && ok "no private planning vocabulary in the tracked tree" \
   || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
@@ -131,6 +131,20 @@ if [ -d .venv ] && [ -f docs/architecture/build.py ]; then
     bad "architecture.svg does NOT match build.py — regenerate: uv run python docs/architecture/build.py (and re-export the PNG)"
   fi
   rm -f "$tmp_svg"
+fi
+
+# The judge diagram is the one that goes on camera, where a stale box is worse
+# than a stale poster: it is narrated aloud. Same deterministic byte-compare.
+# The PNG is NOT checked -- it is a browser render, so it is not reproducible
+# byte-for-byte here; re-export it whenever this check fires.
+if [ -d .venv ] && [ -f docs/architecture/build_judge_diagram.py ]; then
+  tmp_jsvg=$(mktemp)
+  if KEPLARIA_JUDGE_DIAGRAM_OUT="$tmp_jsvg"        uv run python docs/architecture/build_judge_diagram.py >/dev/null 2>&1      && cmp -s "$tmp_jsvg" docs/architecture/judge-diagram.svg; then
+    ok "judge-diagram.svg matches its build (video diagram not stale)"
+  else
+    bad "judge-diagram.svg does NOT match build_judge_diagram.py — regenerate it and re-export the PNG"
+  fi
+  rm -f "$tmp_jsvg"
 fi
 
 echo "== cloud infra (read-only) =="
