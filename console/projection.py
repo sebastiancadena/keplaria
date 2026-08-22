@@ -25,6 +25,7 @@ def _routing(routing: dict | None) -> dict | None:
         "proposed": list(routing.get("proposed") or []),
         "route": list(routing.get("route") or []),
         "dropped": list(routing.get("dropped") or []),
+        "added": list(routing.get("added") or []),
         "reason": routing.get("reason"),
         "refused": routing.get("refused"),
         "department": routing.get("department"),

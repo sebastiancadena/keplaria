@@ -155,3 +155,22 @@ def test_refused_commands_are_emitted_with_only_action_and_cycle():
     ])
     view = public_case(case)
     assert view["refused_commands"] == [{"action": "apply_hold", "cycle": 1}]
+
+
+def test_the_projection_carries_an_agent_policy_added_to_the_route():
+    """A completed under-proposal is as much a policy action as a drop.
+
+    The coordinator may name fewer agents than the event requires; policy
+    completes the route and records the difference in `added`. Without this
+    key the completion is invisible downstream and only drops are legible,
+    which reads as though policy can subtract but never add.
+    """
+    raw = {**RAW_CASE, "routing": {**RAW_CASE["routing"],
+                                   "proposed": ["compliance"],
+                                   "route": ["evidence", "compliance"],
+                                   "added": ["evidence"]}}
+    assert public_case(raw)["routing"]["added"] == ["evidence"]
+
+
+def test_the_projection_defaults_added_to_an_empty_list():
+    assert public_case(RAW_CASE)["routing"]["added"] == []

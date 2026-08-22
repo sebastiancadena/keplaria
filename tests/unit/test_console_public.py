@@ -98,6 +98,43 @@ def test_the_detail_page_shows_a_dropped_agent_distinctly_from_a_refusal(
     assert "Dropped by policy" in response.text
 
 
+def test_the_detail_page_shows_the_proposal_beside_the_engaged_route(
+    db, case_id, client
+):
+    """The route a judge must be able to read in seconds is a comparison.
+
+    Rendering only the engaged agents shows the outcome and hides the
+    decision; the proposal is what makes the policy gate visible as a gate.
+    The fixture proposes two agents and drops one, so a page that renders
+    only `route` would still show 'evidence' and pass a weaker assertion --
+    hence the check is on the PROPOSED label carrying both names.
+    """
+    _park_a_real_case(db, case_id)
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "Proposed" in response.text
+
+
+def test_the_detail_page_shows_an_agent_policy_added_to_the_route(
+    db, case_id, client
+):
+    """The mirror of the dropped test: completion must render too.
+
+    The stored routing block is edited directly rather than driven through a
+    park, because the fixture event proposes a complete route -- there is no
+    under-proposal to complete. What is under test is the render, and the
+    write goes through the same document the projection reads.
+    """
+    _park_a_real_case(db, case_id)
+    doc = db.collection("cases").document(case_id)
+    routing = doc.get().to_dict()["routing"]
+    routing["added"] = ["compliance"]
+    doc.update({"routing": routing})
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "Added by policy" in response.text
+
+
 def test_the_templates_refuse_a_withheld_field_the_view_model_hands_them(
     db, case_id, client, monkeypatch
 ):

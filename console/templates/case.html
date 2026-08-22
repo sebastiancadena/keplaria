@@ -32,7 +32,14 @@
   <p>Department: <span class="mono">{{ case.routing.department }}</span>
      <span class="caption">({{ case.routing.department_source }})</span></p>
   {% endif %}
-  <p>Engaged: <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span></p>
+  {% if case.routing.proposed %}
+        <p>Proposed: <span class="mono">{{ case.routing.proposed|join(', ') }}</span>
+        <span class="caption">(coordinator)</span></p>
+        {% endif %}
+        <p>Engaged: <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span></p>
+        {% if case.routing.added %}
+        <p>Added by policy: <span class="mono">{{ case.routing.added|join(', ') }}</span></p>
+        {% endif %}
   {% if case.routing.dropped %}
   <p>Dropped by policy: <span class="mono">{{ case.routing.dropped|join(', ') }}</span></p>
   {% endif %}
