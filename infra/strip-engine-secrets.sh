@@ -50,13 +50,14 @@ curl -s -H "Authorization: Bearer $TOKEN" "${BASE}/${ENGINE}" > "$TMP/engine.jso
 # field, so the PSC interface config, resource limits and instance counts stay
 # explicit rather than relying on the mask to leave them alone.
 #
-# KNOWN TO FAIL HERE, CAUSE UNDIAGNOSED (2026-08-20). Two attempts both came
-# back "The Reasoning Engine failed to be updated" — first with a
-# `spec.deploymentSpec.env` mask and an env-only body, then with the full
-# deploymentSpec above. Neither is a case of asking for something unsupported:
-# the v1 discovery document describes `env` as "Environment variables to be set
-# with the Reasoning Engine deployment. The environment variables can be
-# updated through the UpdateReasoningEngine API."
+# DIAGNOSED AND FIXED 2026-08-22: the failure was the API surface, not the
+# operation. The v1 UpdateReasoningEngine rejects this patch with the generic
+# "failed to be updated" (tried 2026-08-20 with both a `spec.deploymentSpec.env`
+# mask and the full deploymentSpec); the SAME body against **v1beta1** with
+# `updateMask=spec.deployment_spec.env` was APPLIED on the first attempt and
+# removed FRAPPE_API_KEY / FRAPPE_API_SECRET from the live engine. The attempt
+# loop below therefore tries v1beta1 first and keeps the other shapes as
+# fallbacks. Historical notes kept for context:
 #
 # What is ruled out: it is not a rebuild failure (Cloud Build logged nothing on
 # either attempt), and it does no damage (the engine spec is byte-identical
