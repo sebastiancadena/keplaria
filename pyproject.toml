@@ -1,7 +1,7 @@
 [project]
 name = "keplaria"
 version = "0.1.0"
-description = "Add your description here"
+description = "Continuous supplier assurance: a durable agent mission that onboards a supplier, wakes months later to chase expiring evidence, holds purchasing when it lapses, and releases the hold once the renewal checks out."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

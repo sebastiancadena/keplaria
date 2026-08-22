@@ -110,6 +110,18 @@ execution state in **Agent Platform Sessions**, and reaches a private screening
 VM over a Private Service Connect interface — that VM has no external IP and is
 not reachable from the internet.
 
+Which agents may act on an event is not decided by a model. A versioned
+**fleet catalog** — one committed artifact — declares every agent, the complete
+route for each event type, and the agents each business department may engage;
+it is the same artifact the public console's `/fleet` view renders, so what a
+judge sees cataloged is literally what routing enforces. The coordinator model
+proposes a route, and deterministic policy corrects that proposal to the
+catalog's declared route, recording what it dropped and what it added as an
+audit diff on the case. A proposal that reaches across a department boundary —
+a finance-labeled event trying to engage the onboarding specialists — is
+refused and quarantined rather than corrected, and a catalog that fails to
+load refuses every proposal rather than falling back to stale data.
+
 Three **Cloud Run** services cover everything around the graph: an authenticated
 **Pub/Sub** push adapter that is the only component able to drive a state change
 through the graph, a public read-only case console, and the authenticated review
@@ -118,8 +130,12 @@ IAP assertion rather than from a header a caller could set.
 
 Authoritative case state lives in **Firestore**, transactionally: the case
 version, the event claim that makes duplicate and out-of-order events
-impossible, the approval, and the command outbox that makes ERP writes
-idempotent. Generative memory is deliberately not trusted with compliance facts.
+impossible, the approval, and the command outbox that makes ERP record writes
+idempotent — every record write reconciles against a deterministic external
+id. The one stated exception is outbound renewal mail, which the ERP does not
+deduplicate, so an accepted send whose response is lost can repeat a message
+but never a record. Generative memory is deliberately not trusted with
+compliance facts.
 Credentials come from **Secret Manager**, each service runs as its own service
 account, and the ERP identity is scoped rather than trusted — it receives the
 ERP's own 403 on anything outside its role. Traces go to **Cloud Trace** and are
@@ -144,9 +160,15 @@ such. Nothing here is customer data, production data, or a de-identified
 derivative of either.
 
 - **Case documents** — certificates of insurance, food-safety certificates, tax
-  and bank-verification letters — are authored fixtures. They give the model
-  genuine multimodal extraction work without putting anyone's records into a
-  model prompt.
+  and bank-verification letters — are authored fixtures, stored as the redacted
+  page-text derivative the pipeline is contracted to produce. That derivative
+  is exactly what the Evidence agent receives, and every field it extracts must
+  resolve to a verbatim span of it or the case quarantines — real grounded
+  extraction, without putting anyone's records into a model prompt. Two limits
+  are deliberate and stated in the code as well as here: the PDF/OCR/redaction
+  preprocessor that would produce the same derivative from a raster scan is
+  future work, and the evidence file attached to the ERP record is a
+  well-formed placeholder PDF, not a source scan.
 - **The screening index is a synthetic watchlist** authored for this project in
   the FollowTheMoney format, in `fixtures/watchlist/`. The screening service
   fetches nothing from OpenSanctions and indexes no OpenSanctions content. The

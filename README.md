@@ -289,7 +289,12 @@ above, not grounding.
 deterministic ID (`{case_id}:{action}`). A command already `DONE` is never
 re-driven, so a replayed event produces exactly one ERP write. ERP records
 are keyed by supplier name, so a duplicate create collides natively (409)
-and is reported rather than retried blindly.
+and is reported rather than retried blindly. The one side effect without
+destination-level reconciliation is outbound renewal mail: the ERP does not
+deduplicate outbound messages, so an accepted send whose response is lost
+before the command records `DONE` can repeat a message on the next drain —
+a repeated message, never a repeated record. The claim here is scoped
+accordingly: record writes are idempotent; message sends are at-least-once.
 
 ### Operational constraints
 
@@ -1033,10 +1038,10 @@ of a parked case: seeing it, and deciding on it.
   `execute_pending_commands` composition `tests/unit/test_approval_release.py`
   pins, then drains. It writes the decision and the resulting command state,
   so it needs `roles/datastore.user`, and because a committed approval can
-  execute a queued ERP write, it will also need Frappe Cloud credentials once
-  deployed — a second Cloud Run identity, alongside `keplaria-ingress` (see
-  "Deploying (documented, not yet run)" below: neither service account
-  exists in this project yet).
+  execute a queued ERP write, it also holds Frappe Cloud credentials — a
+  second Cloud Run identity, alongside `keplaria-ingress` (see "First-time
+  provisioning" below; both service accounts exist and `scripts/doctor.sh`
+  checks them).
 
 ### One image, two entry points
 
