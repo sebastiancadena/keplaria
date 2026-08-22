@@ -942,13 +942,33 @@ The last of those three currently reports **red**, and that is accurate rather
 than a bug: an engine deployed before this split still carries the old values
 as plaintext. They are **dead credentials** — the Frappe API secret was rotated
 on 2026-08-20 and Secret Manager holds the replacement — so what remains is
-stale text, not a usable key. It clears on the next `agents-cli deploy`, which
-now produces a clean engine because `.env` no longer carries secrets.
+stale text, not a usable key.
 
-Removing them in place, without a redeploy, is what
-`infra/strip-engine-secrets.sh` is for. It does not currently work: see the
-comment block at the top of that script for what was tried, what is ruled out,
-and why the operation is documented as supported even though it fails here.
+**A redeploy does NOT clear them. This was measured on 2026-08-22, and it
+contradicts what this section and `infra/strip-engine-secrets.sh` both
+previously claimed.** A normal `agents-cli deploy` ran that day with a clean
+`.env`, and the engine still carried `FRAPPE_API_KEY` and `FRAPPE_API_SECRET`
+afterwards — doctor re-run after the deploy still reports red. `agents-cli`
+**carries the existing engine's env forward on update**; it does not replace the
+set with what `.env` holds. The proof is by elimination: `DEVTO_API_KEY` exists
+only in `.env.secrets` and is absent from the engine, so `.env.secrets` was
+never read, and `.env` no longer holds the Frappe keys — leaving carry-forward
+as the only source. `agents-cli deploy` also exposes no flag that removes an env
+var: `--update-env-vars` only sets.
+
+So **both** documented remedies are now known not to work, and the item is open
+rather than pending-a-deploy:
+
+- **In place**, via `infra/strip-engine-secrets.sh` — fails with "The Reasoning
+  Engine failed to be updated". See the comment block at the top of that script
+  for what was tried and what is ruled out.
+- **By redeploy** — disproven above.
+
+What is *not* urgent about it: the values are dead, the engine has no public
+egress, and its graph never imports the executor, so they are unusable as well
+as unused. What remains is hygiene on a readable field, not an exposure of a
+live credential — and it does not need another rotation first, because the
+rotation already happened.
 
 Rotating the Frappe secret is four steps, and the middle two are what deployed
 services actually read:
@@ -1059,11 +1079,74 @@ review service commits a decision against that same state, and the next
 event pass (or a manual drain) is what actually executes on it. No case is
 ever sitting mid-run waiting on this UI.
 
-### Deploying (documented, not yet run)
+### Routine redeploy
 
-Neither `keplaria-console@` nor `keplaria-review@` service accounts exist
-yet in this project — this is the order the commands need to run in, for a
-human operator to execute:
+Both services run from **one image**, so the normal loop is build once, then
+deploy both. Deploy by **digest**, not `:latest` — `:latest` moves, and two
+services silently ending up on different builds is exactly what the one-image
+design exists to prevent.
+
+```bash
+# 1. Cheap local check first — this catches an import error in seconds
+# rather than after a three-minute build.
+uv run python -c "import console.public, console.review; print('both apps import')"
+
+# 2. Build. The digest is printed in the result; copy it.
+gcloud builds submit --config console/cloudbuild.yaml \
+  --project keplaria --region=us-central1 \
+  --substitutions=_IMAGE=us-central1-docker.pkg.dev/keplaria/keplaria/console:latest
+
+# 3. Deploy both, pinned to that digest. Passing ONLY --image preserves the
+# service account, env vars, secrets, IAP binding and ingress settings; do
+# NOT re-run the provisioning flags below, which would reset them.
+IMG=us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:PASTE_DIGEST
+for SVC in keplaria-console keplaria-review; do
+  gcloud run deploy "$SVC" --image "$IMG" \
+    --region us-central1 --project keplaria
+done
+
+# 4. Verify against the live services, not the build log.
+curl -s -o /dev/null -w 'console /fleet: %{http_code}\n' \
+  https://keplaria-console-584548214478.us-central1.run.app/fleet   # expect 200
+curl -s -o /dev/null -w 'review anon: %{http_code}\n' \
+  https://keplaria-review-584548214478.us-central1.run.app/review   # expect 302
+```
+
+**Step 4 is not ceremony.** On 2026-08-22 a deploy succeeded, the container
+started, and every route worked except `/fleet`, which returned 503 because a
+data directory was missing from the image — see "Runtime data directories"
+below. Nothing before step 4 would have shown it.
+
+### Runtime data directories must be copied explicitly
+
+Three directories live **outside** `app/` and are read at runtime:
+
+| Directory | Read by | Failure if absent |
+|---|---|---|
+| `catalog/` | `app/catalog.py` → `fleet.v1.json` | `CatalogLoadError`; every routing proposal refused, `/fleet` 503s |
+| `policy/` | `app/risk.py` → `supplier_risk.v2.json` | `POLICY_UNAVAILABLE`; every case blocked |
+| `fixtures/` | `app/documents.py` → `documents/` | `DocumentUnavailable`; every document case quarantined |
+
+`.gcloudignore` decides what reaches the **build context**; each Dockerfile's
+`COPY` list decides what lands in the **image**. Both must allow it, and the
+second is the one that gets forgotten — an image missing one of these builds,
+starts, and serves every unrelated route, so no build or startup signal fires.
+
+**The engine is different and must be reasoned about separately.**
+`agents-cli deploy` packages the *source tree* ("Creating in-memory tarfile of
+source_packages") under `.gcloudignore` and never consults a Dockerfile, so the
+engine and the Cloud Run images fail in different ways from the same mistake.
+
+`tests/unit/test_container_packaging.py` enforces this: it discovers the list by
+scanning `app/` for paths that escape the package, and fails any image shipping
+`app/` without them. **Add a fourth directory to that test, not only to a
+Dockerfile** — comments on the first two did not prevent the third.
+
+### First-time provisioning (already run — kept for rebuilds)
+
+Both service accounts and both services now exist; `scripts/doctor.sh` checks
+them. This is the order the commands needed to run in, and the order a rebuild
+from an empty project would need again:
 
 ```bash
 # 1. Service accounts and their IAM grants (project-level IAM cannot be

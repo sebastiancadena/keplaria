@@ -64,11 +64,25 @@ curl -s -H "Authorization: Bearer $TOKEN" "${BASE}/${ENGINE}" > "$TMP/engine.jso
 # about updating an engine deployed via `sourceCodeSpec`, which is what this one
 # uses, and whose source the GET response does not return.
 #
-# Until that is understood, a normal `agents-cli deploy` is the way to clear
-# stale env — .env no longer carries secrets, so a redeploy produces a clean
-# engine by construction. Keep this script: the operation is documented as
-# supported, so the failure is worth a proper diagnosis rather than an
-# assumption that it cannot work.
+# THE FALLBACK BELOW WAS WRONG, AND WAS MEASURED WRONG ON 2026-08-22. This
+# block used to say that a normal `agents-cli deploy` clears stale env, because
+# .env no longer carries secrets. It does not. A deploy ran that day with a
+# clean .env and the engine still carried FRAPPE_API_KEY and FRAPPE_API_SECRET
+# afterwards: `agents-cli` carries the EXISTING engine's env forward on update
+# rather than replacing the set with what .env holds. Proof by elimination —
+# DEVTO_API_KEY lives only in .env.secrets and is absent from the engine, so
+# that file was never read, and .env no longer holds the Frappe keys. There is
+# also no removal flag: `agents-cli deploy --update-env-vars` only sets.
+#
+# So this script is not a convenience any more — it is the only known path, and
+# it does not work yet. That makes the undiagnosed PATCH failure above the whole
+# problem rather than a curiosity. Keep this script and diagnose it; do not
+# reach for a redeploy, which has now been tried and recorded.
+#
+# Not urgent, and worth saying so next to the alarm: the values are dead (the
+# Frappe secret was rotated 2026-08-20), the engine has no public egress, and
+# its graph never imports the executor. This is hygiene on a readable field,
+# not a live credential exposure, and it needs no further rotation first.
 python3 - "$TMP/engine.json" "$TMP/patch.json" <<'PY'
 import json, sys
 
