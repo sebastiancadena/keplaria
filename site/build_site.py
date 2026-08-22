@@ -49,7 +49,10 @@ font-family:Inter,system-ui,sans-serif;line-height:1.65;
 .wrap{max-width:64rem;margin:0 auto;padding:3rem 1.5rem 5rem}
 header{display:flex;align-items:center;justify-content:space-between;
 gap:1rem;flex-wrap:wrap;margin-bottom:4rem}
-header svg{height:46px;width:auto}
+header svg{height:96px;width:auto}
+/* The lockup viewBox carries 0.5x-icon clear space, so the artwork is
+   74.74% of the element width and HALF its height. 96px tall renders a
+   ~142px-wide mark, clear of the 96px lockup minimum; 46px did not. */
 nav a{color:var(--muted);text-decoration:none;margin-left:1.5rem;font-size:.95rem}
 nav a:hover{color:var(--star)}
 h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;

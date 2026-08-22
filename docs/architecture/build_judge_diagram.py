@@ -136,7 +136,10 @@ S.append(lockup_symbol())
 S.append("</defs>")
 S.append(f'<rect width="{W}" height="{H}" fill="{VOID}"/>')
 
-S.append('<use href="#keplaria-lockup" x="52" y="40" width="230" height="116"/>')
+# Half of this element is the lockup's built-in clear space, so 380 wide
+# puts the artwork at ~284px -- a title-card mark on a 1920 frame, not
+# the 172px speck the first pass drew.
+S.append('<use href="#keplaria-lockup" x="44" y="24" width="380" height="192"/>')
 
 # ------------------------------------------------------------------ walls
 # Wall 1 breaks where the Policy Gate sits in it; wall 2 breaks only where
