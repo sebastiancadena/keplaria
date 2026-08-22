@@ -12,14 +12,27 @@ RUN uv pip install --system --no-cache -r /srv/console/pyproject.toml
 COPY app /srv/app
 COPY console /srv/console
 
-# app/risk.py's DEFAULT_POLICY_PATH resolves to policy/supplier_risk.v2.json,
-# which lives outside app/ and so does not arrive with the COPY above. No
-# route in either app calls load_policy today — effective_band reads the band
-# the graph already wrote onto the case — but app.executor.runner is on the
-# review service's import graph, and the failure mode if that ever changes is
-# silent: load_policy would raise, assess would return POLICY_UNAVAILABLE, and
-# the case would come back `blocked` with nothing on the page to say the
-# policy file was simply absent from the image.
+# Data directories that app/ resolves at runtime. They live outside app/ and
+# so do NOT arrive with the COPY above, and nothing about a missing one is
+# visible at build time — the image builds, starts, and serves.
+#
+# catalog/ is load-bearing for this image specifically: console/public.py's
+# /fleet route calls get_catalog(), and shipping without it renders
+# fleet_unavailable.html with a 503 on every request. That is exactly what
+# happened on 2026-08-22, on the first deploy after the catalog merged.
+#
+# policy/ has no caller on either app's routes today — effective_band reads
+# the band the graph already wrote onto the case — but app.executor.runner is
+# on the review service's import graph, and if that ever changes the failure
+# is silent: load_policy raises, assess returns POLICY_UNAVAILABLE, and the
+# case comes back `blocked` with nothing on the page to say the file was
+# simply absent from the image.
+#
+# tests/unit/test_container_packaging.py discovers this list from the code and
+# fails if an image carrying app/ omits any of it. Add to that test, not just
+# here, if you find a fourth.
+COPY catalog /srv/catalog
+COPY fixtures /srv/fixtures
 COPY policy /srv/policy
 
 ENV PYTHONPATH=/srv

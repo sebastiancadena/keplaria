@@ -26,14 +26,20 @@ COPY ./pyproject.toml ./README.md ./uv.lock* ./
 
 COPY ./app ./app
 
-# app/risk.py's DEFAULT_POLICY_PATH resolves to policy/supplier_risk.v1.json
-# and app/documents.py's FIXTURE_ROOT resolves to fixtures/documents/ at
-# runtime — both outside app/. .gcloudignore controls what reaches the build
-# context, but it is this COPY list that decides what actually lands in the
-# image; omitting either directory here means load_policy() and
-# load_document() both fail closed (DocumentUnavailable -> quarantine,
-# POLICY_UNAVAILABLE -> blocked) on every case that reaches them, silently,
-# because .gcloudignore alone does not catch it.
+# app/risk.py's DEFAULT_POLICY_PATH resolves to policy/supplier_risk.v2.json,
+# app/documents.py's FIXTURE_ROOT to fixtures/documents/, and
+# app/catalog.py's DEFAULT_CATALOG_PATH to catalog/fleet.v1.json — all three
+# outside app/. .gcloudignore controls what reaches the build context, but it
+# is this COPY list that decides what actually lands in the image; omitting
+# any of them means load_policy(), load_document() and get_catalog() fail
+# closed (POLICY_UNAVAILABLE -> blocked, DocumentUnavailable -> quarantine,
+# CatalogLoadError -> every routing proposal refused) on every case that
+# reaches them, silently, because .gcloudignore alone does not catch it.
+#
+# The catalog line was missing on 2026-08-22 and took /fleet down with a 503
+# on the console image, which has the same hole. The list is now discovered
+# and enforced by tests/unit/test_container_packaging.py.
+COPY ./catalog ./catalog
 COPY ./policy ./policy
 COPY ./fixtures ./fixtures
 
