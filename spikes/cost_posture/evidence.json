@@ -132,13 +132,13 @@
     }
   ],
   "cloud_run_pinned_above_zero": "none",
-  "commit": "c5765e2",
+  "commit": "da268ba",
   "credit_expiry": "2026-11-04",
   "credit_note": "console-only (Billing -> Credits); no API exposes the balance. Pass it in with --credit-remaining/--credit-expiry, and --credit-as-of with the date it was actually read -- a balance carried forward from an earlier reading is stale by roughly the burn rate per day, and dating it to the collection run would hide that.",
   "credit_read_on": "2026-08-20",
   "credit_remaining_usd": 138.09,
   "criterion": "the judging window running cost is measured, not estimated, and the alerting that guards it is known to watch the right project",
-  "date": "2026-08-22T14:52:31Z",
+  "date": "2026-08-22T15:02:34Z",
   "disks": [
     {
       "name": "keplaria-yente",
@@ -158,8 +158,9 @@
       "memory": "4Gi"
     }
   },
-  "gross_cost_month_to_date_usd": 15.49,
-  "gross_cost_note": "month-to-date before credits, from the keplaria-gross-observe budget. null means no notification had been published yet at collection time.",
+  "gross_cost_month_to_date_usd": 16.63,
+  "gross_cost_note": "month-to-date before credits, from the NEWEST keplaria-gross-observe notification by publish time -- a pull hands back unacked messages in no order, so taking the last one in the batch silently reports an older figure that looks entirely plausible. null means no notification had been published yet at collection time.",
+  "gross_cost_published_at": "2026-08-22T15:00:34.920Z",
   "instances": [
     {
       "machineType": "e2-standard-4",

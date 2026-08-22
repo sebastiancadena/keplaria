@@ -86,10 +86,26 @@ leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' '
   && ok "no private planning vocabulary in the tracked tree" \
   || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
 # Commit messages are covered by the same rule and were the harder miss.
-leak_msgs=$(git log --format='%h %s%n%b' -n 40 | grep -nEi "$LEAK_RE" | head -3)
-[ -z "$leak_msgs" ] \
-  && ok "last 40 commit messages carry no private vocabulary" \
-  || meh "private vocabulary in a recent commit message — squash before pushing: $(echo "$leak_msgs" | head -1)"
+# Whether the commit is already PUSHED changes what can be done about it, so
+# say which: "squash before pushing" is unactionable advice for a commit that
+# is already public, and a warning nobody can act on is a warning everybody
+# learns to scroll past.
+leak_commits=""
+for _sha in $(git log --format='%H' -n 40); do
+  git log -1 --format='%s%n%b' "$_sha" | grep -qEi "$LEAK_RE" || continue
+  if git merge-base --is-ancestor "$_sha" origin/main 2>/dev/null; then
+    leak_commits="$leak_commits $(git log -1 --format='%h' "$_sha")(pushed)"
+  else
+    leak_commits="$leak_commits $(git log -1 --format='%h' "$_sha")(local)"
+  fi
+done
+if [ -z "$leak_commits" ]; then
+  ok "last 40 commit messages carry no private vocabulary"
+elif printf '%s' "$leak_commits" | grep -q '(local)'; then
+  meh "private vocabulary in an UNPUSHED commit message — reword it before pushing:$leak_commits"
+else
+  meh "private vocabulary in an already-pushed commit message:$leak_commits — rewriting public history this close to submission costs more than the clause does; left deliberately, do not force-push to tidy it"
+fi
 
 echo "== project =="
 [ -d .venv ] && uv lock --check >/dev/null 2>&1 \

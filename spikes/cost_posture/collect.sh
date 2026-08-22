@@ -70,21 +70,33 @@ echo "== gross spend (before credits), observer subscription =="
 # no subscriber but this one, so pulling here cannot starve the kill switch.
 GROSS_RAW="$(gcloud pubsub subscriptions pull \
   "projects/${PROJECT}/subscriptions/billing-observe-pull" \
-  --project="$PROJECT" --limit=10 --format=json 2>/dev/null || echo '[]')"
-GROSS_COST="$(python3 -c '
+  --project="$PROJECT" --limit=100 --format=json 2>/dev/null || echo '[]')"
+# A pull returns unacked messages in NO particular order, so "the last one in
+# the batch" is not "the newest" -- it is whichever the server happened to hand
+# over last. Two runs minutes apart reported $15.71 and $15.49 while the newest
+# notification said $16.63, and every one of those is a real message, which is
+# why the wrong ones look completely plausible. Sort by publishTime and keep
+# the newest, and record WHICH notification the figure came from so the number
+# can be traced to a message rather than to a lucky pull.
+read -r GROSS_COST GROSS_AT <<<"$(python3 -c '
 import sys, json, base64
 rows = json.load(sys.stdin)
 best = None
 for r in rows:
-    d = r.get("message", {}).get("data")
-    if not d:
+    msg = r.get("message", {})
+    d = msg.get("data")
+    at = msg.get("publishTime")
+    if not d or not at:
         continue
-    p = json.loads(base64.b64decode(d).decode())
-    best = p.get("costAmount", best)
-print(best if best is not None else "")
+    payload = json.loads(base64.b64decode(d).decode())
+    if payload.get("costAmount") is None:
+        continue
+    if best is None or at > best[1]:
+        best = (payload["costAmount"], at)
+print("%s %s" % best if best else " ")
 ' <<<"$GROSS_RAW")"
 if [[ -n "$GROSS_COST" ]]; then
-  echo "   gross month-to-date: \$$GROSS_COST"
+  echo "   gross month-to-date: \$$GROSS_COST (notification published $GROSS_AT)"
 else
   echo "   (no notification queued yet; a new budget joins the ~25min cycle within the hour)"
 fi
@@ -229,7 +241,7 @@ NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 OUT_PATH="$HERE/evidence.json" \
 NOW="$NOW" COMMIT="$COMMIT" \
 BILLING_ACCOUNT="$BILLING_ACCOUNT" PROJECT_NUMBER="$PROJECT_NUMBER" \
-NET_COST="${NET_COST:-}" GROSS_COST="${GROSS_COST:-}" \
+NET_COST="${NET_COST:-}" GROSS_COST="${GROSS_COST:-}" GROSS_AT="${GROSS_AT:-}" \
 CREDIT_REMAINING="$CREDIT_REMAINING" CREDIT_EXPIRY="$CREDIT_EXPIRY" \
   CREDIT_AS_OF="$CREDIT_AS_OF" \
 BUDGETS_JSON="$BUDGETS_JSON" ENGINE_SPEC="$ENGINE_SPEC" \
@@ -257,7 +269,8 @@ doc = {
   "net_cost_month_to_date_usd": num("NET_COST"),
   "net_cost_note": "month-to-date after all credits; this is what is actually owed. Read from the newest kill-switch notification.",
   "gross_cost_month_to_date_usd": num("GROSS_COST"),
-  "gross_cost_note": "month-to-date before credits, from the keplaria-gross-observe budget. null means no notification had been published yet at collection time.",
+  "gross_cost_published_at": txt("GROSS_AT"),
+  "gross_cost_note": "month-to-date before credits, from the NEWEST keplaria-gross-observe notification by publish time -- a pull hands back unacked messages in no order, so taking the last one in the batch silently reports an older figure that looks entirely plausible. null means no notification had been published yet at collection time.",
   "credit_remaining_usd": num("CREDIT_REMAINING"),
   "credit_expiry": txt("CREDIT_EXPIRY"),
   "credit_read_on": txt("CREDIT_AS_OF"),

@@ -69,7 +69,7 @@ opens the link on a Sunday. It now carries an hourly start schedule and no stop
 schedule, so it comes back on its own within the hour whatever knocks it over.
 
 We know what that costs because we measured it rather than pricing it from a
-rate card. Gross running cost for the entire project is **$15.71** month to
+rate card. Gross running cost for the entire project is **$16.63** month to
 date, before any credit is applied — read from a billing budget that
 deliberately excludes credits, because every budget that includes them reports
 `$0.00` while a credit is covering the bill, which is true and tells you
