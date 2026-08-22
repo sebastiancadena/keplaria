@@ -349,24 +349,31 @@ def apply_route(node_input, ctx: Context) -> Event:
 
     A remaining PolicyError still blocks the case rather than skipping it: a
     refused proposal must never reach commit_commands. But validate_route no
-    longer raises just because the coordinator over-proposed — a known,
+    longer raises just because the coordinator mis-proposed — a known,
     department-permitted agent the event type doesn't permit (e.g.
     `compliance` on `certificate_received`) is silently dropped from the
-    route it returns, not refused. `refused` here covers everything
+    route it returns, and a declared agent the coordinator failed to name is
+    added back: the catalog's event route is the complete route, not a menu,
+    so an under-proposal (e.g. compliance-only on `new_supplier_packet`)
+    runs the full declared workflow instead of a partial one that would have
+    ignored the attached certificate. `refused` here covers everything
     validate_route (and its own precondition, resolve_department) still
     raise on: an unknown event type, an unknown agent name, an unknown
     department, an agent outside the calling department's scope
-    (DEPARTMENT_FORBIDS_AGENT), a genuinely empty proposal on an event type
-    that requires one, a catalog that cannot load, or — before validate_route
-    is ever reached — a v1 event with no department and a sunset (null)
-    legacy default (resolve_department's own UNKNOWN_DEPARTMENT). `dropped`
-    records the narrowing separately, so the persisted case still shows
-    exactly what the coordinator asked for versus what policy actually ran —
-    an audit trail the earlier all-or-nothing refusal didn't need, because a
-    refusal already carried `proposed` and an empty `route` was
-    self-explanatory. A narrowed route needs the diff spelled out or a
-    reviewer can't tell "coordinator proposed exactly this" from
-    "coordinator proposed more and policy trimmed it."
+    (DEPARTMENT_FORBIDS_AGENT), an event type requiring an agent the
+    department may not run (REQUIRED_AGENT_FORBIDDEN — completion never
+    smuggles an agent past the department boundary), a genuinely empty
+    proposal on an event type that requires one, a catalog that cannot load,
+    or — before validate_route is ever reached — a v1 event with no
+    department and a sunset (null) legacy default (resolve_department's own
+    UNKNOWN_DEPARTMENT). `dropped` and `added` record both halves of the
+    correction separately, so the persisted case still shows exactly what
+    the coordinator asked for versus what policy actually ran — an audit
+    trail the earlier all-or-nothing refusal didn't need, because a refusal
+    already carried `proposed` and an empty `route` was self-explanatory. A
+    corrected route needs the diff spelled out or a reviewer can't tell
+    "coordinator proposed exactly this" from "coordinator proposed
+    more-or-less and policy corrected it."
 
     Evidence only has a document to extract from when the event actually
     carries a `document_ref`. A packet with no document is not a failure —
@@ -412,7 +419,7 @@ def apply_route(node_input, ctx: Context) -> Event:
     except PolicyError as exc:
         department = raw_department or ""
         department_source = "unresolved"
-        route, refused, dropped = [], str(exc), []
+        route, refused, dropped, added = [], str(exc), [], []
     else:
         try:
             route = validate_route(event_type, proposed, department)
@@ -420,11 +427,14 @@ def apply_route(node_input, ctx: Context) -> Event:
             dropped = [
                 agent for agent in dict.fromkeys(proposed) if agent not in route
             ]
+            added = [
+                agent for agent in route if agent not in dict.fromkeys(proposed)
+            ]
         except PolicyError as exc:
             # A rejected proposal is a policy outcome the trace must show,
             # and it must never fall through to a side effect —
             # quarantine_case is the only node this can reach next.
-            route, refused, dropped = [], str(exc), []
+            route, refused, dropped, added = [], str(exc), [], []
 
     evidence_skipped_no_document = "evidence" in route and not has_document
     evidence_skipped_tainted_document = "evidence" in route and has_document and tainted
@@ -435,6 +445,7 @@ def apply_route(node_input, ctx: Context) -> Event:
         "department_source": department_source,
         "route": route,
         "dropped": dropped,
+        "added": added,
         "reason": reason,
         "refused": refused,
         "evidence_skipped_no_document": evidence_skipped_no_document,

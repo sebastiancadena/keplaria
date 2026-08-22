@@ -87,12 +87,22 @@ def validate_route(event_type: str, route: list[str], department: str) -> list[s
       and must be visible — quarantined, recorded, on the console — so it
       raises DEPARTMENT_FORBIDS_AGENT, and it does so BEFORE event-type
       narrowing: an agent that is both department-forbidden and
-      event-type-disallowed refuses rather than silently dropping.
-    - The EVENT TYPE narrows. A known, department-permitted agent the
-      event type doesn't allow is dropped from the returned route, exactly
-      as before the department dimension existed: the coordinator
-      over-proposing inside its own scope is a model mistake, not a
-      violation worth denying the whole event over.
+      event-type-disallowed refuses rather than silently dropping. The
+      same boundary holds against completion: an event type whose declared
+      route requires an agent the calling department may not run raises
+      REQUIRED_AGENT_FORBIDDEN — completion must never smuggle an agent
+      past the department scope.
+    - The EVENT TYPE decides the route. The catalog's declared route is
+      the COMPLETE route for the event type, not a menu: a known,
+      department-permitted agent the event type doesn't allow is dropped,
+      and a declared agent the coordinator failed to name is added. Both
+      directions are model mistakes, not violations worth denying the
+      whole event over — an over-proposal must not run an agent policy
+      never permitted, and an under-proposal must not run a partial
+      workflow (a compliance-only new_supplier_packet used to onboard a
+      supplier while ignoring its attached certificate). The caller
+      records both diffs against the proposal (app.nodes.apply_route's
+      `dropped` and `added`).
 
     The department is a policy-and-audit label asserted by the producer,
     not an authenticated identity: what this function guarantees is that
@@ -101,8 +111,9 @@ def validate_route(event_type: str, route: list[str], department: str) -> list[s
     Still raising, unchanged from before: an unknown event type, an agent
     name this system has never heard of, and a genuinely empty proposal on
     an event type that requires at least one agent (a check on what was
-    *proposed* — a proposal that named only event-type-disallowed agents
-    narrows to [] without raising).
+    *proposed* — the coordinator producing nothing at all is a malformed
+    proposal, per the architecture contract, while a partial or misdirected
+    one is corrected and recorded).
     """
     catalog = _catalog()
     known = catalog.routable_ids()
@@ -128,10 +139,16 @@ def validate_route(event_type: str, route: list[str], department: str) -> list[s
                 f"{department!r} scope"
             )
 
+    for agent in allowed:
+        if agent not in scope.permitted_agents:
+            raise PolicyError(
+                f"REQUIRED_AGENT_FORBIDDEN: event type {event_type!r} "
+                f"requires {agent!r}, which is outside the {department!r} scope"
+            )
+
     if allowed and not requested:
         raise PolicyError(
             f"EMPTY_ROUTE: event type {event_type!r} requires at least one agent"
         )
 
-    permitted = [agent for agent in requested if agent in allowed]
-    return [agent for agent in known if agent in permitted]
+    return [agent for agent in known if agent in allowed]

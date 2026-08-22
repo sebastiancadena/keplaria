@@ -17,15 +17,49 @@ def test_permitted_route_is_returned_normalised():
     ]
 
 
-def test_a_disallowed_agent_is_dropped_not_refused():
+def test_a_disallowed_agent_is_dropped_and_the_required_one_still_runs():
     """A known agent the event type doesn't permit narrows the route rather
     than refusing the whole proposal — the user's decision after the
     coordinator was observed live, reproducibly, over-proposing `compliance`
     for `certificate_received` despite its own instruction saying not to.
-    Before this change this raised PolicyError (see git history for
-    `test_route_outside_the_allowlist_is_refused`, which this replaces); now
-    the disallowed agent is silently absent from the returned route."""
-    assert validate_route("certificate_received", ["compliance"], "procurement") == []
+    Since route completion (2026-08-22) the narrowing no longer strands the
+    event with nobody to do the work: the catalog route is the complete
+    route, so `evidence` runs even though the coordinator never named it.
+    Before completion this returned [] and the certificate was ignored."""
+    assert validate_route("certificate_received", ["compliance"], "procurement") == [
+        "evidence"
+    ]
+
+
+def test_an_under_proposed_route_is_completed_to_the_catalog_route():
+    """The catalog's event route is the COMPLETE route, not a menu. A
+    compliance-only proposal for a new_supplier_packet used to screen and
+    onboard the supplier while ignoring the attached certificate; policy now
+    adds the missing required agent instead of running a partial workflow."""
+    assert validate_route("new_supplier_packet", ["compliance"], "procurement") == [
+        "evidence",
+        "compliance",
+    ]
+
+
+def test_an_evidence_only_proposal_is_completed_with_compliance():
+    """The mirror-image partial: evidence alone would extract and then fail
+    closed at the gate for want of a screening record — an avoidable
+    quarantine of a valid event."""
+    assert validate_route("new_supplier_packet", ["evidence"], "procurement") == [
+        "evidence",
+        "compliance",
+    ]
+
+
+def test_a_department_that_cannot_run_a_required_agent_is_refused():
+    """Completion must never smuggle an agent past the department boundary:
+    when the event type's route requires an agent the calling department is
+    not permitted to run, the event is refused and quarantined rather than
+    completed. finance permits no agents, so it can never lawfully carry a
+    new_supplier_packet."""
+    with pytest.raises(PolicyError, match="REQUIRED_AGENT_FORBIDDEN"):
+        validate_route("new_supplier_packet", [], "finance")
 
 
 def test_over_proposing_a_disallowed_agent_still_returns_the_permitted_ones():

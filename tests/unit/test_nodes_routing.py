@@ -232,6 +232,73 @@ def test_a_department_permitted_agent_the_event_type_disallows_is_dropped_not_re
     assert result.actions.route == "evidence"
 
 
+def test_an_under_proposed_route_is_completed_and_the_diff_recorded():
+    """The completion half of the audit diff: a compliance-only proposal for
+    a new_supplier_packet used to run partial — screening the supplier while
+    ignoring the attached certificate. Policy now completes the route to the
+    catalog's declared set, and `added` records what the coordinator failed
+    to name, exactly as `dropped` records what it over-named, so the
+    persisted case still shows proposed-versus-ran."""
+    case = _case("CASE-ADD-1", "new_supplier_packet", document_ref="fixture:x")
+    case["department"] = "procurement"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["compliance"], "reason": "under-proposed"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["route"] == ["evidence", "compliance"]
+    assert result.output["added"] == ["evidence"]
+    assert result.output["dropped"] == []
+    assert result.output["refused"] is None
+    assert result.actions.route == "evidence"
+
+
+def test_a_complete_proposal_records_an_empty_added_diff():
+    ctx = _StubContext({
+        "case": _case("CASE-ADD-2", "new_supplier_packet", document_ref="fixture:x"),
+    })
+    node_input = {"route": ["evidence", "compliance"], "reason": "complete"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["added"] == []
+    assert result.output["dropped"] == []
+
+
+def test_a_narrowed_to_empty_proposal_is_completed_not_stranded():
+    """A proposal that becomes empty after disallowed agents are removed
+    must not strand the event with nobody to do the work: compliance-only
+    on certificate_received narrows to [], then completes to the event's
+    declared ['evidence'] — both halves of the diff recorded."""
+    case = _case("CASE-ADD-3", "certificate_received", document_ref="fixture:x")
+    case["department"] = "procurement"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["compliance"], "reason": "wrong specialist"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["route"] == ["evidence"]
+    assert result.output["added"] == ["evidence"]
+    assert result.output["dropped"] == ["compliance"]
+    assert result.output["refused"] is None
+    assert result.actions.route == "evidence"
+
+
+def test_a_required_agent_outside_the_department_scope_is_blocked():
+    """Completion must not smuggle an agent past the department boundary: a
+    finance-labeled new_supplier_packet requires agents finance may not run,
+    so the event is refused and quarantined, never completed."""
+    case = _case("CASE-ADD-4", "new_supplier_packet", document_ref="fixture:x")
+    case["department"] = "finance"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": [], "reason": "finance cannot onboard"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "REQUIRED_AGENT_FORBIDDEN" in result.output["refused"]
+
+
 def test_unknown_agent_name_is_blocked_not_skipped():
     ctx = _StubContext({"case": _case("CASE-3", "new_supplier_packet")})
     node_input = {"route": ["finance_bot"], "reason": "hallucinated agent"}
