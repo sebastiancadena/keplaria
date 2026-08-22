@@ -6,11 +6,33 @@ malformed event is rejected at the edge rather than halfway through a workflow.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from datetime import date
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# The schema versions this code knows how to interpret. A forward version is
+# a contract that does not exist here yet; reading it with today's rules
+# would be silent misinterpretation, so validation refuses it at the edge
+# (the ingress acks-and-drops, so redelivery never retries a malformed event).
+SUPPORTED_SCHEMA_VERSIONS: frozenset[int] = frozenset({1, 2})
+
+# Identifiers become Firestore document ids and log keys. Bounded, non-empty,
+# never path-like: a "/" reads as a document path at the storage boundary,
+# "." / ".." are reserved names there, and surrounding whitespace would let
+# " CASE-1" and "CASE-1" address two different cases.
+_MAX_IDENTIFIER_LENGTH = 200
 
 
 class CanonicalEvent(BaseModel):
-    """The versioned event every producer must emit."""
+    """The versioned event every producer must emit.
+
+    Unknown fields are rejected (`extra="forbid"`): every producer is
+    first-party and emits exactly the declared fields, so an unknown key is
+    a producer bug or a tampered payload — modeled explicitly, per contract,
+    rather than silently ignored.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     event_id: str
     case_id: str
@@ -44,6 +66,46 @@ class CanonicalEvent(BaseModel):
     effective_date: str | None = None
     # Immutable payload reference; resolved by app.documents.load_document.
     document_ref: str | None = None
+
+    @field_validator("event_id", "case_id")
+    @classmethod
+    def _require_a_storable_identifier(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("identifier must be non-empty")
+        if value != value.strip():
+            raise ValueError("identifier must carry no surrounding whitespace")
+        if len(value) > _MAX_IDENTIFIER_LENGTH:
+            raise ValueError(
+                f"identifier exceeds {_MAX_IDENTIFIER_LENGTH} characters"
+            )
+        if "/" in value:
+            raise ValueError("identifier must not contain a path separator")
+        if value in {".", ".."}:
+            raise ValueError("identifier must not be a reserved dot-name")
+        return value
+
+    @field_validator("schema_version")
+    @classmethod
+    def _require_a_supported_schema_version(cls, value: int) -> int:
+        if value not in SUPPORTED_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"schema_version {value} is not supported "
+                f"(supported: {sorted(SUPPORTED_SCHEMA_VERSIONS)})"
+            )
+        return value
+
+    @field_validator("effective_date")
+    @classmethod
+    def _require_an_iso_effective_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError(
+                "effective_date must be an ISO calendar date (YYYY-MM-DD)"
+            ) from exc
+        return value
 
     @model_validator(mode="after")
     def _require_department_at_v2(self) -> "CanonicalEvent":
