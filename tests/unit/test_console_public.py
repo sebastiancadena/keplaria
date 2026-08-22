@@ -77,6 +77,14 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     assert "create_supplier" in response.text
 
 
+def test_the_case_list_links_to_the_fleet_page(client):
+    """The fleet page (this branch's surface) was otherwise unreachable by
+    navigation — no template linked to it and it offered no way back."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'href="/fleet"' in response.text
+
+
 def test_the_detail_page_shows_a_dropped_agent_distinctly_from_a_refusal(
     db, case_id, client
 ):

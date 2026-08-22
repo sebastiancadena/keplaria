@@ -127,6 +127,15 @@ def test_the_fleet_view_renders_the_coordinator_fleet_wide(
     assert "Fleet-wide" in response.text
 
 
+def test_the_fleet_view_links_back_to_the_case_list(client, install_catalog):
+    install_catalog(_catalog_dict())
+
+    response = client.get("/fleet")
+
+    assert response.status_code == 200
+    assert 'href="/"' in response.text
+
+
 def test_an_unavailable_catalog_renders_an_explicit_error(
     client, install_catalog
 ):
