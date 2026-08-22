@@ -145,6 +145,16 @@ PNG beside it is a browser render. Doctor byte-compares the SVG against its
 build, so a box that stops matching the code turns the check red. Nothing
 carrying meaning sits below 28px — this is not a shrunk `architecture.svg`.
 
+**Animated:** `video/judge-diagram.mp4` (17.0s, 1920×1080), from
+`video/judge_diagram_scene.py` rendered with the Manim kit in
+`~/dev/git/byteql-video` (`uv run --group animation scripts/render.py`).
+It assembles in the narration's order: walls and zones first, then each box
+as its clause is spoken, with the single ERP crossing drawn LAST — after the
+pause point, matching the line "and Ground Control can pause the flow before
+the ERP". **This clip is outside the continuous-unedited window (0:15–2:25),
+which is the only reason it may exist.** If it is cut, the static SVG stands
+in with no other change — that is also its rollback.
+
 **The device:** two walls, each pierced exactly once. The Policy Gate is
 embedded in the first; a single heavy arrow crosses the second. "Only the
 gate decides" and "only the outbox reaches the ERP" are read as shape, not
