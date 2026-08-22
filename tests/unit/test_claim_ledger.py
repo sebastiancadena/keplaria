@@ -114,6 +114,7 @@ def test_a_number_whose_copy_is_not_written_yet_is_pending_not_a_pass(tmp_path):
         path="enforced_hold_days",
         render="{} days",
         appears_in=(),
+        reason="held until the lifecycle copy is rewritten",
     )
 
     result = ledger.check(claim, root=tmp_path)
@@ -121,6 +122,27 @@ def test_a_number_whose_copy_is_not_written_yet_is_pending_not_a_pass(tmp_path):
     assert result.status == "pending"
     assert result.ok is True
     assert result.expected == "31 days"
+    assert "held until" in result.detail
+
+
+def test_a_claim_held_back_with_no_reason_fails_the_run(tmp_path):
+    """A deliberate hold says why. An unexplained one is indistinguishable from
+    a claim that was quietly abandoned, which is the failure this tool exists to
+    prevent — so it is a failure, not a soft status."""
+    _evidence(tmp_path, "spikes/lifecycle/evidence.json", {"enforced_hold_days": 31})
+    claim = ledger.Claim(
+        id="enforced_hold_days",
+        claim="Days a non-compliant supplier was actually held from purchasing",
+        evidence="spikes/lifecycle/evidence.json",
+        path="enforced_hold_days",
+        render="{} days",
+        appears_in=(),
+    )
+
+    result = ledger.check(claim, root=tmp_path)
+
+    assert result.status == "pending_unexplained"
+    assert result.ok is False
 
 
 def test_the_rendered_page_states_each_value_its_evidence_and_its_qualifier(tmp_path):

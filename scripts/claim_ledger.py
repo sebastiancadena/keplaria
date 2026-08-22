@@ -60,8 +60,16 @@ class Result:
 
     @property
     def ok(self) -> bool:
-        """A run fails on a number stated wrongly, or one that lost its source."""
-        return self.status not in ("mismatch", "no_evidence")
+        """A run fails on a number stated wrongly, one that lost its source, or
+        one held back from public copy with no reason recorded.
+
+        The last is not bookkeeping. `pending` is the status a claim sits in
+        while nobody is looking at it, so an unexplained one is indistinguishable
+        from a claim that was quietly abandoned — and this project has already
+        shipped a criteria table promising evidence that had been retired. A
+        deliberate hold states why it is held, the same way a `manual` row
+        states who read it."""
+        return self.status not in ("mismatch", "no_evidence", "pending_unexplained")
 
 
 def check(claim: Claim, root: Path) -> Result:
@@ -82,13 +90,17 @@ def check(claim: Claim, root: Path) -> Result:
         if expected.lower() not in (root / surface).read_text().lower()
     )
     if not claim.appears_in:
-        status = "pending"
+        status = "pending" if claim.reason else "pending_unexplained"
     elif missing:
         status = "mismatch"
     else:
         status = "ok"
     return Result(
-        claim=claim, status=status, expected=expected, missing_from=missing
+        claim=claim,
+        status=status,
+        expected=expected,
+        missing_from=missing,
+        detail=claim.reason,
     )
 
 
@@ -118,6 +130,7 @@ _STATUS_LABEL = {
     "mismatch": "MISMATCH",
     "manual": "read by a human",
     "pending": "copy not written yet",
+    "pending_unexplained": "PENDING, NO REASON",
     "no_evidence": "EVIDENCE GONE",
 }
 
@@ -192,6 +205,10 @@ def main(argv: list[str] | None = None) -> int:
             line += "  NOT FOUND IN " + ", ".join(result.missing_from)
         if result.status == "no_evidence":
             line += "  " + result.detail
+        if result.status == "pending" and result.detail:
+            line += f"  held: {result.detail}"
+        if result.status == "pending_unexplained":
+            line += "  no `reason` recorded for holding this claim back"
         print(line)
 
     failing = [r for r in results if not r.ok]
@@ -199,6 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         f"\n{len(results)} claims: "
         f"{sum(r.status == 'ok' for r in results)} verified, "
         f"{sum(r.status == 'pending' for r in results)} awaiting copy, "
+        f"{sum(r.status == 'pending_unexplained' for r in results)} held without a reason, "
         f"{sum(r.status == 'manual' for r in results)} read by a human, "
         f"{sum(r.status == 'mismatch' for r in results)} stale, "
         f"{sum(r.status == 'no_evidence' for r in results)} without evidence"
