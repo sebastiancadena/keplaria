@@ -483,3 +483,42 @@ def test_failures_page_shows_a_dead_command_and_a_dead_event(client, monkeypatch
     assert "CASE-STUCK" in response.text
     assert "CASE-LOST" in response.text
     assert "ERP down" in response.text
+
+
+def test_the_queue_page_never_renders_the_raw_account(client):
+    """The assertion that actually protects the recording.
+
+    Testing mask_account alone would pass while the template rendered the
+    raw subject beside it; what must be true is that the address is absent
+    from the page a camera points at.
+    """
+    response = client.get("/review")
+    assert response.status_code == 200
+    assert "reviewer@example.com" not in response.text
+    assert "r•••@example.com" in response.text
+
+
+def test_the_reviewer_banner_masks_the_account_it_names():
+    """The queue page is on camera in the submission video.
+
+    Contest rule 12 prohibits personal information and account emails in the
+    submitted video, and this banner is the only place the deployment renders
+    a real account. Masking beats remembering not to film it: a checklist is
+    skipped once and a recording is re-shot, a mask is not.
+
+    The local part keeps its first character so a reviewer can still tell
+    which account they are signed in as, which is the whole point of the
+    banner.
+    """
+    from console.review import mask_account
+
+    assert mask_account("sebastiancadena@gmail.com") == "s•••@gmail.com"
+    assert mask_account("a@b.co") == "a•••@b.co"
+
+
+def test_masking_leaves_a_non_address_alone():
+    """require_reviewer can hand back a subject that is not an email."""
+    from console.review import mask_account
+
+    assert mask_account("accounts.google.com:12345") == "accounts.google.com:12345"
+    assert mask_account("") == ""

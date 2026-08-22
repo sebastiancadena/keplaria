@@ -133,6 +133,23 @@ def healthz(reviewer: str = Depends(require_reviewer)) -> dict:
     return {"status": "ok"}
 
 
+def mask_account(subject: str) -> str:
+    """Mask the local part of an account address for on-screen display.
+
+    Display only. The raw subject is what `commit_approval` records as the
+    decision's actor -- an audit trail that cannot identify the decider is
+    not an audit trail, and this function must never reach that path.
+
+    A subject that is not an address is returned unchanged: IAP can hand back
+    a non-email principal, and inventing a mask for it would hide the fact
+    that the deployment is not naming a person at all.
+    """
+    local, sep, domain = subject.partition("@")
+    if not sep or not local:
+        return subject
+    return f"{local[0]}•••@{domain}"
+
+
 @api.get("/review", response_class=HTMLResponse)
 def review_list(request: Request, reviewer: str = Depends(require_reviewer)):
     db = get_client()
@@ -154,7 +171,7 @@ def review_list(request: Request, reviewer: str = Depends(require_reviewer)):
     return templates.TemplateResponse(
         request=request,
         name="review_list.html",
-        context={"cases": parked, "reviewer": reviewer},
+        context={"cases": parked, "reviewer": mask_account(reviewer)},
     )
 
 
