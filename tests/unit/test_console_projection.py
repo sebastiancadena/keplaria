@@ -103,9 +103,18 @@ def test_a_superseded_approval_stops_applying():
 
 
 def test_subthreshold_candidates_are_emitted():
+    """Exact shape, deliberately: this is an allowlist.
+
+    `caption` and `topics` were added on 2026-08-22 -- both were already
+    captured upstream in app/nodes.py and dropped here, which left the page
+    rendering an opaque fixture id where a name existed. Anything ELSE
+    appearing in this dict is a field that got published without being read,
+    which is what this equality is here to catch.
+    """
     view = public_case(RAW_CASE)
     assert view["screening"]["candidates"] == [
-        {"id": "syn-co-008", "score": 0.526, "match": False}
+        {"id": "syn-co-008", "caption": None, "score": 0.526,
+         "match": False, "topics": []}
     ]
 
 
@@ -174,3 +183,132 @@ def test_the_projection_carries_an_agent_policy_added_to_the_route():
 
 def test_the_projection_defaults_added_to_an_empty_list():
     assert public_case(RAW_CASE)["routing"]["added"] == []
+
+
+# --- derived status ------------------------------------------------------
+#
+# `phase` is a graph-internal field and must never be shown as a status.
+# commit_approval does not touch it (only app.nodes.park_case writes it), so
+# an approved and executed case still reads `awaiting_approval` -- which on
+# camera says a case is waiting seconds after the ERP rows appeared. The
+# status below is derived from what actually happened instead.
+
+def _case(**over) -> dict:
+    base = {
+        "case_id": "CASE-9",
+        "case_version": 1,
+        "phase": "awaiting_approval",
+        "policy": {"band": "review", "score": 0.25},
+    }
+    base.update(over)
+    return base
+
+
+def test_a_parked_case_reads_as_stopped_not_as_a_phase_name():
+    view = public_case(_case(), [{"action": "create_supplier", "status": "held"}])
+    assert view["status"]["state"] == "PARKED"
+    assert "awaiting_approval" not in view["status"]["summary"]
+    assert view["status"]["erp_writes"] == 0
+
+
+def test_an_applied_approval_reads_as_approved_even_though_phase_never_moved():
+    """The defect this whole treatment exists for."""
+    view = public_case(
+        _case(approval={"decision": "approved", "case_version": 1,
+                        "approval_id": "A-1"}),
+        [{"action": "create_supplier", "status": "pending"}],
+    )
+    assert view["phase"] == "awaiting_approval"
+    assert view["status"]["state"] == "APPROVED"
+
+
+def test_a_case_whose_commands_all_ran_reads_as_executed():
+    view = public_case(
+        _case(approval={"decision": "approved", "case_version": 1,
+                        "approval_id": "A-1"}),
+        [{"action": "create_supplier", "status": "done"},
+         {"action": "attach_evidence", "status": "done"}],
+    )
+    assert view["status"]["state"] == "EXECUTED"
+    assert view["status"]["erp_writes"] == 2
+
+
+def test_a_blocked_case_says_nothing_will_be_written():
+    view = public_case(_case(policy={"band": "blocked", "score": 0.9}), [])
+    assert view["status"]["state"] == "BLOCKED"
+
+
+def test_a_case_still_running_reads_as_processing():
+    view = public_case(_case(phase="processing", policy={}), [])
+    assert view["status"]["state"] == "PROCESSING"
+
+
+def test_a_superseded_approval_does_not_read_as_approved():
+    """effective_band stops applying it; the status must agree with that."""
+    view = public_case(
+        _case(case_version=4, approval={"decision": "approved",
+                                        "case_version": 1, "approval_id": "A-1"}),
+        [{"action": "create_supplier", "status": "held"}],
+    )
+    assert view["status"]["state"] == "PARKED"
+
+
+# --- screening candidates ------------------------------------------------
+
+def test_the_projection_carries_the_candidate_name_yente_returned():
+    """`caption` is captured in app/nodes.py and was dropped here.
+
+    Without it the table shows `syn-co-008`, which tells a reader nothing
+    about why the matcher hesitated -- the name is the whole story of the
+    deliberate near-miss.
+    """
+    view = public_case(_case(screening={"candidates": [
+        {"id": "syn-co-008", "caption": "Comercializadora Andes Verde S.A.S.",
+         "score": 0.6716417910447763, "match": False}]}), [])
+    row = view["screening"]["candidates"][0]
+    assert row["caption"] == "Comercializadora Andes Verde S.A.S."
+
+
+def test_candidates_are_ordered_by_score_descending():
+    view = public_case(_case(screening={"candidates": [
+        {"id": "a", "score": 0.17, "match": False},
+        {"id": "b", "score": 0.67, "match": False},
+        {"id": "c", "score": 0.04, "match": False}]}), [])
+    assert [c["id"] for c in view["screening"]["candidates"]] == ["b", "a", "c"]
+
+
+def test_the_projection_names_which_candidates_a_risk_factor_cited():
+    """The near-match row must be markable without the template guessing.
+
+    Marking "the highest score" would be a heuristic that silently lies the
+    moment a factor cites something else. The factor's own value names the
+    candidate, so the projection reports what was cited rather than what
+    looks likely.
+    """
+    view = public_case(_case(
+        policy={"band": "review", "score": 0.25, "factors_fired": [
+            {"id": "SUBTHRESHOLD_CANDIDATE", "value": "syn-co-008 @ 0.672",
+             "weight": 0.25}]},
+        screening={"candidates": [
+            {"id": "syn-co-008", "score": 0.67, "match": False},
+            {"id": "syn-co-006", "score": 0.18, "match": False}]}), [])
+    assert view["cited_candidate_ids"] == ["syn-co-008"]
+
+
+def test_no_factors_cites_no_candidates():
+    view = public_case(_case(screening={"candidates": [
+        {"id": "syn-co-006", "score": 0.18, "match": False}]}), [])
+    assert view["cited_candidate_ids"] == []
+
+
+def test_a_non_string_candidate_id_does_not_take_the_page_down():
+    """Producer-supplied and therefore untrusted.
+
+    Found by an existing fixture, not by inspection: the first version of
+    the citation lookup did `id in values` and raised TypeError on a list,
+    which would have been a 500 on the public console rather than one
+    unmarked row.
+    """
+    view = public_case(_case(screening={"candidates": [
+        {"id": ["syn-co-008"], "score": 0.67, "match": False}]}), [])
+    assert view["cited_candidate_ids"] == []

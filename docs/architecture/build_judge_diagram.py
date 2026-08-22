@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -61,6 +62,20 @@ def font_face(family: str, fname: str) -> str:
         f"src:url(data:font/woff2;base64,{data}) format('woff2');"
         f"font-weight:100 900;font-style:normal;}}"
     )
+
+
+def lockup_symbol() -> str:
+    """The real mark from the brand repo, embedded verbatim.
+
+    Geometry untouched per the brand guidelines -- the ellipse's off-centre
+    focus is the whole idea of the mark, and a redrawn or letter-spaced
+    substitute throws it away.
+    """
+    raw = (ASSETS / "keplaria-lockup-horizontal-dark.svg").read_text()
+    vb = re.search(r'viewBox="([^"]+)"', raw).group(1)
+    body = re.sub(r"^<svg[^>]*>", "", raw.strip())
+    body = re.sub(r"</svg>\s*$", "", body)
+    return f'<symbol id="keplaria-lockup" viewBox="{vb}">{body}</symbol>'
 
 
 def text(x, y, s, size=28, family=INTER, weight=400, fill=STAR,
@@ -117,10 +132,11 @@ for name, color, mw in [("amber", AMBER, 5), ("exit", AMBER, 4.5)]:
         f' markerWidth="{mw}" markerHeight="{mw}" orient="auto-start-reverse">'
         f'<path d="M0,0 L10,5 L0,10 z" fill="{color}"/></marker>'
     )
+S.append(lockup_symbol())
 S.append("</defs>")
 S.append(f'<rect width="{W}" height="{H}" fill="{VOID}"/>')
 
-S.append(text(60, 88, "KEPLARIA", 32, SG, 500, MUTED, spacing="0.24em"))
+S.append('<use href="#keplaria-lockup" x="52" y="40" width="230" height="116"/>')
 
 # ------------------------------------------------------------------ walls
 # Wall 1 breaks where the Policy Gate sits in it; wall 2 breaks only where

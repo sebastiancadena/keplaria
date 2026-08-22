@@ -1,25 +1,45 @@
 {% extends "base.html" %}
 {% block title %}{{ case.case_id }} — Keplaria{% endblock %}
 {% block content %}
-<h1 class="mono">{{ case.case_id }}</h1>
-<p class="body-small">{{ case.supplier }} · {{ case.phase }} · version {{ case.case_version }}</p>
+<h1>{{ case.supplier or case.case_id }}</h1>
+<p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
+
+<div class="status status--{{ case.status.state|lower }}">
+  <p class="status__state">{{ case.status.state }}</p>
+  <p class="status__summary">{{ case.status.summary }}</p>
+</div>
 
 <div class="rule--focus"></div>
 
 <section class="panel">
   <div class="panel__header">
-    <h2>Verdict</h2>
-    <span class="caption">Gate vs. effective</span>
+    <h2>Risk verdict</h2>
   </div>
-  <p>
-    <span class="band--{{ case.gate_band or 'review' }}">Gate: {{ case.gate_band }}</span>
-    &nbsp;&nbsp;
-    <span class="band--{{ case.effective_band or 'review' }}">Effective: {{ case.effective_band }}</span>
-  </p>
-  <p>Score {{ case.policy.score }} against policy {{ case.policy.policy_id }}
-     v{{ case.policy.policy_version }}</p>
+  <p>Score <span class="mono">{{ '%.2f'|format(case.policy.score or 0) }}</span> ·
+     policy <span class="mono">{{ case.policy.policy_id }} v{{ case.policy.policy_version }}</span></p>
+  <dl class="provenance">
+    <dt><span class="band--{{ case.gate_band or 'review' }}">Gate verdict: {{ case.gate_band }}</span></dt>
+    <dd>Set by policy. An approval is recorded beside it, never over it.</dd>
+    <dt><span class="band--{{ case.effective_band or 'review' }}">Effective band: {{ case.effective_band }}</span></dt>
+    <dd>{% if case.approval and case.approval.applies %}Released by a human at Ground Control.
+        {% else %}Awaiting a Ground Control decision. A release would change this line only.
+        {% endif %}</dd>
+  </dl>
   {% if case.policy.factors_fired %}
-  <ul>{% for factor in case.policy.factors_fired %}<li class="mono">{{ factor }}</li>{% endfor %}</ul>
+  <p class="kicker">Why</p>
+  <ul class="factors">
+  {% for factor in case.policy.factors_fired %}
+    <li>
+      {% if factor is mapping %}
+        <span class="factor__weight mono">{{ '%+.2f'|format(factor.weight or 0) }}</span>
+        <span class="factor__value">{{ factor.value }}</span>
+        <span class="factor__id mono">{{ factor.id }}</span>
+      {% else %}
+        <span class="mono">{{ factor }}</span>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
   {% endif %}
   {% for reason in case.policy.reasons %}<p class="body-small">{{ reason }}</p>{% endfor %}
 </section>
@@ -27,42 +47,55 @@
 {% if case.routing %}
 <section class="panel">
   <div class="panel__header"><h2>Routing</h2></div>
-  <p>{{ case.routing.reason }}</p>
-  {% if case.routing.department %}
-  <p>Department: <span class="mono">{{ case.routing.department }}</span>
-     <span class="caption">({{ case.routing.department_source }})</span></p>
-  {% endif %}
-  {% if case.routing.proposed %}
-        <p>Proposed: <span class="mono">{{ case.routing.proposed|join(', ') }}</span>
-        <span class="caption">(coordinator)</span></p>
-        {% endif %}
-        <p>Engaged: <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span></p>
-        {% if case.routing.added %}
-        <p>Added by policy: <span class="mono">{{ case.routing.added|join(', ') }}</span></p>
-        {% endif %}
-  {% if case.routing.dropped %}
-  <p>Dropped by policy: <span class="mono">{{ case.routing.dropped|join(', ') }}</span></p>
-  {% endif %}
+  <p class="kicker">The coordinator model proposes. Versioned policy decides.</p>
+  <dl class="provenance">
+    {% if case.routing.department %}
+    <dt><span class="chip">Event</span></dt>
+    <dd>Department <span class="mono">{{ case.routing.department }}</span>
+        {%- if case.routing.department_source and case.routing.department_source != 'event' %}
+        <span class="caption">(source: {{ case.routing.department_source }})</span>
+        {%- endif %}</dd>
+    {% endif %}
+    {% if case.routing.proposed %}
+    <dt><span class="chip">Model</span></dt>
+    <dd>Proposed <span class="mono">{{ case.routing.proposed|join(', ') }}</span>
+        {% if case.routing.reason %}<span class="quote">&ldquo;{{ case.routing.reason }}&rdquo;
+        &mdash; coordinator rationale, recorded verbatim</span>{% endif %}</dd>
+    {% endif %}
+    <dt><span class="chip">Policy</span></dt>
+    <dd>Engaged <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span>
+        {% if case.routing.added %}&middot; added <span class="mono">{{ case.routing.added|join(', ') }}</span>{% endif %}
+        {% if case.routing.dropped %}&middot; dropped <span class="mono">{{ case.routing.dropped|join(', ') }}</span>{% endif %}
+        {% if not case.routing.added and not case.routing.dropped %}&middot; proposal accepted as-is{% endif %}</dd>
+  </dl>
   {% if case.routing.refused %}<p>Refused: {{ case.routing.refused }}</p>{% endif %}
 </section>
 {% endif %}
 
 <section class="panel">
   <div class="panel__header"><h2>Screening</h2></div>
-  <p class="body-small">{% if case.screening.reachable %}Reachable{% else %}Unreachable{% endif %} ·
-     {{ case.screening.candidate_count }} candidate(s)</p>
+  {% if case.screening.reachable %}
+  <p class="body-small">Screened against a synthetic, rights-cleared watchlist &mdash; not
+     live sanctions data. {{ case.screening.candidate_count }}
+     candidate{{ '' if case.screening.candidate_count == 1 else 's' }}.</p>
   <table>
-    <thead><tr><th>Entity</th><th>Score</th><th>Flagged</th></tr></thead>
+    <thead><tr><th>Verdict</th><th>Name</th><th>Watchlist id</th><th class="num">Match</th></tr></thead>
     <tbody>
     {% for candidate in case.screening.candidates %}
-      <tr>
+      <tr class="{{ 'row--near' if candidate.id in case.cited_candidate_ids else '' }}">
+        <td>{% if candidate.match %}<span class="verdict verdict--match">Match</span>
+            {%- elif candidate.id in case.cited_candidate_ids %}<span class="verdict verdict--near">Near-match</span>
+            {%- else %}<span class="verdict verdict--low">Below concern</span>{% endif %}</td>
+        <td>{{ candidate.caption or '—' }}</td>
         <td class="mono">{{ candidate.id }}</td>
-        <td class="mono">{{ candidate.score }}</td>
-        <td>{{ 'yes' if candidate.match else 'no' }}</td>
+        <td class="mono num">{{ '%.2f'|format(candidate.score or 0) }}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <p class="body-small">Screening did not complete, so this case cannot reach a clear band.</p>
+  {% endif %}
 </section>
 
 <section class="panel">

@@ -358,3 +358,92 @@ button[value="rejected"]:hover {
   .masthead { flex-direction: column; align-items: flex-start; }
   .panel__header { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 }
+
+/* --- Derived status strip -------------------------------------------------
+   The one thing a reader must take from this page: what the system did, and
+   whether anything was written. It sits above every panel because during the
+   video's live segment it changes three times and IS the narration.
+   PARKED alone earns the amber rule -- an accent that marks every state
+   marks none. */
+.status {
+  border-left: 3px solid var(--border-soft);
+  background: rgb(248 250 252 / 0.03);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  margin: var(--space-5) 0;
+}
+.status--parked { border-left-color: var(--amber); }
+.status--blocked { border-left-color: var(--blocked); }
+.status--executed { border-left-color: var(--clear); }
+.status__state {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  margin: 0 0 var(--space-2);
+}
+.status--parked .status__state { color: var(--amber-bright); }
+.status--blocked .status__state { color: var(--blocked); }
+.status--executed .status__state { color: var(--clear); }
+.status__summary { margin: 0; max-width: 62ch; }
+
+/* --- Provenance lists ----------------------------------------------------
+   Every claim on this page belongs to someone: policy set the gate, a human
+   released the case, the model proposed the route. A definition list says
+   "this value, and where it came from" without inventing a component. */
+.provenance { margin: var(--space-4) 0 0; }
+.provenance dt { margin-top: var(--space-3); font-weight: 600; }
+.provenance dd { margin: var(--space-1) 0 0; max-width: 68ch; }
+.chip {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+}
+.kicker {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+.quote { display: block; margin-top: var(--space-2); font-style: italic; }
+
+/* --- Risk factors --------------------------------------------------------
+   The weight leads because on this demo's case the single factor's weight IS
+   the score; the machine-readable id trails, because a judge greps for it
+   but reads the sentence. */
+.factors { list-style: none; padding: 0; margin: var(--space-4) 0 0; }
+.factors li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-hair);
+  flex-wrap: wrap;
+}
+.factor__weight { color: var(--amber-bright); font-weight: 600; }
+.factor__value { flex: 1 1 20ch; }
+.factor__id { font-size: 0.78rem; opacity: 0.75; }
+
+/* --- Screening verdicts --------------------------------------------------
+   The old FLAGGED column read "no" on every row including the one that
+   parked the case: it answered "did we block?" when the question a reader
+   has is "did anyone need to look?" */
+.verdict {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.verdict--near { color: var(--amber-bright); font-weight: 600; }
+.verdict--match { color: var(--blocked); font-weight: 600; }
+.verdict--low { color: var(--star); opacity: 0.55; }
+.row--near { background: rgb(245 158 11 / 0.06); }
+td.num, th.num { text-align: right; }
+
+/* The "Why" label above the factor list: a heading small enough not to
+   compete with the panel title, large enough not to be a caption. */
+.provenance + .kicker { margin-top: var(--space-5); }
+.kicker + .factors { margin-top: var(--space-2); }
+.kicker { font-size: 0.9rem; opacity: 0.8; }
