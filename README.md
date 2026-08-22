@@ -1024,7 +1024,12 @@ of a parked case: seeing it, and deciding on it.
 
 - **`keplaria-console`** — public, unauthenticated, read-only. Renders
   `console/projection.py`'s allowlist view of a case: what it looked like
-  when it was scored, and its current effective band. `console/store.py` is
+  when it was scored, and its current effective band. The routing panel
+  shows the coordinator's **proposal** beside the route policy actually
+  **engaged**, plus both directions of the policy diff — agents `dropped`
+  and agents `added` to complete an under-proposal. Rendering only the
+  engaged route would show the outcome and hide the decision, which reads
+  as though the gate can subtract but never add. `console/store.py` is
   explicit that "no route here calls a write" is a claim about the route
   table, not about what got imported — `console/projection.py` needs
   `effective_band` from `app.executor.runner`, and that module's import
