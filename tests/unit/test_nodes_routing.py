@@ -119,6 +119,119 @@ def test_evidence_only_with_no_document_falls_through_to_skip():
     assert result.output["evidence_skipped_no_document"] is True
 
 
+def test_apply_route_records_the_department_and_source():
+    """A v1 case with no department resolves the catalog's legacy value,
+    and the decision says so — the record distinguishes an event that
+    claimed a department from one that was grandfathered."""
+    ctx = _StubContext({
+        "case": _case("CASE-D1", "new_supplier_packet", document_ref="fixture:x"),
+    })
+    node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["department"] == "procurement"
+    assert result.output["department_source"] == "legacy_default"
+    assert result.output["refused"] is None
+
+
+def test_a_department_refusal_routes_to_blocked_and_is_recorded():
+    """The new refusal takes the SAME path as every existing refusal:
+    blocked -> quarantine, zero claims. Matched on the code, not on mere
+    non-None-ness, so this cannot pass for the wrong refusal."""
+    case = _case("CASE-D2", "new_supplier_packet", document_ref="fixture:x")
+    case["department"] = "finance"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["evidence"], "reason": "finance reaching for evidence"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "DEPARTMENT_FORBIDS_AGENT" in (result.output["refused"] or "")
+    assert result.output["department"] == "finance"
+    assert result.output["department_source"] == "event"
+
+
+def test_an_undeclared_department_is_refused_but_recorded_as_claimed():
+    """resolve_department's docstring promises it does NOT verify that a
+    producer-supplied department is declared — that is validate_route's own
+    check, so the refusal lands in the routing record with the department
+    that claimed it. An event claiming a department the catalog has never
+    heard of must still be refused (via validate_route's own
+    UNKNOWN_DEPARTMENT check), and the record must keep showing exactly what
+    was claimed rather than erasing or substituting it."""
+    case = _case("CASE-D3", "new_supplier_packet", document_ref="fixture:x")
+    case["department"] = "warehouse"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["evidence"], "reason": "warehouse reaching for evidence"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.actions.route == "blocked"
+    assert "UNKNOWN_DEPARTMENT" in (result.output["refused"] or "")
+    assert result.output["department"] == "warehouse"
+    assert result.output["department_source"] == "event"
+
+
+def test_a_null_legacy_department_is_refused_and_recorded_as_unresolved(
+    tmp_path, monkeypatch
+):
+    """The sunset state must be auditable: a v1 case with no department
+    claim, against a catalog whose grandfather clause has been retired
+    (legacy.v1_department is null), must be refused before validate_route is
+    even reached, and the record must say exactly that — 'unresolved', an
+    empty department, and the coded refusal — not merely 'refused' with any
+    other shape."""
+    import copy
+    import json
+
+    import app.catalog as catalog_module
+    from tests.unit.test_catalog import _catalog_dict
+
+    catalog = copy.deepcopy(_catalog_dict())
+    catalog["legacy"]["v1_department"] = None
+    path = tmp_path / "fleet.test.json"
+    path.write_text(json.dumps(catalog))
+    monkeypatch.setattr(catalog_module, "DEFAULT_CATALOG_PATH", path)
+    catalog_module.reset_catalog_cache()
+    try:
+        ctx = _StubContext({
+            "case": _case("CASE-D4", "new_supplier_packet", document_ref="fixture:x"),
+        })
+        node_input = {"route": ["evidence", "compliance"], "reason": "new supplier"}
+
+        result = apply_route(node_input, ctx)
+
+        assert result.actions.route == "blocked"
+        assert result.output["department_source"] == "unresolved"
+        assert result.output["department"] == ""
+        assert "UNKNOWN_DEPARTMENT" in (result.output["refused"] or "")
+    finally:
+        catalog_module.reset_catalog_cache()
+
+
+def test_a_department_permitted_agent_the_event_type_disallows_is_dropped_not_refused():
+    """The drop half of refuse/drop, asserted above the pure-function level
+    (app.policy.validate_route already covers this in isolation): a known,
+    department-permitted agent the event type doesn't allow must be
+    silently narrowed out of the route, not refused. `certificate_received`
+    permits only 'evidence' (see catalog/fleet.v1.json's event_routes);
+    'compliance' is inside procurement's permitted_agents but outside this
+    event type's own allowed set, so it must land in `dropped`, not trigger
+    a `refused` outcome or a 'blocked' branch."""
+    case = _case("CASE-DROP-1", "certificate_received", document_ref="fixture:x")
+    case["department"] = "procurement"
+    ctx = _StubContext({"case": case})
+    node_input = {"route": ["evidence", "compliance"], "reason": "over-proposed"}
+
+    result = apply_route(node_input, ctx)
+
+    assert result.output["route"] == ["evidence"]
+    assert result.output["dropped"] == ["compliance"]
+    assert result.output["refused"] is None
+    assert result.actions.route == "evidence"
+
+
 def test_unknown_agent_name_is_blocked_not_skipped():
     ctx = _StubContext({"case": _case("CASE-3", "new_supplier_packet")})
     node_input = {"route": ["finance_bot"], "reason": "hallucinated agent"}
@@ -141,7 +254,7 @@ def test_empty_route_when_agents_are_required_is_blocked_not_skipped():
 
 def test_empty_route_when_no_agents_are_required_skips_not_blocked():
     """The crux of the fix: 'no agents required' must not collapse into
-    'refused'. evidence_overdue maps to an empty ALLOWED_ROUTES set, so an
+    'refused'. evidence_overdue maps to an empty allowed_routes() set, so an
     empty proposal is legitimate and must reach commit_commands via 'skip',
     not be quarantined."""
     ctx = _StubContext({"case": _case("CASE-5", "evidence_overdue")})

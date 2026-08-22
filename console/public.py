@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from app.catalog import CatalogLoadError, get_catalog
 from app.state.firestore import get_client
 from console.projection import public_case
 from console.store import list_cases, load_case
@@ -38,6 +39,45 @@ def index(request: Request):
     cases = [public_case(case) for case in list_cases(db)]
     return templates.TemplateResponse(
         request=request, name="cases.html", context={"cases": cases}
+    )
+
+
+@api.get("/fleet", response_class=HTMLResponse)
+def fleet(request: Request):
+    """The fleet: each department's enforced scope, from the same catalog
+    the authorization path loads. There is no separate presentational
+    list — what renders here IS what routing and claim-time enforcement
+    read, so this page cannot drift from authorization.
+    """
+    try:
+        catalog = get_catalog()
+    except CatalogLoadError:
+        # Loudly, never an empty fleet: an empty page would read as "no
+        # agents exist", when the truth is that the same load failure is
+        # refusing every routing proposal right now.
+        return templates.TemplateResponse(
+            request=request,
+            name="fleet_unavailable.html",
+            context={},
+            status_code=503,
+        )
+
+    manifests = {agent.id: agent for agent in catalog.agents}
+    return templates.TemplateResponse(
+        request=request,
+        name="fleet.html",
+        context={
+            "catalog": catalog,
+            "shared_agents": [a for a in catalog.agents if not a.routable],
+            "departments": [
+                {
+                    "name": name,
+                    "scope": scope,
+                    "agents": [manifests[a] for a in scope.permitted_agents],
+                }
+                for name, scope in catalog.departments.items()
+            ],
+        },
     )
 
 

@@ -20,6 +20,8 @@ RAW_CASE = {
         "dropped": [],
         "reason": "New supplier packet requires screening.",
         "refused": None,
+        "department": "procurement",
+        "department_source": "event",
         "evidence_skipped_no_document": False,
         "evidence_skipped_tainted_document": False,
     },
@@ -122,8 +124,34 @@ def test_commands_emit_only_action_status_and_cycle():
     assert "0001234567" not in repr(view)
 
 
+def test_the_projection_emits_the_routing_department_fields():
+    projected = public_case(RAW_CASE)
+    assert projected["routing"]["department"] == "procurement"
+    assert projected["routing"]["department_source"] == "event"
+
+
 def test_a_case_with_no_optional_blocks_does_not_raise():
     view = public_case({"case_id": "CASE-2", "case_version": 1, "phase": "processing"})
     assert view["case_id"] == "CASE-2"
     assert view["approval"] is None
     assert view["screening"]["candidates"] == []
+    assert view["refused_commands"] == []
+
+
+def test_refused_commands_are_emitted_with_only_action_and_cycle():
+    """The claim-time refusal record must reach the public view — see
+    app.nodes._claim_lifecycle_commands, which persists it onto the case
+    document precisely because no outbox row exists for it. external_id and
+    status carry no case detail here (status is always REFUSED_BY_DEPARTMENT)
+    but the allowlist still names exactly what it emits, same as
+    `commands` above."""
+    case = dict(RAW_CASE, refused_commands=[
+        {
+            "action": "apply_hold",
+            "cycle": 1,
+            "status": "refused_by_department",
+            "external_id": None,
+        }
+    ])
+    view = public_case(case)
+    assert view["refused_commands"] == [{"action": "apply_hold", "cycle": 1}]

@@ -27,6 +27,8 @@ def _routing(routing: dict | None) -> dict | None:
         "dropped": list(routing.get("dropped") or []),
         "reason": routing.get("reason"),
         "refused": routing.get("refused"),
+        "department": routing.get("department"),
+        "department_source": routing.get("department_source"),
         "evidence_skipped_no_document": bool(
             routing.get("evidence_skipped_no_document")
         ),
@@ -93,5 +95,19 @@ def public_case(case: dict, commands: Iterable[dict] = ()) -> dict:
                 "cycle": c.get("cycle"),
             }
             for c in commands
+        ],
+        # Persisted by app.nodes._claim_lifecycle_commands directly onto the
+        # case document — not the outbox, which a refused command never
+        # reaches. Named explicitly rather than folded into "commands" above:
+        # commands there are read from the outbox subcollection passed in as
+        # `commands`, a wholly different source, and a refusal must stay
+        # visually and textually distinct from a queued/executed command.
+        "refused_commands": [
+            {
+                "action": c.get("action"),
+                "cycle": c.get("cycle"),
+            }
+            for c in (case.get("refused_commands") or [])
+            if isinstance(c, dict)
         ],
     }

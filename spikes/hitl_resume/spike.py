@@ -30,6 +30,7 @@ USER_ID = "spike-user"
 CASE = {
     "case_id": "SPIKE-001",
     "event_type": "new_supplier_packet",
+    "department": "procurement",
     "supplier": "Fictional Supplies S.A.S. (synthetic fixture)",
     "amount": 4200.0,
 }

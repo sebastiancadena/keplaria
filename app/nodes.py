@@ -16,11 +16,12 @@ from google.cloud import firestore
 from opentelemetry import trace
 from pydantic import ValidationError
 
+from app.catalog import CatalogLoadError, get_catalog
 from app.documents import DocumentUnavailable, load_document
 from app.grounding import RedactedDerivative, validate as grounding_validate
 from app.injection import scan as scan_for_injection
 from app.lifecycle import decide
-from app.policy import CLOCK_EVENTS, PolicyError, validate_route
+from app.policy import CLOCK_EVENTS, PolicyError, resolve_department, validate_route
 from app.risk import BLOCKED, CLEAR, REVIEW, RiskVerdict, assess_case, lifecycle_timing
 from app.schemas import CanonicalEvent, ComplianceAssessment, ScreeningResult
 from app.state.commands import DONE, claim_command
@@ -348,18 +349,24 @@ def apply_route(node_input, ctx: Context) -> Event:
 
     A remaining PolicyError still blocks the case rather than skipping it: a
     refused proposal must never reach commit_commands. But validate_route no
-    longer raises just because the coordinator over-proposed — a known agent
-    the event type doesn't permit (e.g. `compliance` on `certificate_received`)
-    is silently dropped from the route it returns, not refused. `refused`
-    here is therefore reserved for what validate_route still does raise on:
-    an unknown agent name, or a genuinely empty proposal on an event type
-    that requires one. `dropped` records the narrowing separately, so the
-    persisted case still shows exactly what the coordinator asked for versus
-    what policy actually ran — an audit trail the earlier all-or-nothing
-    refusal didn't need, because a refusal already carried `proposed` and an
-    empty `route` was self-explanatory. A narrowed route needs the diff
-    spelled out or a reviewer can't tell "coordinator proposed exactly this"
-    from "coordinator proposed more and policy trimmed it."
+    longer raises just because the coordinator over-proposed — a known,
+    department-permitted agent the event type doesn't permit (e.g.
+    `compliance` on `certificate_received`) is silently dropped from the
+    route it returns, not refused. `refused` here covers everything
+    validate_route (and its own precondition, resolve_department) still
+    raise on: an unknown event type, an unknown agent name, an unknown
+    department, an agent outside the calling department's scope
+    (DEPARTMENT_FORBIDS_AGENT), a genuinely empty proposal on an event type
+    that requires one, a catalog that cannot load, or — before validate_route
+    is ever reached — a v1 event with no department and a sunset (null)
+    legacy default (resolve_department's own UNKNOWN_DEPARTMENT). `dropped`
+    records the narrowing separately, so the persisted case still shows
+    exactly what the coordinator asked for versus what policy actually ran —
+    an audit trail the earlier all-or-nothing refusal didn't need, because a
+    refusal already carried `proposed` and an empty `route` was
+    self-explanatory. A narrowed route needs the diff spelled out or a
+    reviewer can't tell "coordinator proposed exactly this" from
+    "coordinator proposed more and policy trimmed it."
 
     Evidence only has a document to extract from when the event actually
     carries a `document_ref`. A packet with no document is not a failure —
@@ -393,21 +400,39 @@ def apply_route(node_input, ctx: Context) -> Event:
     proposed = list((node_input or {}).get("route", []))
     reason = (node_input or {}).get("reason", "")
 
+    # Effective department: the event's own claim, or the catalog's v1
+    # grandfather value. Resolution happens HERE, not in the schema, so
+    # the persisted routing decision records which source it came from.
+    # The department is a producer-asserted policy-and-audit label; the
+    # guarantee below is that an out-of-scope proposal is refused and
+    # recorded, never that a mislabeled producer is prevented.
+    raw_department = case.get("department") or None
     try:
-        route = validate_route(event_type, proposed)
-        refused = None
-        dropped = [agent for agent in dict.fromkeys(proposed) if agent not in route]
+        department, department_source = resolve_department(raw_department)
     except PolicyError as exc:
-        # A rejected proposal is a policy outcome the trace must show, and it
-        # must never fall through to a side effect — quarantine_case is the
-        # only node this can reach next.
+        department = raw_department or ""
+        department_source = "unresolved"
         route, refused, dropped = [], str(exc), []
+    else:
+        try:
+            route = validate_route(event_type, proposed, department)
+            refused = None
+            dropped = [
+                agent for agent in dict.fromkeys(proposed) if agent not in route
+            ]
+        except PolicyError as exc:
+            # A rejected proposal is a policy outcome the trace must show,
+            # and it must never fall through to a side effect —
+            # quarantine_case is the only node this can reach next.
+            route, refused, dropped = [], str(exc), []
 
     evidence_skipped_no_document = "evidence" in route and not has_document
     evidence_skipped_tainted_document = "evidence" in route and has_document and tainted
 
     decision = {
         "proposed": proposed,
+        "department": department,
+        "department_source": department_source,
         "route": route,
         "dropped": dropped,
         "reason": reason,
@@ -778,7 +803,7 @@ def assess_risk(node_input, ctx: Context) -> Event:
     to coincide with "no screening" for every clock event but silently
     stopped coinciding the moment an agentic event could also reach this
     node with no fresh screening of its own: certificate_received's route is
-    `{evidence}` only (see app/policy.py's ALLOWED_ROUTES), so it never
+    `{evidence}` only (see app/policy.py's allowed_routes()), so it never
     engages compliance and never populates `screening`. Scoring that fresh
     from `screening=None` would land `clear` regardless of what the last
     real screening found — laundering a previously blocked supplier via a
@@ -913,6 +938,37 @@ def assess_risk(node_input, ctx: Context) -> Event:
     return Event(output=payload, state={"policy": payload}, route=verdict.band)
 
 
+REFUSED_BY_DEPARTMENT = "refused_by_department"
+
+
+def _department_command_scope(case: dict) -> frozenset[str] | None:
+    """The effective department's permitted commands, or None to refuse all.
+
+    None — not an empty set — is returned when the department cannot be
+    resolved, is not declared, or the catalog cannot load: absence
+    withholds, the same direction as every other guard in this module.
+    Deliberately never raises: this runs inside graph terminals, and the
+    serving platform allows one concurrent query, so an exception here
+    becomes retry pressure instead of a decision.
+
+    This is the only place the CLOCK path consults the department at all —
+    clock events never pass validate_route. The department is a
+    producer-asserted policy-and-audit label (clock producers stamp
+    "procurement" by convention — the scheduler acts on behalf of the
+    lifecycle procurement owns, not on behalf of a person); the guarantee
+    is that an out-of-scope command is refused and durably recorded, with
+    no outbox row for the executor to ever see.
+    """
+    try:
+        department, _ = resolve_department(case.get("department") or None)
+        scope = get_catalog().departments.get(department)
+    except (PolicyError, CatalogLoadError):
+        return None
+    if scope is None:
+        return None
+    return frozenset(scope.permitted_commands)
+
+
 def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tuple:
     """Run decide() and claim every command it names; persist lifecycle state.
 
@@ -931,6 +987,15 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
     Returns (decision, claimed) where `claimed` is one dict per command with
     its action, cycle, queued/already_done/dead status, and any external_id a
     previous completed claim recorded.
+
+    A department-refused entry in `claimed` deliberately leaves no outbox
+    row (see the loop below), but it is not left with zero durable trace
+    either: it is also persisted onto the case document as
+    `refused_commands`, in the same `update` this function already writes.
+    Without that, the refusal is real — no outbox row, so the executor
+    never sees it — but nothing survives to show a reviewer it happened,
+    while the fleet page and this module's own docstrings say "refused and
+    recorded."
     """
     case_state = ctx.state.get("case_state") or {}
 
@@ -941,8 +1006,21 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
         timing=lifecycle_timing(),
     )
 
+    permitted_commands = _department_command_scope(case)
     claimed: list[dict] = []
     for command in decision.commands:
+        # Refused BEFORE claim_command: an out-of-scope command must leave
+        # no outbox row at all, so there is nothing downstream to drain,
+        # refuse again, or retry — only this durable record that the
+        # department's scope withheld it.
+        if permitted_commands is None or command.action not in permitted_commands:
+            claimed.append({
+                "action": command.action,
+                "cycle": decision.cycle,
+                "status": REFUSED_BY_DEPARTMENT,
+                "external_id": None,
+            })
+            continue
         claim = claim_command(
             db, case_id, command.action, decision.cycle, command.payload
         )
@@ -982,6 +1060,15 @@ def _claim_lifecycle_commands(db, case_id: str, case: dict, ctx: Context) -> tup
     update = {"lifecycle": lifecycle_block, "updated_at": firestore.SERVER_TIMESTAMP}
     if decision.certificate is not None:
         update["certificate"] = decision.certificate
+    # Only when non-empty, same absence discipline as `certificate` above:
+    # a pass that refuses nothing must not overwrite an earlier refusal
+    # record with an empty list. (There is no code path today that clears a
+    # department's scope back open mid-case, so a stale entry here is not
+    # currently reachable — but "no key at all" is the correct write either
+    # way, matching every other conditional field in this update.)
+    refused_commands = [c for c in claimed if c["status"] == REFUSED_BY_DEPARTMENT]
+    if refused_commands:
+        update["refused_commands"] = refused_commands
 
     db.collection(CASES).document(case_id).set(update, merge=True)
     return decision, claimed
@@ -1024,6 +1111,14 @@ def commit_commands(node_input, ctx: Context) -> Event:
     must write nothing to the outbox: only the lifecycle/certificate blocks
     and the outcome summary are persisted, exactly like quarantine_case and
     park_case.
+
+    The status word is derived from `claimed`, not from `decision.commands`:
+    `decision.commands` is decide()'s proposal, taken before the department
+    scope ever filters it, so a case whose every command was refused at
+    claim time would otherwise still read "committed" — indistinguishable
+    on the case list from a real commit the executor has not drained yet.
+    Only a claim that actually reached the outbox (anything other than
+    REFUSED_BY_DEPARTMENT) counts as committed.
     """
     case = ctx.state.get("case", {})
     case_id = case.get("case_id", "")
@@ -1040,10 +1135,13 @@ def commit_commands(node_input, ctx: Context) -> Event:
             "keplaria.commands", [c["action"] for c in claimed]
         )
 
+        committed = any(c["status"] != REFUSED_BY_DEPARTMENT for c in claimed)
+        status = "committed" if committed else "no_action"
+
         _record_outcome(
             db,
             case_id,
-            "committed" if decision.commands else "no_action",
+            status,
             ctx.state.get("routing"),
             ctx.state.get("screening"),
             ctx.state.get("policy"),
@@ -1053,7 +1151,7 @@ def commit_commands(node_input, ctx: Context) -> Event:
 
     return Event(
         output={
-            "status": "committed" if decision.commands else "no_action",
+            "status": status,
             "case_id": case_id,
             "reason": decision.reason,
             "state": decision.state,

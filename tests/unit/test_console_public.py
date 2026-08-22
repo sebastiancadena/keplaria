@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.nodes import park_case
+from app.nodes import commit_commands, park_case
 from app.state.approvals import APPROVED, commit_approval
 from app.state.firestore import claim_event
 from console.public import api
@@ -38,6 +38,17 @@ def _park_a_real_case(db, case_id: str) -> int:
             "supplier": "Andes Foods",
             "effective_date": "2026-08-16",
         },
+        "routing": {
+            "proposed": ["evidence", "compliance"],
+            "route": ["evidence", "compliance"],
+            "dropped": ["compliance"],
+            "reason": "new supplier",
+            "refused": None,
+            "department": "dept-sentinel-7",
+            "department_source": "event",
+            "evidence_skipped_no_document": False,
+            "evidence_skipped_tainted_document": False,
+        },
         "screening": {
             "endpoint": "http://10.10.0.2:8000", "supplier": "Andes Foods",
             "reachable": True, "error": None, "flagged": [],
@@ -64,6 +75,27 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     assert response.status_code == 200
     assert "Gate: review" in response.text
     assert "create_supplier" in response.text
+
+
+def test_the_case_list_links_to_the_fleet_page(client):
+    """The fleet page (this branch's surface) was otherwise unreachable by
+    navigation — no template linked to it and it offered no way back."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'href="/fleet"' in response.text
+
+
+def test_the_detail_page_shows_a_dropped_agent_distinctly_from_a_refusal(
+    db, case_id, client
+):
+    """The 'drop' half of refuse/drop, asserted at the template layer: the
+    fixture's routing.dropped (see _park_a_real_case) is non-empty while
+    routing.refused stays None, so this pins the narrowing line as a thing
+    that renders independent of a refusal, not merely alongside one."""
+    _park_a_real_case(db, case_id)
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "Dropped by policy" in response.text
 
 
 def test_the_templates_refuse_a_withheld_field_the_view_model_hands_them(
@@ -127,6 +159,47 @@ def test_a_subthreshold_candidate_is_shown(db, case_id, client):
     response = client.get(f"/cases/{case_id}")
     assert "syn-co-008" in response.text
     assert "0.526" in response.text
+
+
+def test_the_detail_page_shows_the_department_chip(db, case_id, client):
+    """Sentinel value, not a real department name — 'procurement' appears
+    in enough other copy that asserting it could pass vacuously."""
+    _park_a_real_case(db, case_id)
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "dept-sentinel-7" in response.text
+
+
+def test_the_detail_page_shows_a_command_refused_by_department(db, case_id, client):
+    """A department-scope refusal at claim time leaves no outbox row, but it
+    must still reach the case page: app.nodes._claim_lifecycle_commands
+    persists it onto the case document precisely because console/store.py's
+    load_case builds its command list from the outbox subcollection alone.
+    Driven through the real commit_commands terminal, same principle as this
+    module's park_case-based setup above — hand-writing the refusal onto the
+    case document would prove nothing about whether the graph itself ever
+    produces it."""
+    ctx = _StubContext({
+        "case": {
+            "case_id": case_id,
+            "event_type": "renewal_due",
+            "supplier": "Andes Foods",
+            "effective_date": "2026-08-20",
+            "department": "finance",
+        },
+        "case_state": {
+            "supplier": "Andes Foods",
+            "lifecycle": {"state": "active", "cycle": 1},
+            "certificate": {"expiry_date": "2026-09-01", "evidence_version": 1},
+        },
+    })
+    commit_commands(None, ctx)
+
+    response = client.get(f"/cases/{case_id}")
+
+    assert response.status_code == 200
+    assert "request_renewal" in response.text
+    assert "refused and recorded" in response.text
 
 
 def test_an_unknown_case_is_a_404(client):

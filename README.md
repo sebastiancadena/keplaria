@@ -130,7 +130,8 @@ topic keplaria-events
   -> Firestore inbox transaction (claims event_id, creates/advances the
      case, bumps case_version)
   -> Agent Runtime graph: parse -> LLM coordinator routing proposal ->
-     deterministic route validation (app/policy.py) -> yente screening
+     deterministic route validation (app/policy.py, derived from
+     catalog/fleet.v1.json) -> yente screening
      over PSC-I -> (when candidates exist) compliance interpretation,
      independently checked -> deterministic risk gate (app/risk.py) ->
      queue ERP command, or park/quarantine the case
@@ -147,7 +148,26 @@ separate component from the agent graph, by design, not a workaround.
 **Two deterministic gates, both fail-closed.** The LLM coordinator only
 proposes a route; `app/policy.py` decides whether it is permitted, and a
 refused proposal routes to a `quarantine_case` terminal that performs no
-command claim and no ERP write. Screening results then pass through a second,
+command claim and no ERP write.
+
+Route validation is derived from a versioned catalog artifact
+(`catalog/fleet.v1.json`), which also scopes three departments —
+procurement, compliance, finance — over agents and commands. The
+department on an event is a policy-and-audit label asserted by its
+producer, not an authenticated identity: an event whose department
+proposes an agent outside its scope is refused, quarantined, and durably
+recorded (`DEPARTMENT_FORBIDS_AGENT`), and a command outside its scope is
+refused at claim time with no outbox row. Finance's scope is empty — its
+events engage no agents and cannot originate supplier writes; proposing
+either is refused and recorded. Clock events stamp `procurement` by
+convention (the scheduler acts on behalf of the supplier lifecycle
+procurement owns — a modeling convention, not a claim of human origin). A
+catalog that cannot load refuses every proposal; there is no fallback
+map. The catalog ships in the container: scope changes take effect at the
+next deployment, not live. The public console renders each department's
+enforced scope at `/fleet` from the same artifact.
+
+Screening results then pass through a second,
 independent gate: `app/risk.py` scores the case against a versioned policy
 fixture (`policy/supplier_risk.v2.json`) and returns one of three bands.
 `clear` queues the ERP command; `review` parks the case as
