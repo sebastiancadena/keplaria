@@ -273,6 +273,8 @@ def test_the_case_page_carries_strip_and_lifecycle(client, db):
     assert 'data-testid="lifecycle-strip"' in page
     assert 'aria-current="step"' in page      # exactly one step is current
     assert page.count('aria-current="step"') == 1
+    assert "risk verdict" in page.lower()     # gloss for "Band" survives
+    assert "parked" in page.lower()           # gloss for a stopped case survives
 
 
 def test_the_fleet_page_carries_a_context_strip(client):

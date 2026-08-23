@@ -583,3 +583,4 @@ def test_the_review_case_carries_strip_and_lifecycle(db, case_id, client):
     page = client.get(f"/review/{case_id}").text
     assert 'data-testid="context-strip"' in page
     assert 'data-testid="lifecycle-strip"' in page
+    assert "near-matches" in page.lower()     # gloss for screening rows survives
