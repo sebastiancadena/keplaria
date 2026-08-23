@@ -450,7 +450,11 @@ def test_the_review_page_shows_a_command_refused_by_department(db, case_id, clie
 
     assert response.status_code == 200
     assert "create_supplier" in response.text
-    assert "refused and recorded" in response.text
+    assert "refused by policy" in response.text
+    assert "recorded at claim time" in response.text
+    assert "cannot release" in response.text, (
+        "the page must say approving will NOT run a refused command"
+    )
 
 
 def test_failures_page_shows_a_dead_command_and_a_dead_event(client, monkeypatch):
@@ -522,3 +526,47 @@ def test_masking_leaves_a_non_address_alone():
 
     assert mask_account("accounts.google.com:12345") == "accounts.google.com:12345"
     assert mask_account("") == ""
+
+
+# --- the review page is the one on camera at the human beat ---------------
+#
+# It rendered the RAW case document, so none of the projection's work reached
+# it: a raw phase string, a dict repr for a risk factor, 16-digit match
+# scores, opaque watchlist ids. It is also the page where a person decides,
+# which makes "what has been written so far" the single fact it must not
+# leave the reader to infer.
+
+def test_the_review_page_shows_a_derived_status_not_a_phase_name(db, case_id, client):
+    _park_a_real_case(db, case_id)
+    response = client.get(f"/review/{case_id}")
+    assert response.status_code == 200
+    assert "PARKED" in response.text
+    assert "awaiting_approval" not in response.text
+
+
+def test_the_review_page_names_the_screening_candidate(db, case_id, client):
+    """A reviewer deciding on a near-match must see WHO matched."""
+    _park_a_real_case(db, case_id)
+    doc = db.collection("cases").document(case_id)
+    screening = doc.get().to_dict()["screening"]
+    screening["candidates"] = [{
+        "id": "syn-co-008", "caption": "Comercializadora Andes Verde S.A.S.",
+        "score": 0.6716417910447763, "match": False, "topics": ["sanction"]}]
+    doc.update({"screening": screening})
+    response = client.get(f"/review/{case_id}")
+    assert "Comercializadora Andes Verde S.A.S." in response.text
+    assert "0.67" in response.text
+    assert "0.6716417910447763" not in response.text
+
+
+def test_the_review_page_renders_a_risk_factor_as_prose_not_a_dict(db, case_id, client):
+    _park_a_real_case(db, case_id)
+    doc = db.collection("cases").document(case_id)
+    policy = doc.get().to_dict()["policy"]
+    policy["factors_fired"] = [
+        {"id": "SUBTHRESHOLD_CANDIDATE", "value": "syn-co-008 @ 0.672",
+         "weight": 0.25}]
+    doc.update({"policy": policy})
+    response = client.get(f"/review/{case_id}")
+    assert "'weight':" not in response.text, "a dict repr reached the page"
+    assert "+0.25" in response.text

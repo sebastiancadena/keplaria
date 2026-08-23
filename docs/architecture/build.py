@@ -291,11 +291,15 @@ S.append("</defs>")
 S.append(f'<rect width="{W}" height="{H}" fill="{VOID}"/>')
 
 # ---------------------------------------------------------------- header
-S.append('<use href="#keplaria-lockup" x="6" y="12" width="166" height="84"/>')
-S.append(text(196, 56, "System architecture", 28, SG, 700, STAR, spacing="-0.015em"))
+# Half of this element is the lockup's own clear space (the viewBox carries
+# it), so the artwork is 74.74% of the width and HALF the height. 190 wide
+# renders a 142px mark; the header band ends at y=112, which caps how much
+# further this can grow without colliding with the first plane.
+S.append('<use href="#keplaria-lockup" x="0" y="4" width="190" height="96"/>')
+S.append(text(212, 56, "System architecture", 28, SG, 700, STAR, spacing="-0.015em"))
 S.append(
     text(
-        196,
+        212,
         80,
         "Continuous supplier assurance — onboard once, govern for months",
         13,

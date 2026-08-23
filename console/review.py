@@ -69,6 +69,7 @@ from app.state.commands import MAX_EXECUTION_ATTEMPTS
 from app.state.dead_events import list_dead_events
 from app.state.firestore import get_client
 from console.iap import require_reviewer
+from console.projection import public_case
 from console.store import (
     case_id_is_addressable,
     list_awaiting_cases,
@@ -219,7 +220,13 @@ def review_case(
         request=request,
         name="review_case.html",
         context={
-            "case": case,
+            # The projected view, not the raw document: the reviewer needs the
+            # same derived status, formatted scores and named candidates the
+            # public console shows, and rendering the raw case here is what
+            # left this page -- the one a person actually decides on -- the
+            # least legible surface in the system. The projection withholds
+            # nothing this page displays.
+            "case": public_case(case, commands),
             "commands": commands,
             "pending": pending,
             "reviewer": reviewer,

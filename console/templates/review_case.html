@@ -1,78 +1,128 @@
 {% extends "review_base.html" %}
 {% block title %}Review {{ case.case_id }} — Keplaria{% endblock %}
 {% block content %}
-<h1 class="mono">{{ case.case_id }}</h1>
-<p>{{ case.supplier }} · {{ case.phase }} · version {{ case.case_version }}</p>
+{#  This page is where a person decides, and it is on camera during the
+    submission video's human beat. Two things therefore outrank everything
+    else: what has been written so far (nothing, while parked), and what
+    approving will run. Both are stated, not left to be inferred from a
+    phase name or a command table. #}
+<h1>{{ case.supplier or case.case_id }}</h1>
+<p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
 
-<h2>Verdict</h2>
-<p><span class="band--{{ case.policy.band or 'review' }}">Gate: {{ case.policy.band }}</span>
-  — score {{ case.policy.score }}
-  (policy {{ case.policy.policy_id }} v{{ case.policy.policy_version }})</p>
-{% for factor in case.policy.factors_fired %}
-  <p class="mono">{{ factor }}</p>
-{% endfor %}
-{% for reason in case.policy.reasons %}<p>{{ reason }}</p>{% endfor %}
+<div class="status status--{{ case.status.state|lower }}">
+  <p class="status__state">{{ case.status.state }}</p>
+  <p class="status__summary">{{ case.status.summary }}</p>
+</div>
+
+<section class="panel">
+  <div class="panel__header"><h2>Why it stopped</h2></div>
+  <p>Score <span class="mono">{{ '%.2f'|format(case.policy.score or 0) }}</span> ·
+     policy <span class="mono">{{ case.policy.policy_id }} v{{ case.policy.policy_version }}</span>
+     · <span class="band--{{ case.gate_band or 'review' }}">gate: {{ case.gate_band }}</span></p>
+  {% if case.policy.factors_fired %}
+  <ul class="factors">
+  {% for factor in case.policy.factors_fired %}
+    <li>
+      {% if factor is mapping %}
+        <span class="factor__weight mono">{{ '%+.2f'|format(factor.weight or 0) }}</span>
+        <span class="factor__value">{{ factor.value }}</span>
+        <span class="factor__id mono">{{ factor.id }}</span>
+      {% else %}<span class="mono">{{ factor }}</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+  {% for reason in case.policy.reasons %}<p class="body-small">{{ reason }}</p>{% endfor %}
+</section>
+
+{% if case.screening.candidates %}
+<section class="panel">
+  <div class="panel__header"><h2>Screening</h2></div>
+  <p class="body-small">Screened against a synthetic, rights-cleared watchlist —
+     not live sanctions data. A near-match is a reason to look, not a finding.</p>
+  <table>
+    <thead><tr><th>Verdict</th><th>Name</th><th>Watchlist id</th><th class="num">Match</th></tr></thead>
+    <tbody>
+    {% for candidate in case.screening.candidates %}
+      <tr class="{{ 'row--near' if candidate.id in case.cited_candidate_ids else '' }}">
+        <td>{% if candidate.match %}<span class="verdict verdict--match">Match</span>
+            {%- elif candidate.id in case.cited_candidate_ids %}<span class="verdict verdict--near">Near-match</span>
+            {%- else %}<span class="verdict verdict--low">Below concern</span>{% endif %}</td>
+        <td>{{ candidate.caption or '—' }}</td>
+        <td class="mono">{{ candidate.id }}</td>
+        <td class="mono num">{{ '%.2f'|format(candidate.score or 0) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 
 {% if case.routing %}
-<h2>Routing</h2>
-{% if case.routing.department %}
-<p>Department: <span class="mono">{{ case.routing.department }}</span>
-   <span class="caption">({{ case.routing.department_source }})</span></p>
-{% endif %}
-<p>Proposed: <span class="mono">{{ case.routing.proposed|join(', ') or 'none' }}</span>
-   — engaged: <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span></p>
-{% if case.routing.dropped %}
-<p>Dropped by policy: <span class="mono">{{ case.routing.dropped|join(', ') }}</span></p>
-{% endif %}
-{% if case.routing.refused %}
-<p><span class="band--blocked">Refused</span> {{ case.routing.refused }}</p>
-{% endif %}
+<section class="panel">
+  <div class="panel__header"><h2>What ran</h2></div>
+  <p class="kicker">The coordinator model proposes. Versioned policy decides.</p>
+  <dl class="provenance">
+    {% if case.routing.department %}
+    <dt><span class="chip">Event</span></dt>
+    <dd>Department <span class="mono">{{ case.routing.department }}</span></dd>
+    {% endif %}
+    <dt><span class="chip">Model</span></dt>
+    <dd>Proposed <span class="mono">{{ case.routing.proposed|join(', ') or 'none' }}</span></dd>
+    <dt><span class="chip">Policy</span></dt>
+    <dd>Engaged <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span>
+        {% if case.routing.added %}&middot; added <span class="mono">{{ case.routing.added|join(', ') }}</span>{% endif %}
+        {% if case.routing.dropped %}&middot; dropped <span class="mono">{{ case.routing.dropped|join(', ') }}</span>{% endif %}</dd>
+    {% if case.routing.refused %}
+    <dt><span class="band--blocked">Refused</span></dt>
+    <dd>{{ case.routing.refused }}</dd>
+    {% endif %}
+  </dl>
+</section>
 {% endif %}
 
-<h2>Screening</h2>
-<table>
-  <thead><tr><th>Entity</th><th>Score</th><th>Flagged</th></tr></thead>
-  <tbody>
-  {% for candidate in case.screening.candidates %}
-    <tr><td class="mono">{{ candidate.id }}</td>
-        <td class="mono">{{ candidate.score }}</td>
-        <td>{{ 'yes' if candidate.match else 'no' }}</td></tr>
+<section class="panel">
+  <div class="panel__header"><h2>Your decision</h2></div>
+  {% if not pending %}
+    <p>Nothing is pending on this case. Approving would release no commands.</p>
+  {% else %}
+  <p>Approving releases {{ pending|length }}
+     command{{ '' if pending|length == 1 else 's' }} to run against the ERP.
+     Rejecting discards {{ 'it' if pending|length == 1 else 'them' }}. Neither
+     edits the risk verdict above &mdash; the decision is recorded beside it.</p>
+  <ul class="factors">
+  {% for command in pending %}
+    <li><span class="verdict verdict--near">will run</span>
+        <span class="factor__value mono">{{ command.action }}</span>
+        <span class="factor__id mono">cycle {{ command.cycle }}</span></li>
   {% endfor %}
-  </tbody>
-</table>
+  </ul>
+  {% endif %}
 
-<h2>What approving will run</h2>
-{% if not pending %}
-  <p>Nothing is pending on this case.</p>
-{% else %}
-<ul>
-{% for command in pending %}
-  <li class="mono">{{ command.action }} (cycle {{ command.cycle }}) —
-      currently {{ command.status }}</li>
-{% endfor %}
-</ul>
-{% endif %}
+  {% if case.refused_commands %}
+  <p class="body-small">Already refused by policy as outside this case's
+     department scope, and recorded at claim time. No outbox row exists for
+     {{ 'it' if case.refused_commands|length == 1 else 'them' }}; approving
+     cannot release {{ 'it' if case.refused_commands|length == 1 else 'them' }}.</p>
+  <ul class="factors">
+  {% for command in case.refused_commands %}
+    <li><span class="verdict verdict--match">refused</span>
+        <span class="factor__value mono">{{ command.action }}</span>
+        <span class="factor__id mono">cycle {{ command.cycle }}</span></li>
+  {% endfor %}
+  </ul>
+  {% endif %}
 
-{% if case.refused_commands %}
-<h2>Refused commands</h2>
-<p>Outside the case's department scope — refused and recorded at claim time.
-   No outbox row exists for these; approving this case cannot release them.</p>
-<ul>
-{% for command in case.refused_commands %}
-  <li class="mono">{{ command.action }} (cycle {{ command.cycle }})</li>
-{% endfor %}
-</ul>
-{% endif %}
-
-{% if decided %}
-<p>This case already has a recorded decision:
-   <span class="band--{{ 'clear' if case.approval.decision == 'approved' else 'blocked' }}">
-     {{ case.approval.decision }}</span></p>
-{% else %}
-<form method="post" action="/review/{{ case.case_id }}/decide">
-  <input type="hidden" name="expected_case_version" value="{{ expected_case_version }}">
-  <button type="submit" name="decision" value="approved">Approve</button>
-  <button type="submit" name="decision" value="rejected">Reject</button>
-</form>
-{% endif %}
+  {% if decided %}
+  <p>This case already has a recorded decision:
+     <span class="band--{{ 'clear' if case.approval.decision == 'approved' else 'blocked' }}">
+       {{ case.approval.decision }}</span></p>
+  {% else %}
+  <form method="post" action="/review/{{ case.case_id }}/decide">
+    <input type="hidden" name="expected_case_version" value="{{ expected_case_version }}">
+    <button type="submit" name="decision" value="approved">Approve</button>
+    <button type="submit" name="decision" value="rejected">Reject</button>
+  </form>
+  {% endif %}
+</section>
 {% endblock %}
