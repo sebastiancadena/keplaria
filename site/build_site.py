@@ -39,7 +39,40 @@ ASSETS_REPO = Path.home() / "dev" / "git" / "keplaria-assets"
 OG_IMAGE = ASSETS_REPO / "assets" / "social" / "og-image.png"
 
 CONSOLE = "https://keplaria-console-bklu5jcdea-uc.a.run.app"
+REVIEW = "https://keplaria-review-bklu5jcdea-uc.a.run.app/review"
 REPO = "https://github.com/sebastiancadena/keplaria"
+
+# One line above each group on /proof, saying in plain language what the
+# group proves -- not what the numbers are (the table already says that).
+# Assertion in proof() keeps this list honest if claims.toml grows a claim
+# nobody assigned to a group.
+GROUPS = (
+    ("The run's own clock, compared against the same work timed by hand.",
+     ("run_machine_seconds", "run_human_seconds", "run_budget_seconds",
+      "manual_baseline_seconds", "manual_baseline_steps",
+      "manual_steps_eliminated", "simulated_business_days")),
+    ("Checks this run re-executes every time it reports them, not numbers "
+     "quoted from an earlier pass.",
+     ("core_contracts_count", "domain_eval_cases", "domain_eval_mean_score",
+      "contract_suite_passed")),
+    ("What that run actually wrote to the ERP (enterprise resource planning "
+     "&mdash; the system of record for suppliers and purchasing), and what "
+     "it refused to write twice.",
+     ("fields_without_rekeying", "enforced_hold_days",
+      "policy_required_interventions", "duplicate_writes_after_retry")),
+    ("What running this project costs to operate &mdash; kept here for "
+     "traceability even where it hasn&rsquo;t been turned into a prose "
+     "claim anywhere else yet.",
+     ("gross_cost_month_to_date", "credit_remaining",
+      "yente_uptime_hours_per_day")),
+    ("Statements a human read and confirmed by hand, because no automatic "
+     "check can settle them.",
+     ("hold_before_decision", "eval_suite_at_the_time_of_the_pin",
+      "reasoning_tokens_and_timing_at_the_pin")),
+    ("What the published build-piece article already said, checked here "
+     "against the run it described at the time.",
+     ("article_eval_suite_at_publication", "article_run_timing_at_publication")),
+)
 
 CSS = """
 :root{--void:#0B1020;--ink:#111827;--amber:#F59E0B;--amber-bright:#FBBF24;
@@ -73,6 +106,15 @@ background:rgb(248 250 252 / .03)}
 .fig b{display:block;font-family:"Space Grotesk",system-ui,sans-serif;
 font-size:1.7rem;font-weight:600;color:var(--amber-bright);margin-bottom:.35rem}
 .fig span{color:var(--muted);font-size:.92rem}
+.evalgrid{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
+margin:2rem 0}
+.evalstep{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
+background:rgb(248 250 252 / .03)}
+.evalstep a{text-decoration:none}
+.evalstep b{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
+color:var(--amber-bright)}
+.evalstep a:hover b{text-decoration:underline}
+.evalstep p{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
 .actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2.5rem 0}
 .btn{display:inline-block;padding:.7rem 1.15rem;border-radius:10px;
 border:1px solid var(--border);color:var(--star);text-decoration:none;
@@ -84,6 +126,8 @@ th{text-align:left;font-weight:600;color:var(--muted);font-size:.78rem;
 letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem;
 border-bottom:1px solid var(--border)}
 td{padding:.7rem .5rem;border-bottom:1px solid var(--hair);vertical-align:top}
+.grouplead td{padding:1.4rem .5rem .5rem;color:var(--star);font-weight:600;
+font-size:.95rem;border-bottom:1px solid var(--border)}
 .val{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--amber-bright);
 white-space:nowrap}
 .q{color:var(--muted);font-size:.86rem}
@@ -158,15 +202,21 @@ def index(claims) -> str:
     return shell(
         "Keplaria",
         f"""
-<h1>Supplier onboarding usually ends<br>when the ERP record is created.</h1>
-<p class="lede">Keplaria keeps governing that supplier for months afterwards.</p>
-<p class="sub">A fleet of agents onboards a supplier, screens it for sanctions,
-and then stays with it &mdash; requesting certificate renewals, applying a
-purchasing hold when evidence goes overdue, and releasing that hold when valid
-new evidence arrives. An LLM coordinator <em>proposes</em> which specialists
-should run; a deterministic policy layer <em>decides</em>, against a versioned
-catalog. Nothing reaches the ERP except through an outbox, and a human can stop
-any case on the way.</p>
+<h1>Supplier compliance doesn&rsquo;t end at onboarding.<br>Most tools do.</h1>
+<p class="lede">Certificates expire months after a supplier is onboarded, and
+every onboarding tool retires the day the ERP (enterprise resource planning
+&mdash; the business&rsquo;s system of record for suppliers and purchasing)
+record is created. The ongoing work &mdash; noticing the expiry, chasing the
+renewal, deciding whether it is still safe to buy &mdash; goes back to a
+person with a calendar reminder.</p>
+<p class="sub">Keplaria stays. One durable mission per supplier wakes months
+later on its own clock: it requests renewed evidence, places a reversible
+purchasing hold when a certificate lapses, checks the renewal against the
+source document, and releases the hold. An LLM coordinator <em>proposes</em>
+which specialists should run; a deterministic policy layer <em>decides</em>,
+against a versioned catalog. It stops exactly where policy requires a human
+decision &mdash; and nowhere else. Nothing reaches the ERP except through an
+outbox.</p>
 {figures(claims)}
 <div class="note"><b>Every number on this site is bound to the run that
 produced it.</b> The verification page is generated from the evidence files, not
@@ -175,6 +225,23 @@ written by hand &mdash; so it cannot quietly disagree with them.</div>
 <a class="btn btn--go" href="{CONSOLE}">Open the live case console</a>
 <a class="btn" href="/proof">Verification ledger</a>
 <a class="btn" href="{REPO}">Source</a>
+</div>
+<h2>Evaluate this in three minutes</h2>
+<div class="evalgrid">
+<div class="evalstep"><a href="{CONSOLE}"><b>1&nbsp;&middot; Case console</b></a>
+<p>No sign-in. Open a case: a context strip and a lifecycle indicator
+(onboarded &rarr; active &rarr; renewal requested &rarr; held &rarr; released)
+show where it stands, and the status line says exactly what has been written
+to the ERP so far &mdash; for a parked case, nothing yet.</p></div>
+<div class="evalstep"><a href="{REVIEW}"><b>2&nbsp;&middot; Review console</b></a>
+<p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy &mdash;
+Google&rsquo;s sign-in check in front of the service). Cases policy stopped
+wait here with their ERP writes held; approving one is what releases them.</p>
+</div>
+<div class="evalstep"><b>3&nbsp;&middot; Demonstration video</b>
+<p>Linked from the Devpost submission. One continuous, unedited take: a stop
+for a human, an approval that releases the held writes, then a simulated year
+of renewals, a hold, and a release.</p></div>
 </div>
 <h2>Named for the law, not the planets</h2>
 <p class="sub">An agent that runs for minutes can afford to improvise. One that
@@ -203,19 +270,28 @@ OpenTelemetry</p>
     )
 
 
+def _proof_row(claim) -> str:
+    result = resolve(claim, ROOT) if claim.verify == "evidence" else None
+    value = (f'<span class="val">{html.escape(result)}</span>' if result
+             else '<span class="q">read the evidence file</span>')
+    qualifier = (f'<div class="q">{html.escape(claim.qualifier)}</div>'
+                 if claim.qualifier else "")
+    return (
+        f"<tr><td>{html.escape(claim.claim)}{qualifier}</td>"
+        f"<td>{value}</td>"
+        f'<td class="mono">{html.escape(claim.evidence or "—")}</td></tr>'
+    )
+
+
 def proof(claims) -> str:
+    by_id = {claim.id: claim for claim in claims}
+    covered = {claim_id for _, ids in GROUPS for claim_id in ids}
+    missing = {claim.id for claim in claims} - covered
+    assert not missing, f"claims.toml has ungrouped claims: {sorted(missing)}"
     rows = []
-    for claim in claims:
-        result = resolve(claim, ROOT) if claim.verify == "evidence" else None
-        value = (f'<span class="val">{html.escape(result)}</span>' if result
-                 else '<span class="q">read the evidence file</span>')
-        qualifier = (f'<div class="q">{html.escape(claim.qualifier)}</div>'
-                     if claim.qualifier else "")
-        rows.append(
-            f"<tr><td>{html.escape(claim.claim)}{qualifier}</td>"
-            f"<td>{value}</td>"
-            f'<td class="mono">{html.escape(claim.evidence or "—")}</td></tr>'
-        )
+    for lead, ids in GROUPS:
+        rows.append(f'<tr class="grouplead"><td colspan="3">{lead}</td></tr>')
+        rows.extend(_proof_row(by_id[claim_id]) for claim_id in ids)
     return shell(
         "Verification — Keplaria",
         f"""
