@@ -12,6 +12,7 @@ Read-only by default. Every destructive action needs an explicit target AND
     uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --supplier "NAME" --yes
     uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --case TV-XXXX --yes
     uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --communication ID --file ID --yes
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --contact ID --yes
 
 Why this exists rather than an ERP MCP server: these operations are
 human-triggered maintenance, not something an agent should be able to reach
@@ -105,17 +106,36 @@ def _suppliers() -> list[dict]:
 LINKED, ORPHANED, UNLINKED = "linked", "orphaned", "unlinked"
 
 # Communication and File both point at a Supplier, and spell it differently.
+# Contact points at one too, but through a child table rather than a field --
+# `_rows` flattens it into these same two names so every doctype reads alike.
 LINK_FIELDS = {
     "Communication": ("reference_doctype", "reference_name"),
     "File": ("attached_to_doctype", "attached_to_name"),
+    "Contact": ("link_doctype", "link_name"),
 }
 # Free text each row carries, scanned by substring rather than equality.
-TEXT_FIELDS = {"Communication": ("subject",), "File": ("file_name",)}
+# Contact scans its own NAME because that is where the supplier name lands:
+# Frappe builds a supplier's contact as `<supplier>-<supplier>`.
+TEXT_FIELDS = {
+    "Communication": ("subject",),
+    "File": ("file_name",),
+    "Contact": ("name", "company_name", "first_name", "email_id"),
+}
 
 ROW_FIELDS = {
     "Communication": '["name","reference_doctype","reference_name","subject","creation"]',
     "File": '["name","attached_to_doctype","attached_to_name","file_name","is_folder","creation"]',
+    "Contact": '["name","company_name","first_name","email_id","creation"]',
 }
+
+# Doctypes whose supplier link lives in a `Dynamic Link` child table. That
+# table cannot be listed over the REST API -- `/api/resource/Dynamic Link`
+# answers 403 even to the site owner -- so the only way to read the link is to
+# fetch each document. Affordable here because these are demo-scale counts,
+# and the alternative was inferring the link from `company_name`, which
+# matches today by coincidence of how Frappe fills it in and is not the field
+# the ERP actually files the row under.
+CHILD_LINKED = {"Contact"}
 
 
 def _rows(doctype: str, filters: str | None = None) -> list[dict]:
@@ -129,7 +149,33 @@ def _rows(doctype: str, filters: str | None = None) -> list[dict]:
     with frappe_admin_client() as client:
         response = client.get(f"/api/resource/{doctype}", params=params)
         response.raise_for_status()
-        return response.json()["data"]
+        rows = response.json()["data"]
+        if doctype in CHILD_LINKED:
+            for row in rows:
+                row.update(_supplier_link(client, doctype, row["name"]))
+        return rows
+
+
+def _supplier_link(client, doctype: str, name: str) -> dict:
+    """The row's first Supplier link, flattened to the LINK_FIELDS names.
+
+    One request per row, and deliberately so: see CHILD_LINKED. A row whose
+    document cannot be read is reported as carrying no link rather than
+    silently as linked, because the audit's job is to notice what it cannot
+    account for.
+    """
+    response = client.get(f"/api/resource/{doctype}/{urllib.parse.quote(name, safe='')}")
+    if response.status_code >= 400:
+        return {"link_doctype": None, "link_name": None}
+    links = (response.json().get("data") or {}).get("links") or []
+    for link in links:
+        if link.get("link_doctype") == "Supplier":
+            return {"link_doctype": "Supplier", "link_name": link.get("link_name")}
+    first = links[0] if links else {}
+    return {
+        "link_doctype": first.get("link_doctype"),
+        "link_name": first.get("link_name"),
+    }
 
 
 def _files_by_name(names: list[str]) -> list[dict]:
@@ -181,7 +227,12 @@ def row_mentions(row: dict, doctype: str, watch: dict[str, tuple[str, str]]) -> 
     then fail every audit forever. A check that always fails stops being
     read, so these are surfaced for a human and left out of the exit code.
     """
-    mentions: list[str] = []
+    # One line per (row, entity), not per field. A Contact carries the supplier
+    # name in its record name, its company_name and its email address, so a
+    # per-field report printed the same near miss three times -- and a warning
+    # block that reads as three findings when it is one is the same failure as
+    # a check that always fails: it stops being read.
+    hits: dict[tuple[str, str], list[tuple[str, str]]] = {}
     for field in TEXT_FIELDS[doctype]:
         value = str(row.get(field) or "")
         text = _norm(value)
@@ -189,9 +240,14 @@ def row_mentions(row: dict, doctype: str, watch: dict[str, tuple[str, str]]) -> 
             continue
         for key, (entity_id, topics) in watch.items():
             if key in text:
-                mentions.append(
-                    f"{doctype} {row['name']} {field} {value!r} — names {entity_id} [{topics}]"
-                )
+                hits.setdefault((entity_id, topics), []).append((field, value))
+    mentions: list[str] = []
+    for (entity_id, topics), found in hits.items():
+        fields = ", ".join(field for field, _ in found)
+        sample = found[0][1]
+        mentions.append(
+            f"{doctype} {row['name']} {fields} {sample!r} — names {entity_id} [{topics}]"
+        )
     return mentions
 
 
@@ -283,7 +339,7 @@ def cmd_links(args) -> int:
     """
     watch = _watchlist()
     supplier_names = {row["name"] for row in _suppliers()}
-    for doctype in ("Communication", "File"):
+    for doctype in ("Communication", "File", "Contact"):
         rows = [row for row in _rows(doctype) if not row.get("is_folder")]
         _, link_name = LINK_FIELDS[doctype]
         text_field = TEXT_FIELDS[doctype][0]
@@ -326,10 +382,15 @@ def cmd_audit(args) -> int:
         if hit:
             findings.append(f"case {case_id} supplier {supplier!r} matches {hit[0]} [{hit[1]}]")
 
-    # Deleting a Supplier leaves its correspondence and its attachments in
-    # place, so these rows are the one place a sanctioned name can hide from
+    # Deleting a Supplier leaves its correspondence, its attachments and its
+    # Contact in place, so these rows are where a sanctioned name hides from
     # every check above. Folder rows are site structure, not records.
-    for doctype in ("Communication", "File"):
+    #
+    # Contact was added on 2026-08-23, after the scoped-executor work found
+    # that Frappe creates one per Supplier, names it `<supplier>-<supplier>`,
+    # and leaves it behind when the Supplier is purged -- so the name this
+    # audit exists to catch could sit in a row the audit did not read.
+    for doctype in ("Communication", "File", "Contact"):
         rows = [row for row in _rows(doctype) if not row.get("is_folder")]
         orphaned = sum(
             1 for row in rows if link_state(row, doctype, supplier_names) == ORPHANED
@@ -360,16 +421,17 @@ def cmd_audit(args) -> int:
         print("      A compliance demo must not show a sanctioned entity as onboarded.")
         return 1
 
-    print("PASS  no watchlist entity is filed under a supplier, case, message or file")
+    print("PASS  no watchlist entity is filed under a supplier, case, message, file or contact")
     print("      (coarse normalised-name check — yente remains the real screen)")
     return 0
 
 
 def cmd_purge(args) -> int:
-    if not (args.test_suppliers or args.supplier or args.case or args.communication or args.file):
+    if not (args.test_suppliers or args.supplier or args.case or args.communication
+            or args.file or args.contact):
         print(
             "Nothing targeted. Pass --test-suppliers, --supplier NAME, --case ID, "
-            "--communication ID, or --file ID."
+            "--communication ID, --file ID, or --contact ID."
         )
         return 2
 
@@ -383,6 +445,7 @@ def cmd_purge(args) -> int:
     targets_cases = list(args.case or [])
     targets_comms = list(args.communication or [])
     targets_files = list(args.file or [])
+    targets_contacts = list(args.contact or [])
 
     # Naming the target is normally the whole safeguard. It is not enough for
     # `Home` and `Home/Attachments`: those are File rows like any certificate,
@@ -402,6 +465,7 @@ def cmd_purge(args) -> int:
     # even be rehearsed and then confirmed out of habit.
     cited = cited_by_evidence(
         targets_suppliers + targets_cases + targets_comms + targets_files
+        + targets_contacts
     )
     if cited:
         print(f"Refusing {len(cited)} target(s) — committed evidence asserts something about them:")
@@ -419,12 +483,15 @@ def cmd_purge(args) -> int:
 
     print(
         f"Would delete {len(targets_suppliers)} supplier(s), {len(targets_comms)} message(s), "
-        f"{len(targets_files)} file(s) and {len(targets_cases)} case(s):"
+        f"{len(targets_files)} file(s), {len(targets_contacts)} contact(s) and "
+        f"{len(targets_cases)} case(s):"
     )
     for name in targets_comms:
         print(f"  message       {name}")
     for name in targets_files:
         print(f"  file          {name}")
+    for name in targets_contacts:
+        print(f"  contact       {name}")
     for name in targets_suppliers:
         print(f"  ERP supplier  {name}")
     for case_id in targets_cases:
@@ -439,6 +506,7 @@ def cmd_purge(args) -> int:
     erp_targets = (
         [("Communication", name) for name in targets_comms]
         + [("File", name) for name in targets_files]
+        + [("Contact", name) for name in targets_contacts]
         + [("Supplier", name) for name in targets_suppliers]
     )
 
@@ -480,7 +548,7 @@ def main() -> int:
 
     sub.add_parser("suppliers", help="list ERP suppliers, flagging watchlist matches")
     sub.add_parser("cases", help="list case records, flagging watchlist matches")
-    sub.add_parser("links", help="list Communication and File rows filed under a supplier")
+    sub.add_parser("links", help="list Communication, File and Contact rows filed under a supplier")
     sub.add_parser("audit", help="exit non-zero if any watchlist entity is on record")
 
     purge = sub.add_parser("purge", help="delete targeted records (needs --yes)")
@@ -489,6 +557,7 @@ def main() -> int:
     purge.add_argument("--case", action="append", help="one case by id (repeatable)")
     purge.add_argument("--communication", action="append", help="one message by id (repeatable)")
     purge.add_argument("--file", action="append", help="one file by id (repeatable); folders refused")
+    purge.add_argument("--contact", action="append", help="one contact by id (repeatable)")
     purge.add_argument("--yes", action="store_true", help="actually delete; without it this is a dry run")
 
     args = parser.parse_args()

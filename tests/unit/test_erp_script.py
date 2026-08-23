@@ -148,7 +148,7 @@ def test_purge_refuses_a_folder_even_when_it_is_named_explicitly(monkeypatch):
     monkeypatch.setattr(erp, "_files_by_name", lambda names: [{"name": "Home", "is_folder": 1}])
     args = Namespace(
         test_suppliers=False, supplier=None, case=None,
-        communication=None, file=["Home"], yes=True, database="(default)",
+        communication=None, contact=None, file=["Home"], yes=True, database="(default)",
     )
     assert erp.cmd_purge(args) == 2
 
@@ -156,7 +156,7 @@ def test_purge_refuses_a_folder_even_when_it_is_named_explicitly(monkeypatch):
 def test_purge_with_no_target_still_refuses():
     args = Namespace(
         test_suppliers=False, supplier=None, case=None,
-        communication=None, file=None, yes=True, database="(default)",
+        communication=None, contact=None, file=None, yes=True, database="(default)",
     )
     assert erp.cmd_purge(args) == 2
 
@@ -196,7 +196,7 @@ def test_purge_refuses_a_target_a_spike_evidence_file_cites(tmp_path, monkeypatc
     monkeypatch.setattr(erp, "SPIKES", tmp_path)
     args = Namespace(
         test_suppliers=False, supplier=["DLQ Sweep Probe SAS"],
-        case=None, communication=None, file=None, yes=True, database="(default)",
+        case=None, communication=None, contact=None, file=None, yes=True, database="(default)",
     )
 
     assert erp.cmd_purge(args) == 2
@@ -211,8 +211,132 @@ def test_purge_still_proceeds_for_a_target_no_evidence_mentions(tmp_path, monkey
     monkeypatch.setattr(erp, "SPIKES", tmp_path)
     args = Namespace(
         test_suppliers=False, supplier=["TEST Supplier 12"],
-        case=None, communication=None, file=None, yes=False, database="(default)",
+        case=None, communication=None, contact=None, file=None, yes=False, database="(default)",
     )
 
     assert erp.cmd_purge(args) == 0
     assert "TEST Supplier 12" in capsys.readouterr().out
+
+
+def _contact(**over) -> dict:
+    """A Contact row as `_rows` returns it, with its links already resolved.
+
+    Contact does not carry a flat supplier field the way Communication and
+    File do. Its link lives in a `Dynamic Link` child table, which Frappe
+    refuses to serve as a list query (403 even for the site owner), so the
+    reader fetches each Contact document and flattens the first Supplier
+    link it finds into the same two field names the other doctypes use.
+    """
+    row = {
+        "name": "Andes Verde Import Export SAS-Andes Verde Import Export SAS",
+        "link_doctype": "Supplier",
+        "link_name": "Andes Verde Import Export SAS",
+        "company_name": "Andes Verde Import Export SAS",
+        "first_name": None,
+        "email_id": "andes-verde-import-export-sas@example.com",
+    }
+    row.update(over)
+    return row
+
+
+def test_a_contact_pointing_at_a_live_supplier_is_linked():
+    assert erp.link_state(_contact(), "Contact", LIVE) == erp.LINKED
+
+
+def test_a_contact_whose_supplier_was_purged_is_orphaned():
+    """The gap that made this widening necessary.
+
+    Purging a Supplier does not take its Contact with it, and the Contact's
+    name is BUILT from the supplier name — so a sanctioned name outlives the
+    record that carried it in a row the audit could not see at all.
+    """
+    row = _contact(
+        name="Empaques Sabana Norte SAS-Empaques Sabana Norte SAS",
+        link_name="Empaques Sabana Norte SAS",
+    )
+    assert erp.link_state(row, "Contact", LIVE) == erp.ORPHANED
+
+
+def test_a_person_contact_with_no_supplier_link_is_unlinked():
+    """The site owner and the bot users each have a Contact. Not this audit's business."""
+    row = _contact(name="Spike Bot", link_doctype=None, link_name=None,
+                   company_name=None, first_name="Spike Bot")
+    assert erp.link_state(row, "Contact", LIVE) == erp.UNLINKED
+
+
+def test_a_contact_filed_under_a_sanctioned_supplier_fails_the_audit():
+    row = _contact(
+        name="Comercializadora Andes Verde SAS-Comercializadora Andes Verde SAS",
+        link_name="Comercializadora Andes Verde SAS",
+    )
+    findings = erp.row_findings(row, "Contact", WATCH)
+    assert findings and "NR-001" in findings[0]
+
+
+def test_a_contact_naming_a_sanctioned_entity_in_its_text_only_warns():
+    """Same rule as Communication and File: substring cannot tell a near miss apart.
+
+    The Contact NAME is scanned, not only its fields, because that is where
+    the supplier name actually lands — Frappe builds it as `<supplier>-<supplier>`.
+    """
+    row = _contact(name="Deltasur Holdings-Deltasur Holdings",
+                   link_doctype=None, link_name=None, company_name=None)
+    assert erp.row_findings(row, "Contact", WATCH) == []
+    mentions = erp.row_mentions(row, "Contact", WATCH)
+    assert mentions and "NR-002" in mentions[0]
+
+
+def test_the_legitimate_supplier_contact_neither_fails_nor_warns():
+    """`Andes Verde Import Export SAS` is the real supplier and must stay auditable.
+
+    It is filed under itself, which is not a watchlist name, and it embeds no
+    watchlist key -- so it produces nothing at all. That is the outcome that
+    matters: a check which flagged this row every run would stop being read,
+    which is the reasoning already written into `row_mentions`.
+    """
+    row = _contact()
+    assert erp.row_findings(row, "Contact", WATCH) == []
+    assert erp.row_mentions(row, "Contact", WATCH) == []
+
+
+def test_a_contact_embedding_an_alias_warns_but_does_not_fail():
+    """The near-miss rule, on the field where a supplier name actually lands.
+
+    A Contact named for a supplier whose name merely CONTAINS a watchlist
+    alias is not evidence of a sanctioned counterparty, and substring cannot
+    tell the two apart -- so it warns and stays out of the exit code, exactly
+    as a Communication subject does.
+    """
+    row = _contact(name="Deltasur Andina SAS-Deltasur Andina SAS",
+                   link_name="Deltasur Andina SAS", company_name="Deltasur Andina SAS")
+    assert erp.row_findings(row, "Contact", WATCH) == []
+    mentions = erp.row_mentions(row, "Contact", WATCH)
+    assert mentions and "NR-002" in mentions[0]
+
+
+def test_one_row_naming_one_entity_warns_once_however_many_fields_carry_it():
+    """A Contact repeats the supplier name in three fields. That is one finding.
+
+    Reported per field, the pre-recording WARN block showed a single
+    legitimate near-miss row as three separate lines. The block is meant to be
+    read by a human before a recording, and inflating one row into three is
+    the same failure mode the near-miss rule already guards against.
+    """
+    row = _contact(name="Deltasur Andina SAS-Deltasur Andina SAS",
+                   company_name="Deltasur Andina SAS",
+                   email_id="deltasur-andina@example.com",
+                   link_doctype=None, link_name=None)
+    mentions = erp.row_mentions(row, "Contact", WATCH)
+    assert len(mentions) == 1, mentions
+    assert "NR-002" in mentions[0]
+    assert "name" in mentions[0] and "company_name" in mentions[0]
+
+
+def test_two_different_entities_in_one_row_are_still_two_findings():
+    """Collapsing is per entity, not per row: two names is two things to read."""
+    row = _contact(name="Deltasur Comercializadora Andes Verde SAS",
+                   company_name=None, email_id=None,
+                   link_doctype=None, link_name=None)
+    mentions = erp.row_mentions(row, "Contact", WATCH)
+    assert len(mentions) == 2, mentions
+    assert {"NR-001", "NR-002"} == {m.split("names ")[1].split(" ")[0] for m in mentions}

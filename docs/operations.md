@@ -204,6 +204,44 @@ Provisioning note: project-level IAM bindings and billing-account IAM cannot be
 granted from an agent session (permission classifier); run those as the human
 via `!`-prefixed commands.
 
+### Which Firestore the tests talk to
+
+Three targets, and the suite picks one automatically:
+
+| Target | When | Speed |
+|---|---|---|
+| Emulator on `localhost:8451` | default, whenever the port is listening | whole unit suite in ~6s |
+| `keplaria-test` | no emulator running, or a live-marked run, or `KEPLARIA_TEST_USE_REAL_FIRESTORE=1` | ~40s and network-bound |
+| `(default)` | never, from tests | — |
+
+```bash
+gcloud beta emulators firestore start --host-port=localhost:8451
+```
+
+Start it and every run is hermetic; forget to and the run still works, but
+`tests/conftest.py` now says so with a warning instead of falling through in
+silence. That silence was expensive. On 2026-08-23 the full suite took roughly
+thirteen minutes, two `test_sweep` tests hung for ten minutes apiece, and a
+`test_console_store` assertion failed — and that failure had been carried for
+two sessions as a disclosed product defect. It was none of those things. The
+runs were going to the real `keplaria-test` database, which had accumulated
+**10,330 case documents** and 1,533 failed or dead commands, and
+`list_failed_commands` applies its `limit` in the query before sorting in
+Python, so the fixture's own row simply never came back. The same tests pass
+in 0.64s on the emulator.
+
+The accumulated documents were purged on 2026-08-23 after checking that no
+committed spike evidence named anything living there — every cited id is in
+`(default)`. The database and its collection-group index were kept, so the
+fallback path stays usable: it now runs those two files in ~44s.
+
+**A live-marked run never uses the emulator**, even when one is running. The
+emulator does not enforce collection-group indexes, so a query that 400s
+against real Firestore passes against it, and a live run pointed at the
+emulator would be testing the wrong thing while looking greener.
+`tests/unit/test_firestore_target_selection.py` pins that decision, including
+that the default `-m 'not live'` is not a live run.
+
 ### Firestore indexes: the `outbox` collection-group index
 
 The sweep (`app/executor/sweep.py`) and `/review/failures` run a **collection
@@ -221,8 +259,9 @@ real on 2026-08-17:
   creates is `COLLECTION`-scoped and the collection-group query still fails.
 
 The only route that works is the REST API. Run it once per database — the
-deployed sweep and `/review/failures` use `(default)`, and `uv run pytest` uses
-`keplaria-test` whenever `FIRESTORE_EMULATOR_HOST` is unset:
+deployed sweep and `/review/failures` use `(default)`, and a test run uses
+`keplaria-test` whenever it is not on the emulator (see "Which Firestore the
+tests talk to" below):
 
 ```bash
 cat > /tmp/idx.json <<'EOF'
