@@ -20,11 +20,10 @@ the demonstration video URL and the frozen commit the submission cites.
 
 ## Tagline
 
-> Suppliers are onboarded in seconds, then governed for months: the case wakes
-> to chase the expiring certificate, holds purchasing when evidence lapses, and
-> releases the hold when the renewal checks out — every move decided by
-> deterministic policy, not by the model. Keplaria: work in orbit, not work
-> finished.
+> Suppliers are onboarded in seconds — then governed for months. Keplaria
+> wakes to chase expiring certificates, holds purchasing when evidence
+> lapses, and releases the hold when the renewal checks out. The model
+> proposes; deterministic policy decides. Work in orbit, not work finished.
 
 ## Category
 
@@ -45,7 +44,9 @@ the demonstration video URL and the frozen commit the submission cites.
 
 ## What it does
 
-A beverage manufacturer needs a new packaging supplier approved. Keplaria runs
+Supplier compliance is not a one-time check: certificates expire months after
+onboarding, and someone has to notice. A beverage manufacturer needs a new
+packaging supplier approved. Keplaria runs
 the onboarding — document intake, field extraction, screening against a
 synthetic, rights-cleared watchlist — and then does the part nobody builds: it
 stays. Approval was never the hard part. The hard question is whether an agent
