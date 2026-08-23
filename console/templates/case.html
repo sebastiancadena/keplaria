@@ -3,6 +3,11 @@
 {% block content %}
 <h1>{{ case.supplier or case.case_id }}</h1>
 <p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
+<p class="context-strip" data-testid="context-strip">One supplier's case,
+exactly as the system scored it. <strong>Band</strong> is the risk verdict
+deterministic policy assigned; a <strong>parked</strong> case has stopped for
+a human decision, its ERP writes held.</p>
+{% include "_lifecycle.html" %}
 
 <div class="status status--{{ case.status.state|lower }}">
   <p class="status__state">{{ case.status.state }}</p>

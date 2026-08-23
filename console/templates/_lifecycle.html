@@ -1,0 +1,11 @@
+{# Where this payload sits in the supplier lifecycle. Server-rendered from
+   the projection's lifecycle block; no script, no state. #}
+<nav class="lifecycle" aria-label="Case lifecycle" data-testid="lifecycle-strip">
+  {% for step in case.lifecycle.steps %}
+  <span class="lifecycle__step{% if step.current %} lifecycle__step--current{% endif %}"
+        {% if step.current %}aria-current="step"{% endif %}>{{ step.label }}</span>
+  {% endfor %}
+  {% if case.lifecycle.quarantined %}
+  <span class="lifecycle__quarantined">Quarantined — pulled out of the lifecycle for a person to inspect</span>
+  {% endif %}
+</nav>

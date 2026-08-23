@@ -257,3 +257,24 @@ def test_an_unknown_case_is_a_404(client):
 
 def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
+
+
+def test_the_case_list_carries_a_context_strip(client, db):
+    _park_a_real_case(db, "CASE-STRIP-1")
+    page = client.get("/").text
+    assert 'data-testid="context-strip"' in page
+    assert "payload" in page.lower()          # the term is glossed on-page
+
+
+def test_the_case_page_carries_strip_and_lifecycle(client, db):
+    _park_a_real_case(db, "CASE-STRIP-2")
+    page = client.get("/cases/CASE-STRIP-2").text
+    assert 'data-testid="context-strip"' in page
+    assert 'data-testid="lifecycle-strip"' in page
+    assert 'aria-current="step"' in page      # exactly one step is current
+    assert page.count('aria-current="step"') == 1
+
+
+def test_the_fleet_page_carries_a_context_strip(client):
+    page = client.get("/fleet").text
+    assert 'data-testid="context-strip"' in page
