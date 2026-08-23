@@ -8,3 +8,6 @@
    lives in exactly one place. #}
 {% block masthead_tagline %}Review console{% endblock %}
 {% block masthead_caption %}Authenticated · decisions write to the ERP{% endblock %}
+{# The review service serves nothing at "/" — its pages live under /review,
+   so the masthead's home link must point there, not at the console's root. #}
+{% block home_href %}/review{% endblock %}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ case.case_id }} — Keplaria{% endblock %}
 {% block content %}
+<p><a href="/">&larr; All cases</a></p>
 <h1>{{ case.supplier or case.case_id }}</h1>
 <p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
 <p class="context-strip" data-testid="context-strip">One supplier's case —

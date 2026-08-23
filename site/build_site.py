@@ -55,12 +55,12 @@ GROUPS = (
      "quoted from an earlier pass.",
      ("core_contracts_count", "domain_eval_cases", "domain_eval_mean_score",
       "contract_suite_passed")),
-    ("What that run actually wrote to the ERP (enterprise resource planning "
-     "&mdash; the system of record for suppliers and purchasing), and what "
+    ("What that run actually wrote to the ERP (enterprise resource planning: "
+     "the system of record for suppliers and purchasing), and what "
      "it refused to write twice.",
      ("fields_without_rekeying", "enforced_hold_days",
       "policy_required_interventions", "duplicate_writes_after_retry")),
-    ("What running this project costs to operate &mdash; kept here for "
+    ("What running this project costs to operate, kept here for "
      "traceability even where it hasn&rsquo;t been turned into a prose "
      "claim anywhere else yet.",
      ("gross_cost_month_to_date", "credit_remaining",
@@ -91,13 +91,17 @@ header svg{height:96px;width:auto}
    ~142px-wide mark, clear of the 96px lockup minimum; 46px did not. */
 nav a{color:var(--muted);text-decoration:none;margin-left:1.5rem;font-size:.95rem}
 nav a:hover{color:var(--star)}
+/* One centred narrative column. Body text stays left-set for measure, but
+   every prose block shares the same centred axis as the card grids, which
+   deliberately break out wider. */
 h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:0 0 1.25rem;
-letter-spacing:-.02em}
+font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:0 auto 1.25rem;
+max-width:56rem;text-align:center;letter-spacing:-.02em}
 h2{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-font-size:1.4rem;margin:3.5rem 0 1rem}
-.lede{font-size:1.2rem;max-width:44ch;color:var(--star)}
-.sub{color:var(--muted);max-width:62ch}
+font-size:1.4rem;max-width:41rem;margin:3.5rem auto 1rem}
+.lede{font-size:1.2rem;max-width:52ch;margin-left:auto;margin-right:auto;
+text-align:center;color:var(--star)}
+.sub{color:var(--muted);max-width:62ch;margin-left:auto;margin-right:auto}
 .amber{color:var(--amber-bright)}
 .figures{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));
 margin:3rem 0}
@@ -115,7 +119,8 @@ background:rgb(248 250 252 / .03)}
 color:var(--amber-bright)}
 .evalstep a:hover b{text-decoration:underline}
 .evalstep p{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
-.actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2.5rem 0}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;
+margin:2.5rem 0}
 .btn{display:inline-block;padding:.7rem 1.15rem;border-radius:10px;
 border:1px solid var(--border);color:var(--star);text-decoration:none;
 font-size:.97rem}
@@ -133,8 +138,8 @@ white-space:nowrap}
 .q{color:var(--muted);font-size:.86rem}
 code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
 .note{border-left:3px solid var(--amber);padding:.85rem 1.15rem;
-background:rgb(248 250 252 / .03);border-radius:0 12px 12px 0;margin:2rem 0;
-color:var(--star)}
+background:rgb(248 250 252 / .03);border-radius:0 12px 12px 0;
+max-width:41rem;margin:2rem auto;color:var(--star)}
 footer{margin-top:5rem;padding-top:2rem;border-top:1px solid var(--hair);
 color:var(--muted);font-size:.88rem}
 a{color:var(--amber-bright)}
@@ -170,7 +175,7 @@ def shell(title: str, body: str, desc: str, canonical: str) -> str:
 {body}
 <footer>
 <p>Keplaria is a hackathon project. The screening index is a <b>synthetic,
-rights-cleared watchlist</b> &mdash; no live sanctions data is indexed. The ERP is a
+rights-cleared watchlist</b>; no live sanctions data is indexed. The ERP is a
 real ERPNext instance holding fictional suppliers. The manual baseline is
 <b>author-timed, not practitioner-reviewed</b>.</p>
 <p>&copy; 2026 &middot; <a href="{REPO}">source</a> &middot; <a href="/proof">every number, with its evidence</a></p>
@@ -203,13 +208,13 @@ def index(claims) -> str:
     return shell(
         "Keplaria",
         f"""
-<h1>Supplier compliance doesn&rsquo;t end at onboarding.<br>Most tools do.</h1>
+<h1>Supplier compliance doesn&rsquo;t end at onboarding. Most tools do.</h1>
 <p class="lede">Certificates expire months after a supplier is onboarded, and
-every onboarding tool retires the day the ERP (enterprise resource planning
-&mdash; the business&rsquo;s system of record for suppliers and purchasing)
-record is created. The ongoing work &mdash; noticing the expiry, chasing the
-renewal, deciding whether it is still safe to buy &mdash; goes back to a
-person with a calendar reminder.</p>
+every onboarding tool retires the day the ERP record is created (enterprise
+resource planning: the business&rsquo;s system of record for suppliers and
+purchasing). The ongoing work of noticing the expiry, chasing the renewal,
+and deciding whether it is still safe to buy goes back to a person with a
+calendar reminder.</p>
 <p class="sub">Keplaria stays. One durable mission per supplier wakes months
 later on its own clock: it requests renewed evidence, places a reversible
 purchasing hold when a certificate lapses, checks the renewal against the
@@ -221,8 +226,8 @@ deterministic policy layer <em>decides</em>, against a versioned catalog.</p>
 &mdash; and nowhere else. Nothing reaches the ERP except through an outbox (a
 queue of pending ERP writes, released only on approval).</p>
 <div class="note"><b>Every number on this site is bound to the run that
-produced it.</b> The verification page is generated from the evidence files, not
-written by hand &mdash; so it cannot quietly disagree with them.</div>
+produced it.</b> The verification page is generated from the evidence files,
+not written by hand, so it cannot quietly disagree with them.</div>
 <div class="actions">
 <a class="btn btn--go" href="{CONSOLE}">Open the live case console (a real
 deployment, synthetic demo suppliers)</a>
@@ -232,41 +237,41 @@ deployment, synthetic demo suppliers)</a>
 <h2>Evaluate this in three minutes</h2>
 <div class="evalgrid">
 <div class="evalstep"><a href="{CONSOLE}"><b>1&nbsp;&middot; Case console</b></a>
-<p>No sign-in. Open a case &mdash; one supplier&rsquo;s file; the console
-calls it a payload: a context strip and a lifecycle indicator (onboarded
+<p>No sign-in. Open a case: one supplier&rsquo;s file, which the console
+calls a payload. A context strip and a lifecycle indicator (onboarded
 &rarr; active &rarr; renewal requested &rarr; held &rarr; released) show
 where it stands, and the status line says exactly what has been written to
-the ERP so far &mdash; for a parked case (stopped for a human decision
-&mdash; this can happen at any stage), nothing yet.</p>
+the ERP so far. For a parked case, stopped for a human decision at any
+stage, that is nothing yet.</p>
 </div>
 <div class="evalstep"><a href="{REVIEW}"><b>2&nbsp;&middot; Review console
 (Ground Control)</b></a>
-<p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy &mdash;
+<p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy:
 Google&rsquo;s sign-in check in front of the service). Cases the policy
-stopped wait here, their ERP writes held &mdash; approving is what releases
+stopped wait here with their ERP writes held; approving is what releases
 them.</p></div>
 <div class="evalstep"><b>3&nbsp;&middot; Demonstration video</b>
-<p>Not linked yet &mdash; it publishes with the Devpost submission, and will
-be added here then. What it shows: one continuous, unedited take &mdash; a
-stop for a human, an approval that releases the held writes, then a
-simulated year and a half of renewals, a hold, and a release.</p></div>
+<p>Not linked yet: it publishes with the Devpost submission, and will be
+added here then. What it shows: one continuous, unedited take. A stop for
+a human, an approval that releases the held writes, then a simulated year
+and a half of renewals, a hold, and a release.</p></div>
 </div>
 <h2>Named for the law, not the planets</h2>
 <p class="sub">An agent that runs for minutes can afford to improvise. One that
-stays accountable for months cannot &mdash; which is why the model only
+stays accountable for months cannot. That is why the model only
 <em>proposes</em> here, and a versioned, deterministic policy <em>decides</em>.
 The name marks that line. Kepler&rsquo;s breakthrough was not noticing that
 planets move; everyone could see that. It was showing that their motion obeys
 law: predictable, calculable, correctable. That is what lets you launch a case
-once and have it stay up without constant thrust &mdash; when compliance decays,
-and a certificate nears expiry, policy fires a small correction: a renewal
+once and have it stay up without constant thrust. When compliance decays and a
+certificate nears expiry, policy fires a small correction: a renewal
 request, a purchasing hold, a hold release. Spacecraft engineers call those
 corrections station-keeping. So do we.</p>
 <h2>What a case looks like</h2>
 <p class="sub">The console is public and read-only. A case shows what the
 coordinator proposed, what policy actually engaged, the candidates from
 screening against a sanctions watchlist and why one of them needed a person,
-and every command &mdash; including the ones policy refused. A case stopped
+and every command, including the ones policy refused. A case stopped
 for a human says so plainly, and says that nothing has been written.</p>
 <h2>Built on</h2>
 <p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime

@@ -91,6 +91,14 @@ def test_every_surface_that_embeds_the_lockup_clears_the_brand_minimum():
         "console header": (
             "console/templates/base.html",
             r'keplaria-lockup-horizontal-dark\.svg"[^>]*height="(\d+)"', True),
+        # The stylesheet wins over the HTML height attribute at render time,
+        # so the attribute row above proves nothing on its own: the console
+        # shipped a 72px attribute and a 28px CSS rule, and rendered ~41px
+        # of artwork while this test stayed green. Whatever the CSS says the
+        # element is, THAT is the surface.
+        "console header (css)": (
+            "console/static/app.css",
+            r'\.masthead__brand img \{ height: (\d+)px', True),
         "keplaria.com header": (
             "site/build_site.py", r"header svg\{height:(\d+)px", True),
         "architecture diagram": (

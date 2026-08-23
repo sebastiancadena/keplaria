@@ -153,7 +153,13 @@ code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size:
 }
 
 .masthead__brand { display: flex; align-items: center; gap: var(--space-3); }
-.masthead__brand img { height: 28px; width: auto; }
+.masthead__brand a { display: flex; align-items: center; }
+/* The lockup viewBox carries 0.5x-icon clear space: the artwork is 74.74% of
+   the element width and HALF its height, so a 72px element renders a ~107px
+   wide, ~36px tall mark — clear of the 96px brand minimum. 28px did not
+   (~41px), and this rule overrides the height attribute in base.html, so
+   test_console_assets.py reads BOTH. Keep them in agreement. */
+.masthead__brand img { height: 72px; width: auto; }
 
 .tagline {
   font-family: "Space Grotesk", system-ui, sans-serif;
