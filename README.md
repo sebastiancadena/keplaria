@@ -48,7 +48,8 @@ Python, running on the
 
 What those three show together: the model proposes, deterministic policy
 decides, a human stays in exactly the loop policy requires, and nothing
-reaches the ERP except through an approved, idempotent command.
+reaches the ERP except through an approved, idempotent (safe to retry — it
+applies exactly once) command.
 
 ## Access for judges and testers
 
@@ -59,8 +60,8 @@ Two hosted surfaces exist, and only one of them asks who you are.
 
 | Surface | Sign-in | What it is |
 |---|---|---|
-| [Case console](https://keplaria-console-bklu5jcdea-uc.a.run.app) | None | Read-only. Renders a case as it was scored and its current band. The service account behind it holds a Firestore *viewer* role, so read-only is an IAM fact rather than a promise about the route table. |
-| [Review console](https://keplaria-review-bklu5jcdea-uc.a.run.app/review) | Google, through Cloud IAP | Lists cases parked for a human and commits the decision that releases the queued ERP write. |
+| [Case console](https://keplaria-console-bklu5jcdea-uc.a.run.app) | None | Read-only. Renders a case as it was scored and its current band (the policy verdict: clear, review, or blocked). The service account behind it holds a Firestore *viewer* role, so read-only is an IAM fact rather than a promise about the route table. |
+| [Review console (Ground Control)](https://keplaria-review-bklu5jcdea-uc.a.run.app/review) | Google, through Cloud IAP | Lists cases parked for a human and commits the decision that releases the queued ERP write. |
 
 **Signing in to the review console.** Cloud IAP admits the two addresses the
 organizers gave repository access — `testing@devpost.com` and
@@ -275,9 +276,9 @@ withholding something.
 Both directions are proven on the deployed system, by a reviewer signed in
 through IAP:
 
-- **Approval releases** — `spikes/hitl_release/evidence.json`. A case parked
-  on a genuine near-match (0.672, `match=false`) was approved and
-  `create_supplier` wrote to the live ERP.
+- **Approval releases** — `spikes/hitl_release/evidence.json` (HITL —
+  human-in-the-loop). A case parked on a genuine near-match (0.672,
+  `match=false`) was approved and `create_supplier` wrote to the live ERP.
 - **Rejection withholds** — `spikes/hitl_reject/evidence.json`, track A.
   `create_supplier` stayed `pending` and no Supplier was ever created.
 - **Rejection does not withhold a restriction** — same evidence, track B. The
