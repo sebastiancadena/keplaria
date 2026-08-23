@@ -34,6 +34,9 @@ from scripts.claim_ledger import load, resolve  # noqa: E402
 OUT = Path(os.environ.get("KEPLARIA_SITE_OUT", Path(__file__).parent / "dist"))
 LEDGER = ROOT / "docs" / "proof" / "claims.toml"
 LOCKUP = ROOT / "docs" / "architecture" / "assets" / "keplaria-lockup-horizontal-dark.svg"
+# The brand repo ships a full social kit that nothing referenced until now.
+ASSETS_REPO = Path.home() / "dev" / "git" / "keplaria-assets"
+OG_IMAGE = ASSETS_REPO / "assets" / "social" / "og-image.png"
 
 CONSOLE = "https://keplaria-console-bklu5jcdea-uc.a.run.app"
 REPO = "https://github.com/sebastiancadena/keplaria"
@@ -95,7 +98,7 @@ a{color:var(--amber-bright)}
 """
 
 
-def shell(title: str, body: str, desc: str) -> str:
+def shell(title: str, body: str, desc: str, canonical: str) -> str:
     lockup = LOCKUP.read_text().strip()
     return f"""<!doctype html>
 <html lang="en"><head>
@@ -104,6 +107,15 @@ def shell(title: str, body: str, desc: str) -> str:
 <title>{html.escape(title)}</title>
 <meta name="description" content="{html.escape(desc)}">
 <meta name="color-scheme" content="dark">
+<link rel="canonical" href="{canonical}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Keplaria">
+<meta property="og:title" content="{html.escape(title)}">
+<meta property="og:description" content="{html.escape(desc)}">
+<meta property="og:image" content="https://keplaria.com/og-image.png">
+<meta property="og:url" content="{canonical}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://keplaria.com/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
@@ -176,6 +188,7 @@ nothing has been written.</p>
 OpenTelemetry</p>
 """,
         "Supplier onboarding that does not end when the ERP record is created.",
+        "https://keplaria.com/",
     )
 
 
@@ -209,6 +222,7 @@ would be a false green.</div>
 <tbody>{"".join(rows)}</tbody></table></div>
 """,
         "Every public number Keplaria states, bound to the run that produced it.",
+        "https://keplaria.com/proof",
     )
 
 
@@ -217,6 +231,11 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "index.html").write_text(index(claims))
     (OUT / "proof.html").write_text(proof(claims))
+    if OG_IMAGE.exists():
+        (OUT / "og-image.png").write_bytes(OG_IMAGE.read_bytes())
+    else:
+        print(f"WARN: {OG_IMAGE} missing — the share card will 404",
+              file=sys.stderr)
     print(f"wrote {OUT}/index.html and {OUT}/proof.html ({len(claims)} claims)")
     return 0
 
