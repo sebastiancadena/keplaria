@@ -10,12 +10,13 @@ whether it is still safe to buy. Every onboarding tool retires the day the
 ERP record is created — the ongoing work goes back to a person with a
 calendar reminder.
 
-**Keplaria stays.** One durable mission per supplier: it onboards the
-supplier into a real ERP, then wakes months later on its own clock, requests
-renewed evidence, places a reversible purchasing hold when the certificate
-lapses, validates the renewal against the source document, and releases the
-hold. It stops exactly where policy requires a human decision — and nowhere
-else.
+**Keplaria stays.** One durable mission per supplier: it onboards the supplier
+into a real ERP (enterprise resource planning — the business's system of record
+for suppliers and purchasing), then wakes months later on its own clock,
+requests renewed evidence, places a reversible purchasing hold when the
+certificate lapses, validates the renewal against the source document, and
+releases the hold. It stops exactly where policy requires a human decision —
+and nowhere else.
 
 One deployed run of that whole lifecycle: **55.3 s of machine time** and a
 single **47.7 s human approval**, against the same work done by hand in
@@ -34,7 +35,9 @@ Python, running on the
    → renewal requested → held → released), and the status line says what has
    actually been written to the ERP — for a parked case, nothing yet.
 2. **Open [Ground Control](https://keplaria-review-bklu5jcdea-uc.a.run.app/review)**,
-   the human decision surface — Google sign-in through Cloud IAP; the two
+   the human decision surface — Google sign-in through Cloud IAP
+   (Identity-Aware Proxy — Google's sign-in gate in front of the service);
+   the two
    organizer accounts are pre-authorized ([details below](#access-for-judges-and-testers)).
    Cases the policy stopped wait here with their ERP writes held; an
    approval is what releases them.
@@ -87,16 +90,18 @@ will say so plainly. (Availability and running cost are measured separately —
 
 ## Judging criteria → proof
 
-This table matches each judging criterion to what it asks and where the proof
-for it lives in this repository. Every row points at a file that was produced
-by running the system, not by describing it. `spikes/core_contracts/harness.py`
-re-executes the tests it cites and re-reads the evidence it cites on every run,
-so a claim here cannot outlive the behaviour behind it.
+These three rows are the Devpost hackathon's Fortified Enterprise Fleet track
+rubric, with its published 40/30/30 weighting. This table matches each judging
+criterion to what it asks and where the proof for it lives in this repository.
+Every row points at a file that was produced by running the system, not by
+describing it. `spikes/core_contracts/harness.py` re-executes the tests it
+cites and re-reads the evidence it cites on every run, so a claim here cannot
+outlive the behaviour behind it.
 
 | Criterion | What it asks | Proof in this repo |
 |---|---|---|
-| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? | The lifecycle closes: onboard → wake → request evidence → hold → validate renewal → release, over two suppliers and 380 simulated business days, in [`spikes/judge_run/`](spikes/judge_run/). A coordinator selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. |
-| **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure, injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite — 24/24 graded domain cases passing. A schema-valid but source-unsupported worker value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
+| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? | The lifecycle closes: onboard → wake → request evidence → hold → validate renewal → release, over two suppliers and 380 simulated business days, in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. |
+| **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure (an extracted value with no supporting source span), injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite — 24/24 graded domain cases passing. A schema-valid but source-unsupported worker (specialist agent) value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
 | **Demo & Production Readiness** (30%) | Does the video define the friction and architecture, show an unedited live execution, and are setup, diagram, deployment and proof reproducible? | The console URL above is live. The run in `spikes/judge_run/` is a real deployment, re-run on the engine currently serving. `bash scripts/doctor.sh` checks deployment and configuration preconditions read-only and prints its own pass/fail summary; the architecture diagram is generated from committed sources, not drawn; setup is [below](#setup-from-a-fresh-clone). |
 
 ## Platform subsystem coverage
@@ -110,7 +115,7 @@ measured and turned down.
 
 | Subsystem | Status | What is actually true |
 |---|---|---|
-| **Agent Runtime** | Native | Hosts the ADK graph as reasoning engine `keplaria`. Reaches the screening VM over a PSC interface; that VM has no external IP and is not reachable from the internet, and keeps execution state in Agent Platform Sessions. |
+| **Agent Runtime** | Native | Hosts the ADK graph as reasoning engine `keplaria`. Reaches the screening VM over a Private Service Connect (PSC) interface; that VM has no external IP and is not reachable from the internet, and keeps execution state in Agent Platform Sessions. |
 | **Agent Registry** | Native | The deployment auto-registers with no publish step; the entry is live and refreshes on redeploy. It carries the framework (`google-adk`), the runtime reference, the runtime identity principal, and the callable interfaces. Honest limit: those are the fields the Registry populates itself — it holds no owner, purpose, or tool-scope description of its own. |
 | **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP identity is scoped rather than trusted: it receives Frappe's native 403 on anything outside its role. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
 | **Memory Bank** | Deliberately not used | Transactional Firestore owns authoritative case state — case version, event claim, approval, command outbox — and Sessions retain resumable agent history. Generative memory is not trusted with compliance facts, and Sessions are not described here as a Memory Bank equivalent; they hold different things. |
@@ -157,8 +162,9 @@ The agent graph and its adapters run on two different runtimes:
 
 - **Agent Runtime** hosts the ADK graph — reasoning engine `keplaria`
   (`projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416`).
-  It reaches the private yente screening VM over the `keplaria-psc2` PSC-I
-  network attachment and keeps agent execution state in Agent Platform
+  It reaches yente (an open-source sanctions-screening service, running on
+  a private VM) over the `keplaria-psc2` PSC-I network attachment and keeps
+  agent execution state in Agent Platform
   Sessions.
 - **Cloud Run** hosts `keplaria-ingress`, the authenticated Pub/Sub push
   adapter and the component that talks to both Firestore and the ERP, plus
@@ -180,7 +186,8 @@ topic keplaria-events
   -> private Cloud Run ingress (keplaria-ingress)
   -> Firestore inbox transaction (claims event_id, creates/advances the
      case, bumps case_version)
-  -> Agent Runtime graph: parse -> LLM coordinator routing proposal ->
+  -> Agent Runtime graph: parse -> LLM (large language model) coordinator
+     routing proposal ->
      deterministic route validation (app/policy.py, derived from
      catalog/fleet.v1.json) -> yente screening
      over PSC-I -> (when candidates exist) compliance interpretation,
@@ -195,6 +202,10 @@ PSC-attached engine has no public internet egress — Cloud NAT is
 itself cannot reach Frappe Cloud. The deterministic executor that performs
 ERP writes therefore lives in the ingress process. This is a genuinely
 separate component from the agent graph, by design, not a workaround.
+
+The next few paragraphs establish two independent checks that separate what
+the model suggests from what actually reaches the ERP, plus one rule that
+holds can never be blocked by approval requirements.
 
 **Two deterministic gates, both fail-closed.** The LLM coordinator only
 proposes a route; `app/policy.py` decides whether it is permitted, and a
@@ -329,6 +340,9 @@ a repeated message, never a repeated record. The claim here is scoped
 accordingly: record writes are idempotent; message sends are at-least-once.
 
 ### Verification
+
+*The first two entries below prove the headline claims; the rest is
+reference for re-running any one specific proof.*
 
 - `scripts/doctor.sh` — 71 read-only checks (one fewer when the yente VM is
   stopped, since the serving probe only runs against a running VM) covering
