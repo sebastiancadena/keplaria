@@ -258,7 +258,7 @@ case "$yente_status" in
       meh "keplaria-yente RUNNING but not answering on 8000 (index still loading?) — every screened beat would wait 30s and then record SCREENING_UNAVAILABLE"
     fi
     ;;
-  TERMINATED) meh "keplaria-yente VM TERMINATED — the hourly start schedule should raise it within the hour; if it does not, start it by hand. On a capacity error, switch machine family (set-machine-type e2-/n2-/t2d-standard-4) rather than retrying the same one — see README" ;;
+  TERMINATED) meh "keplaria-yente VM TERMINATED — the hourly start schedule should raise it within the hour; if it does not, start it by hand. On a capacity error, switch machine family (set-machine-type e2-/n2-/t2d-standard-4) rather than retrying the same one — see docs/operations.md" ;;
   "")         meh "keplaria-yente VM not created (us-central1 stockout — retry loop?)" ;;
   *)          meh "keplaria-yente VM in state $yente_status" ;;
 esac
@@ -587,9 +587,9 @@ SWEEP_STATE=$(gcloud scheduler jobs describe keplaria-command-sweep \
 # COLLECTION_GROUP — not from a composite. `gcloud firestore indexes composite
 # list` therefore never lists it no matter how long you wait, so a check
 # written against that command can only ever report missing. The right command
-# is `gcloud firestore indexes fields list`; see README "Firestore indexes" for
-# how the index itself is created (REST PATCH — no gcloud verb can express
-# query scope).
+# is `gcloud firestore indexes fields list`; see docs/operations.md
+# "Firestore indexes" for how the index itself is created (REST PATCH — no
+# gcloud verb can express query scope).
 #
 # Checked in BOTH databases, and named individually when one is missing. The
 # index is needed in "(default)" for the deployed sweep and /review/failures,

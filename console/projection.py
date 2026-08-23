@@ -44,6 +44,44 @@ _DONE = "done"
 #: ...and the states that mean it deliberately was not.
 _UNRUN = ("held", "pending", "refused_by_policy")
 
+#: The five stops a reader is shown, in lifecycle order. "released" is not a
+#: stored state -- it is `active` again after a hold was cleared, and showing
+#: it as plain "Active" would erase the story the strip exists to tell.
+_LIFECYCLE_STEPS = (
+    ("onboarding", "Onboarded"),
+    ("active", "Active"),
+    ("renewal_requested", "Renewal requested"),
+    ("held", "Purchasing held"),
+    ("released", "Hold released"),
+)
+
+
+def _lifecycle(case: dict, commands: list[dict]) -> dict:
+    """Where this case sits in the supplier lifecycle, for a cold reader.
+
+    Derived from the lifecycle block the graph persists, plus one command
+    fact (a done clear_hold marks a released case). A state outside the
+    known five -- including quarantined -- highlights nothing rather than
+    guessing.
+    """
+    state = (case.get("lifecycle") or {}).get("state") or "onboarding"
+    released = state == "active" and any(
+        c.get("action") == "clear_hold" and c.get("status") == _DONE
+        for c in commands
+    )
+    step = "released" if released else state
+    known = {key for key, _ in _LIFECYCLE_STEPS}
+    current = step if step in known else None
+    return {
+        "state": state,
+        "step": current,
+        "steps": [
+            {"key": key, "label": label, "current": key == current}
+            for key, label in _LIFECYCLE_STEPS
+        ],
+        "quarantined": state == "quarantined",
+    }
+
 
 def _status(case: dict, commands: list[dict], effective: str | None,
             gate: str | None, approval_id: str | None) -> dict:
@@ -156,6 +194,7 @@ def public_case(case: dict, commands: Iterable[dict] = ()) -> dict:
     return {
         "case_id": case.get("case_id"),
         "status": _status(case, commands, effective, gate, approval_id),
+        "lifecycle": _lifecycle(case, commands),
         "cited_candidate_ids": _cited_candidate_ids(policy, _candidates(screening)),
         "case_version": case.get("case_version"),
         "phase": case.get("phase"),

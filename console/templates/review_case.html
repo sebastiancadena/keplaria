@@ -8,6 +8,12 @@
     phase name or a command table. #}
 <h1>{{ case.supplier or case.case_id }}</h1>
 <p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
+<p class="context-strip" data-testid="context-strip">One stopped payload — a
+supplier's case. <strong>Screening</strong> rows are watchlist near-matches;
+<strong>band</strong> is the verdict deterministic policy assigned. Approve
+to release the held ERP writes, reject to refuse them — either decision is
+final for this revision of the case.</p>
+{% include "_lifecycle.html" %}
 
 <div class="status status--{{ case.status.state|lower }}">
   <p class="status__state">{{ case.status.state }}</p>

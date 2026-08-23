@@ -49,6 +49,15 @@ background:rgb(248 250 252 / .03)}
 .fig b{display:block;font-family:"Space Grotesk",system-ui,sans-serif;
 font-size:1.7rem;font-weight:600;color:var(--amber-bright);margin-bottom:.35rem}
 .fig span{color:var(--muted);font-size:.92rem}
+.evalgrid{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
+margin:2rem 0}
+.evalstep{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
+background:rgb(248 250 252 / .03)}
+.evalstep a{text-decoration:none}
+.evalstep b{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
+color:var(--amber-bright)}
+.evalstep a:hover b{text-decoration:underline}
+.evalstep p{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
 .actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2.5rem 0}
 .btn{display:inline-block;padding:.7rem 1.15rem;border-radius:10px;
 border:1px solid var(--border);color:var(--star);text-decoration:none;
@@ -60,6 +69,8 @@ th{text-align:left;font-weight:600;color:var(--muted);font-size:.78rem;
 letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem;
 border-bottom:1px solid var(--border)}
 td{padding:.7rem .5rem;border-bottom:1px solid var(--hair);vertical-align:top}
+.grouplead td{padding:1.4rem .5rem .5rem;color:var(--star);font-weight:600;
+font-size:.95rem;border-bottom:1px solid var(--border)}
 .val{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--amber-bright);
 white-space:nowrap}
 .q{color:var(--muted);font-size:.86rem}
@@ -76,23 +87,53 @@ a{color:var(--amber-bright)}
 <header><a href="/" aria-label="Keplaria"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-128 -128 1013.52 512" role="img" aria-label="Keplaria"><g transform="rotate(-22 128 128)"><mask id="keplaria-orbit-cut-display" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256"><path fill="#fff" fill-rule="evenodd" d="M0,0 H256 V256 H0 Z M156.916185,186.982224 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z"/></mask><ellipse class="ring" cx="128" cy="128" rx="94" ry="72.004" fill="none" stroke="#F8FAFC" stroke-width="15" mask="url(#keplaria-orbit-cut-display)"/><circle cx="67.572986" cy="128" r="21" fill="#FBBF24" class="focus"/><circle cx="181.916185" cy="186.982224" r="16" fill="#F8FAFC" class="body"/></g><g transform="translate(296.96,169.216)"><path d="M66 0V700H198V422H216L443 700H612L320 355L622 0H448L216 284H198V0Z" fill="#F8FAFC" transform="translate(0.0000,0) scale(0.117760,-0.117760)"/><path d="M296 -14Q222 -14 165.5 17.5Q109 49 77.5 106.5Q46 164 46 242V254Q46 332 77.0 389.5Q108 447 164.0 478.5Q220 510 294 510Q367 510 421.0 477.5Q475 445 505.0 387.5Q535 330 535 254V211H174Q176 160 212.0 128.0Q248 96 300 96Q353 96 378.0 119.0Q403 142 416 170L519 116Q505 90 478.5 59.5Q452 29 408.0 7.5Q364 -14 296 -14ZM175 305H407Q403 348 372.5 374.0Q342 400 293 400Q242 400 212.0 374.0Q182 348 175 305Z" fill="#F8FAFC" transform="translate(72.0691,0) scale(0.117760,-0.117760)"/><path d="M70 -200V496H194V436H212Q229 465 265.0 487.5Q301 510 368 510Q428 510 479.0 480.5Q530 451 561.0 394.0Q592 337 592 256V240Q592 159 561.0 102.0Q530 45 479.0 15.5Q428 -14 368 -14Q323 -14 292.5 -3.5Q262 7 243.5 23.5Q225 40 214 57H196V-200ZM330 96Q389 96 427.5 133.5Q466 171 466 243V253Q466 325 427.0 362.5Q388 400 330 400Q272 400 233.0 362.5Q194 325 194 253V243Q194 171 233.0 133.5Q272 96 330 96Z" fill="#F8FAFC" transform="translate(140.0166,0) scale(0.117760,-0.117760)"/><path d="M70 0V700H196V0Z" fill="#F8FAFC" transform="translate(215.1475,0) scale(0.117760,-0.117760)"/><path d="M224 -14Q171 -14 129.0 4.5Q87 23 62.5 58.5Q38 94 38 145Q38 196 62.5 230.5Q87 265 130.5 282.5Q174 300 230 300H366V328Q366 363 344.0 385.5Q322 408 274 408Q227 408 204.0 386.5Q181 365 174 331L58 370Q70 408 96.5 439.5Q123 471 167.5 490.5Q212 510 276 510Q374 510 431.0 461.0Q488 412 488 319V134Q488 104 516 104H556V0H472Q435 0 411.0 18.0Q387 36 387 66V67H368Q364 55 350.0 35.5Q336 16 306.0 1.0Q276 -14 224 -14ZM246 88Q299 88 332.5 117.5Q366 147 366 196V206H239Q204 206 184.0 191.0Q164 176 164 149Q164 122 185.0 105.0Q206 88 246 88Z" fill="#F8FAFC" transform="translate(246.4717,0) scale(0.117760,-0.117760)"/><path d="M70 0V496H194V440H212Q223 470 248.5 484.0Q274 498 308 498H368V386H306Q258 386 227.0 360.5Q196 335 196 282V0Z" fill="#F8FAFC" transform="translate(314.5370,0) scale(0.117760,-0.117760)"/><path d="M70 0V496H196V0ZM133 554Q99 554 75.5 576.0Q52 598 52 634Q52 670 75.5 692.0Q99 714 133 714Q168 714 191.0 692.0Q214 670 214 634Q214 598 191.0 576.0Q168 554 133 554Z" fill="#F8FAFC" transform="translate(361.1699,0) scale(0.117760,-0.117760)"/><path d="M224 -14Q171 -14 129.0 4.5Q87 23 62.5 58.5Q38 94 38 145Q38 196 62.5 230.5Q87 265 130.5 282.5Q174 300 230 300H366V328Q366 363 344.0 385.5Q322 408 274 408Q227 408 204.0 386.5Q181 365 174 331L58 370Q70 408 96.5 439.5Q123 471 167.5 490.5Q212 510 276 510Q374 510 431.0 461.0Q488 412 488 319V134Q488 104 516 104H556V0H472Q435 0 411.0 18.0Q387 36 387 66V67H368Q364 55 350.0 35.5Q336 16 306.0 1.0Q276 -14 224 -14ZM246 88Q299 88 332.5 117.5Q366 147 366 196V206H239Q204 206 184.0 191.0Q164 176 164 149Q164 122 185.0 105.0Q206 88 246 88Z" fill="#F8FAFC" transform="translate(392.4941,0) scale(0.117760,-0.117760)"/></g></svg></a>
 <nav><a href="/proof">Verification</a><a href="https://github.com/sebastiancadena/keplaria">Source</a></nav></header>
 
-<h1>Supplier onboarding usually ends<br>when the ERP record is created.</h1>
-<p class="lede">Keplaria keeps governing that supplier for months afterwards.</p>
-<p class="sub">A fleet of agents onboards a supplier, screens it for sanctions,
-and then stays with it &mdash; requesting certificate renewals, applying a
-purchasing hold when evidence goes overdue, and releasing that hold when valid
-new evidence arrives. An LLM coordinator <em>proposes</em> which specialists
-should run; a deterministic policy layer <em>decides</em>, against a versioned
-catalog. Nothing reaches the ERP except through an outbox, and a human can stop
-any case on the way.</p>
-<div class="figures"><div class="fig"><b>55.3s</b><span>of machine work, one deployed run</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed</span></div><div class="fig"><b>1</b><span>decision a human had to make</span></div></div>
+<h1>Supplier compliance doesn&rsquo;t end at onboarding.<br>Most tools do.</h1>
+<p class="lede">Certificates expire months after a supplier is onboarded, and
+every onboarding tool retires the day the ERP (enterprise resource planning
+&mdash; the business&rsquo;s system of record for suppliers and purchasing)
+record is created. The ongoing work &mdash; noticing the expiry, chasing the
+renewal, deciding whether it is still safe to buy &mdash; goes back to a
+person with a calendar reminder.</p>
+<p class="sub">Keplaria stays. One durable mission per supplier wakes months
+later on its own clock: it requests renewed evidence, places a reversible
+purchasing hold when a certificate lapses, checks the renewal against the
+source document, and releases the hold. An LLM (large language model)
+coordinator <em>proposes</em> which specialist agents should run; a
+deterministic policy layer <em>decides</em>, against a versioned catalog.</p>
+<div class="figures"><div class="fig"><b>55.3s</b><span>of machine work, one deployed run</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed (author-timed, not practitioner-reviewed)</span></div><div class="fig"><b>1</b><span>decision a human had to make</span></div></div>
+<p class="sub">It stops exactly where policy requires a human decision
+&mdash; and nowhere else. Nothing reaches the ERP except through an outbox (a
+queue of pending ERP writes, released only on approval).</p>
 <div class="note"><b>Every number on this site is bound to the run that
 produced it.</b> The verification page is generated from the evidence files, not
 written by hand &mdash; so it cannot quietly disagree with them.</div>
 <div class="actions">
-<a class="btn btn--go" href="https://keplaria-console-bklu5jcdea-uc.a.run.app">Open the live case console</a>
+<a class="btn btn--go" href="https://keplaria-console-bklu5jcdea-uc.a.run.app">Open the live case console (a real
+deployment, synthetic demo suppliers)</a>
 <a class="btn" href="/proof">Verification ledger</a>
 <a class="btn" href="https://github.com/sebastiancadena/keplaria">Source</a>
+</div>
+<h2>Evaluate this in three minutes</h2>
+<div class="evalgrid">
+<div class="evalstep"><a href="https://keplaria-console-bklu5jcdea-uc.a.run.app"><b>1&nbsp;&middot; Case console</b></a>
+<p>No sign-in. Open a case &mdash; one supplier&rsquo;s file; the console
+calls it a payload: a context strip and a lifecycle indicator (onboarded
+&rarr; active &rarr; renewal requested &rarr; held &rarr; released) show
+where it stands, and the status line says exactly what has been written to
+the ERP so far &mdash; for a parked case (stopped for a human decision
+&mdash; this can happen at any stage), nothing yet.</p>
+</div>
+<div class="evalstep"><a href="https://keplaria-review-bklu5jcdea-uc.a.run.app/review"><b>2&nbsp;&middot; Review console
+(Ground Control)</b></a>
+<p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy &mdash;
+Google&rsquo;s sign-in check in front of the service). Cases the policy
+stopped wait here, their ERP writes held &mdash; approving is what releases
+them.</p></div>
+<div class="evalstep"><b>3&nbsp;&middot; Demonstration video</b>
+<p>Not linked yet &mdash; it publishes with the Devpost submission, and will
+be added here then. What it shows: one continuous, unedited take &mdash; a
+stop for a human, an approval that releases the held writes, then a
+simulated year of renewals, a hold, and a release.</p></div>
 </div>
 <h2>Named for the law, not the planets</h2>
 <p class="sub">An agent that runs for minutes can afford to improvise. One that
@@ -107,10 +148,10 @@ request, a purchasing hold, a hold release. Spacecraft engineers call those
 corrections station-keeping. So do we.</p>
 <h2>What a case looks like</h2>
 <p class="sub">The console is public and read-only. A case shows what the
-coordinator proposed, what policy actually engaged, the screening candidates and
-why one of them needed a person, and every command &mdash; including the ones
-policy refused. A case stopped for a human says so plainly, and says that
-nothing has been written.</p>
+coordinator proposed, what policy actually engaged, the candidates from
+screening against a sanctions watchlist and why one of them needed a person,
+and every command &mdash; including the ones policy refused. A case stopped
+for a human says so plainly, and says that nothing has been written.</p>
 <h2>Built on</h2>
 <p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
 &middot; Cloud Run &middot; Firestore &middot; Pub/Sub &middot; ERPNext &middot;
