@@ -570,3 +570,16 @@ def test_the_review_page_renders_a_risk_factor_as_prose_not_a_dict(db, case_id, 
     response = client.get(f"/review/{case_id}")
     assert "'weight':" not in response.text, "a dict repr reached the page"
     assert "+0.25" in response.text
+
+
+def test_the_review_list_carries_a_context_strip(client, db):
+    page = client.get("/review").text
+    assert 'data-testid="context-strip"' in page
+    assert "releases" in page.lower()
+
+
+def test_the_review_case_carries_strip_and_lifecycle(db, case_id, client):
+    _park_a_real_case(db, case_id)
+    page = client.get(f"/review/{case_id}").text
+    assert 'data-testid="context-strip"' in page
+    assert 'data-testid="lifecycle-strip"' in page
