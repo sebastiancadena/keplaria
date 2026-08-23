@@ -69,14 +69,14 @@ Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 > is now overdue — **SYNC (hold applied)** and a purchasing hold lands in the
 > ERP. This supplier genuinely cannot be bought from.
 
-### Beat 2f — Route three: the certificate (2:05–2:25) — 62 words
+### Beat 2f — Route three: the certificate (2:05–2:25) — 63 words
 
 > **SYNC (certificate event)** Then the certificate comes back. New event, new
 > route: evidence only, no compliance; policy agrees. **SYNC (grounding view)**
 > Every field traces to a verbatim span in the document. **SYNC (hold lifts)**
 > The hold releases. Renewal, hold, release — automatic corrections we call
-> station-keeping. And what the supplier had to do was answer an email: no
-> portal, no login, no account.
+> station-keeping. And the supplier's side of this — by design — is answering
+> an email: no portal, no login, no account.
 >
 > **SYNC (run freezes on end state)** Three hundred eighty simulated days. Five
 > under real hold. Zero human touches.

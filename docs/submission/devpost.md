@@ -75,6 +75,18 @@ are queued rather than executed until a named reviewer approves them in
 write. A rejection is equally binding, and a protective hold is applied whether
 or not anyone ever opens the page.
 
+A compliance relationship has two sides, and the other one is not a corporate
+role at all. The party who must keep a certificate current is often a small
+supplier — a family packaging firm with no compliance department and no room
+for one more portal. Keplaria deliberately asks nothing of them: no portal, no
+login, no account, no training. The renewal request arrives as a real email
+sent by the deployed workflow, and answering it is everything the design asks
+of them.
+One boundary is stated rather than implied: in this prototype the returned
+certificate enters the system as a published event — ingesting the reply
+itself from a mailbox is design intent, not built, and the video labels it
+that way on screen.
+
 One deployed run of that whole loop, captured in
 [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json), covers
 two suppliers: one that parks for a human, and one that runs the full lifecycle
