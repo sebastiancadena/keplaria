@@ -210,7 +210,13 @@ if [ "$repo_vis" = "PUBLIC" ]; then
 elif [ -z "$repo_vis" ]; then
   meh "could not read repo visibility (gh auth?) — verify by hand before submitting"
 else
-  bad "the code repository is $repo_vis — the submission links it and rules require a repository + reproducible README"
+  # DELIBERATE, user's decision 2026-08-22: the repo stays private while the
+  # contest is open so the work is not copyable mid-competition. It MUST be
+  # public before submitting -- the rules require a repository and a
+  # reproducible README, and the submission and the site both link it. Tracked
+  # as a dated gate row in strategy/STATUS.md so /gate-check surfaces it;
+  # warning rather than failing so a known state does not mask a new one.
+  meh "the code repository is $repo_vis — deliberate while the contest is open; MUST be public before submitting (tracked gate)"
 fi
 
 # The public site must actually be reachable: it is the URL the video shows.
