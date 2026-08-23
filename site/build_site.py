@@ -232,13 +232,15 @@ deployment, synthetic demo suppliers)</a>
 <h2>Evaluate this in three minutes</h2>
 <div class="evalgrid">
 <div class="evalstep"><a href="{CONSOLE}"><b>1&nbsp;&middot; Case console</b></a>
-<p>No sign-in. Open a case (one supplier&rsquo;s file): a context strip and a
-lifecycle indicator (onboarded &rarr; active &rarr; renewal requested &rarr;
-held &rarr; released) show where it stands, and the status line says exactly
-what has been written to the ERP so far &mdash; for a parked case (stopped
-for a human decision &mdash; this can happen at any stage), nothing yet.</p>
+<p>No sign-in. Open a case &mdash; one supplier&rsquo;s file; the console
+calls it a payload: a context strip and a lifecycle indicator (onboarded
+&rarr; active &rarr; renewal requested &rarr; held &rarr; released) show
+where it stands, and the status line says exactly what has been written to
+the ERP so far &mdash; for a parked case (stopped for a human decision
+&mdash; this can happen at any stage), nothing yet.</p>
 </div>
-<div class="evalstep"><a href="{REVIEW}"><b>2&nbsp;&middot; Review console</b></a>
+<div class="evalstep"><a href="{REVIEW}"><b>2&nbsp;&middot; Review console
+(Ground Control)</b></a>
 <p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy &mdash;
 Google&rsquo;s sign-in check in front of the service). Cases the policy
 stopped wait here, their ERP writes held &mdash; approving is what releases
@@ -293,7 +295,8 @@ def proof(claims) -> str:
     by_id = {claim.id: claim for claim in claims}
     covered = {claim_id for _, ids in GROUPS for claim_id in ids}
     missing = {claim.id for claim in claims} - covered
-    assert not missing, f"claims.toml has ungrouped claims: {sorted(missing)}"
+    if missing:
+        raise ValueError(f"claims.toml has ungrouped claims: {sorted(missing)}")
     rows = []
     for lead, ids in GROUPS:
         rows.append(f'<tr class="grouplead"><td colspan="3">{lead}</td></tr>')
