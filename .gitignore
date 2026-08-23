@@ -20,6 +20,10 @@ wheels/
 # Local worktrees (superpowers SDD)
 .worktrees/
 
+# Superpowers scratch state (planning/session workspace) — private, never
+# tracked; only .git/info/exclude covered this locally before.
+.superpowers/
+
 # Superpowers process artifacts (specs/plans) — written from the private
 # planning layer, so they carry its vocabulary. Kept locally, never tracked.
 docs/superpowers/
