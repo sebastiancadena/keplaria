@@ -44,16 +44,41 @@ PLACEHOLDER_CERTIFICATE_PDF = (
 )
 
 
-def frappe_client() -> httpx.Client:
-    """Authenticated client for the configured Frappe site."""
+def _client(key: str, secret: str) -> httpx.Client:
     site = os.environ["FRAPPE_SITE"].rstrip("/")
-    key = os.environ["FRAPPE_API_KEY"]
-    secret = os.environ["FRAPPE_API_SECRET"]
     return httpx.Client(
         base_url=site,
         headers={"Authorization": f"token {key}:{secret}"},
         timeout=30,
         follow_redirects=True,
+    )
+
+
+def frappe_client() -> httpx.Client:
+    """Authenticated client for the configured Frappe site.
+
+    This is the SCOPED executor identity: one custom role granting read,
+    write and create on Supplier, read on Supplier Group, and read and create
+    on Communication and File. It holds no delete on anything, cannot reach
+    the ledger doctypes, and cannot edit roles or permissions. Every deployed
+    service uses it; the credential reaches them from Secret Manager, never
+    from a file. `spikes/frappe_scoped_executor/` measures those limits
+    against the live site rather than describing them.
+    """
+    return _client(os.environ["FRAPPE_API_KEY"], os.environ["FRAPPE_API_SECRET"])
+
+
+def frappe_admin_client() -> httpx.Client:
+    """Authenticated client for the site OWNER — local maintenance only.
+
+    Deleting a record needs rights the executor deliberately does not have,
+    so `scripts/erp.py` runs as the owner. Nothing on the deployed path may
+    use this: the credential is absent from Secret Manager and from every
+    Cloud Run service, so reaching for it there raises KeyError rather than
+    quietly succeeding. Kept in `.env.secrets`, never in `.env`.
+    """
+    return _client(
+        os.environ["FRAPPE_ADMIN_API_KEY"], os.environ["FRAPPE_ADMIN_API_SECRET"]
     )
 
 

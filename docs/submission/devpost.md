@@ -162,10 +162,13 @@ but never a record. Generative memory is deliberately not trusted with
 compliance facts.
 Credentials come from **Secret Manager**, each service runs as its own service
 account, and the ERP credential is confined rather than spread: only the
-deterministic executor holds it (no agent ever does), and the ERP's native
-role enforcement is proven with a deliberately unprivileged token that
-receives the ERP's own 403 on supplier access. The executor's own key is not
-yet role-scoped; the repository flags it for rotation. Traces go to **Cloud Trace** and are
+deterministic executor holds it, and no agent ever does. It is also scoped to
+the work. The credential belongs to a purpose-made ERP user whose single role
+grants read, write and create on supplier records and create on correspondence
+and attachments; it cannot delete what it created, cannot widen its own
+permissions, and cannot read an invoice, a payment or a ledger. The repository
+measures those limits against the live system on every run of the check rather
+than asserting them. Traces go to **Cloud Trace** and are
 load-bearing rather than decorative: a 10.6 s rise in run time was diagnosed
 node by node against them and traced to model reasoning length rather than to
 code.

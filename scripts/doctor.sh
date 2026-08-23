@@ -790,6 +790,62 @@ case "$engine_env" in
   *)   bad "deployed engine carries plaintext secret env var(s): ${engine_env} — readable by anyone with viewer access on the engine; the graph does not use them (no public egress, executor runs on Cloud Run)" ;;
 esac
 
+# The ERP credential the deployed services hold must be the SCOPED executor,
+# not the site owner. Until 2026-08-23 it was the owner's key — a full System
+# Manager — while README and the Devpost copy described it as scoped, which a
+# cold read caught as an overclaim. Checked by asking Frappe who the deployed
+# credential authenticates as, because that is the only answer that cannot be
+# satisfied by a comment.
+if [ -f .env ]; then
+  # shellcheck disable=SC1091
+  site="$(grep -E '^FRAPPE_SITE=' .env | cut -d= -f2- | tr -d '"'"'"'"' | sed 's:/*$::')"
+  key="$(gcloud secrets versions access latest --secret frappe-api-key --project keplaria 2>/dev/null)"
+  sec="$(gcloud secrets versions access latest --secret frappe-api-secret --project keplaria 2>/dev/null)"
+  if [ -z "$site" ] || [ -z "$key" ] || [ -z "$sec" ]; then
+    meh "could not resolve the deployed ERP credential, so its identity was not checked"
+  else
+    who="$(curl -s -m 20 -H "Authorization: token ${key}:${sec}" \
+      "${site}/api/method/frappe.auth.get_logged_user" 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("message",""))' 2>/dev/null)"
+    case "$who" in
+      keplaria-executor@keplaria.example)
+        ok "deployed ERP credential authenticates as the scoped executor (${who})" ;;
+      "") meh "the ERP did not answer, so the deployed credential's identity was not checked" ;;
+      *)  bad "deployed ERP credential authenticates as ${who} — the executor must run as the scoped identity, not the site owner; see spikes/frappe_scoped_executor/" ;;
+    esac
+  fi
+fi
+
+# A Cloud Run revision holds the secret VERSION it resolved at deploy time, so
+# adding a version changes nothing until a new revision exists. Rotating and
+# forgetting this step leaves the services on the old credential while every
+# local check passes — the failure the rotation runbook in docs/operations.md
+# exists to prevent, now checked rather than described.
+newest_secret=0
+for sname in frappe-api-key frappe-api-secret; do
+  t="$(gcloud secrets versions describe latest --secret "$sname" --project keplaria \
+        --format='value(createTime)' 2>/dev/null)"
+  [ -n "$t" ] && t="$(date -d "$t" +%s 2>/dev/null || echo 0)"
+  [ "${t:-0}" -gt "$newest_secret" ] && newest_secret="$t"
+done
+if [ "$newest_secret" -eq 0 ]; then
+  meh "could not read the ERP secret versions, so revision freshness was not checked"
+else
+  stale=""
+  for svc in keplaria-ingress keplaria-review; do
+    rt="$(gcloud run services describe "$svc" --region us-central1 --project keplaria \
+          --format='value(status.latestReadyRevisionName)' 2>/dev/null)"
+    [ -z "$rt" ] && continue
+    ct="$(gcloud run revisions describe "$rt" --region us-central1 --project keplaria \
+          --format='value(metadata.creationTimestamp)' 2>/dev/null)"
+    ct="$(date -d "$ct" +%s 2>/dev/null || echo 0)"
+    [ "$ct" -lt "$newest_secret" ] && stale="${stale}${svc} "
+  done
+  [ -z "$stale" ] \
+    && ok "keplaria-ingress and keplaria-review revisions are newer than the ERP secret versions they resolve" \
+    || bad "revision(s) predate the current ERP secret: ${stale}— a revision holds the version it resolved at deploy time, so these still serve the OLD credential; run: gcloud run services update <svc> --region us-central1 --update-secrets FRAPPE_API_KEY=frappe-api-key:latest,FRAPPE_API_SECRET=frappe-api-secret:latest"
+fi
+
 echo "== public claims =="
 # A number in the README that no longer matches the run that produced it is a
 # metric-honesty failure, so this is a FAIL and not a warning. But a script

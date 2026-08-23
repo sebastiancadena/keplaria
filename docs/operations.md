@@ -480,51 +480,92 @@ A Frappe credential on the engine is therefore both unused and readable.
 `.gitignore` at deploy time, so being gitignored proves nothing), and no
 secret-shaped plaintext env var on the deployed engine.
 
-The last of those three currently reports **red**, and that is accurate rather
-than a bug: an engine deployed before this split still carries the old values
-as plaintext. They are **dead credentials** — the Frappe API secret was rotated
-on 2026-08-20 and Secret Manager holds the replacement — so what remains is
-stale text, not a usable key.
+All three now report green, including the engine one — but the route there is
+worth keeping, because two documented remedies were disproven along the way.
 
-**A redeploy does NOT clear them. This was measured on 2026-08-22, and it
-contradicts what this section and `infra/strip-engine-secrets.sh` both
-previously claimed.** A normal `agents-cli deploy` ran that day with a clean
-`.env`, and the engine still carried `FRAPPE_API_KEY` and `FRAPPE_API_SECRET`
-afterwards — doctor re-run after the deploy still reports red. `agents-cli`
-**carries the existing engine's env forward on update**; it does not replace the
-set with what `.env` holds. The proof is by elimination: `DEVTO_API_KEY` exists
-only in `.env.secrets` and is absent from the engine, so `.env.secrets` was
-never read, and `.env` no longer holds the Frappe keys — leaving carry-forward
-as the only source. `agents-cli deploy` also exposes no flag that removes an env
-var: `--update-env-vars` only sets.
+An engine deployed before this split carried the old values as plaintext. A
+redeploy does **not** clear them: a normal `agents-cli deploy` ran on
+2026-08-22 with a clean `.env` and the engine still carried
+`FRAPPE_API_KEY` / `FRAPPE_API_SECRET` afterwards, because `agents-cli`
+carries the existing engine's env forward on update rather than replacing the
+set with what `.env` holds. The proof was by elimination: `DEVTO_API_KEY`
+exists only in `.env.secrets` and never appeared on the engine, so
+`.env.secrets` was never read, and `.env` no longer held the Frappe keys,
+leaving carry-forward as the only source. `agents-cli deploy` exposes no flag
+that removes an env var either — `--update-env-vars` only sets.
 
-So **both** documented remedies are now known not to work, and the item is open
-rather than pending-a-deploy:
+What cleared them was `infra/strip-engine-secrets.sh` against the **v1beta1**
+endpoint; the same call against `v1` fails with "The Reasoning Engine failed
+to be updated". See the comment block at the top of that script.
 
-- **In place**, via `infra/strip-engine-secrets.sh` — fails with "The Reasoning
-  Engine failed to be updated". See the comment block at the top of that script
-  for what was tried and what is ruled out.
-- **By redeploy** — disproven above.
+### Rotating the ERP credential
 
-What is *not* urgent about it: the values are dead, the engine has no public
-egress, and its graph never imports the executor, so they are unusable as well
-as unused. What remains is hygiene on a readable field, not an exposure of a
-live credential — and it does not need another rotation first, because the
-rotation already happened.
+Two identities live on the Frappe site and only one of them is rotated this
+way:
 
-Rotating the Frappe secret is four steps, and the middle two are what deployed
-services actually read:
+| Identity | Env vars | Where it lives | Used by |
+|---|---|---|---|
+| Scoped executor `keplaria-executor` | `FRAPPE_API_KEY` / `FRAPPE_API_SECRET` | Secret Manager `frappe-api-key` / `frappe-api-secret`, and `.env.secrets` | every deployed service |
+| Site owner | `FRAPPE_ADMIN_API_KEY` / `FRAPPE_ADMIN_API_SECRET` | `.env.secrets` only | `scripts/erp.py` |
 
-1. Regenerate — Frappe UI (User → API Access → Generate Keys), or
-   `frappe.core.doctype.user.user.generate_keys` over the API. Only
-   `api_secret` changes; `api_key` is kept.
-2. `gcloud secrets versions add frappe-api-secret --data-file=-`
-3. New revisions for `keplaria-ingress` and `keplaria-review` so `:latest`
-   re-resolves — an existing revision holds the version it resolved at deploy
-   time, so ERP writes fail between steps 1 and 3.
+The owner key is deliberately absent from Secret Manager and from every
+deployed service. Deleting a record needs rights the executor does not have,
+which is the whole point of the split — so if a purge starts returning 403,
+the cause is a missing admin variable, not a broken ERP.
+
+Rotating the executor credential:
+
+1. Regenerate:
+
+   ```bash
+   uv run --env-file .env --env-file .env.secrets \
+       python spikes/frappe_scoped_executor/provision.py --generate-keys
+   ```
+
+   The provision script is idempotent and also re-asserts the role, so it is
+   safe to run without `--generate-keys` any time you want the permissions put
+   back the way `contract.py` declares them.
+
+2. Add BOTH values to Secret Manager. `generate_keys` returns a new
+   `api_secret`, and a rotation onto a different ERP user changes the
+   `api_key` as well, so rotating only the secret is what the 2026-08-20 pass
+   did and it is not enough for an identity change:
+
+   ```bash
+   gcloud secrets versions add frappe-api-key    --project keplaria --data-file=-
+   gcloud secrets versions add frappe-api-secret --project keplaria --data-file=-
+   ```
+
+3. New revisions for `keplaria-ingress` and `keplaria-review`, so `:latest`
+   re-resolves. A revision holds the version it resolved at deploy time, so
+   ERP writes fail between steps 2 and 3. `gcloud run deploy` is blocked from
+   agent sessions but `gcloud run services update` is not, and it needs no
+   image:
+
+   ```bash
+   for svc in keplaria-ingress keplaria-review; do
+     gcloud run services update "$svc" --region us-central1 --project keplaria \
+       --update-secrets FRAPPE_API_KEY=frappe-api-key:latest,FRAPPE_API_SECRET=frappe-api-secret:latest
+   done
+   ```
+
 4. Update `.env.secrets` for local tooling.
 
-The engine needs nothing in step 3. It never reads these.
+5. Re-measure, don't assume:
+
+   ```bash
+   uv run --env-file .env --env-file .env.secrets \
+       python spikes/frappe_scoped_executor/harness.py
+   bash scripts/doctor.sh
+   ```
+
+   Doctor asks the ERP who the deployed credential authenticates as, and
+   checks that both revisions are newer than the secret versions they resolve.
+   Skipping step 3 leaves every local check green while the services keep
+   serving on the old credential, which is exactly what those two checks
+   exist to catch.
+
+The engine needs nothing here. It never reads these.
 
 ### One image, two entry points
 

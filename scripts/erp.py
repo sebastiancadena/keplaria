@@ -4,20 +4,22 @@
 Read-only by default. Every destructive action needs an explicit target AND
 `--yes`; there is no "delete everything" verb, on purpose.
 
-    uv run --env-file .env python scripts/erp.py suppliers
-    uv run --env-file .env python scripts/erp.py cases
-    uv run --env-file .env python scripts/erp.py links
-    uv run --env-file .env python scripts/erp.py audit
-    uv run --env-file .env python scripts/erp.py purge --test-suppliers --yes
-    uv run --env-file .env python scripts/erp.py purge --supplier "NAME" --yes
-    uv run --env-file .env python scripts/erp.py purge --case TV-XXXX --yes
-    uv run --env-file .env python scripts/erp.py purge --communication ID --file ID --yes
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py suppliers
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py cases
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py links
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py audit
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --test-suppliers --yes
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --supplier "NAME" --yes
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --case TV-XXXX --yes
+    uv run --env-file .env --env-file .env.secrets python scripts/erp.py purge --communication ID --file ID --yes
 
 Why this exists rather than an ERP MCP server: these operations are
 human-triggered maintenance, not something an agent should be able to reach
-for mid-task. The Frappe credentials are admin-scoped, so an always-available
-tool would give every agent turn write access to the live ERP. A script keeps
-deletion an intentional act.
+for mid-task. This script runs as the site OWNER (`FRAPPE_ADMIN_API_KEY` /
+`FRAPPE_ADMIN_API_SECRET`, local `.env.secrets` only), because deleting a
+record needs rights the deployed executor deliberately does not have. An
+always-available tool on this credential would give every agent turn write
+access to the live ERP. A script keeps deletion an intentional act.
 
 `audit` answers the question that matters before any recording: is anything
 in the ERP or the live case store a sanctions match? It exists because an
@@ -49,7 +51,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.executor.frappe import frappe_client  # noqa: E402
+from app.executor.frappe import frappe_admin_client  # noqa: E402
 from app.state.firestore import CASES, get_client  # noqa: E402
 
 WATCHLIST = Path(__file__).resolve().parent.parent / "fixtures" / "watchlist" / "entities.ftm.json"
@@ -87,7 +89,7 @@ def _watchlist() -> dict[str, tuple[str, str]]:
 
 
 def _suppliers() -> list[dict]:
-    with frappe_client() as client:
+    with frappe_admin_client() as client:
         response = client.get(
             "/api/resource/Supplier",
             params={
@@ -124,7 +126,7 @@ def _rows(doctype: str, filters: str | None = None) -> list[dict]:
     }
     if filters:
         params["filters"] = filters
-    with frappe_client() as client:
+    with frappe_admin_client() as client:
         response = client.get(f"/api/resource/{doctype}", params=params)
         response.raise_for_status()
         return response.json()["data"]
@@ -442,7 +444,7 @@ def cmd_purge(args) -> int:
 
     deleted, failed = 0, []
     if erp_targets:
-        with frappe_client() as client:
+        with frappe_admin_client() as client:
             for doctype, name in erp_targets:
                 quoted = urllib.parse.quote(name, safe="")
                 response = client.delete(f"/api/resource/{doctype}/{quoted}")

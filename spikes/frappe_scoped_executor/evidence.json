@@ -1,0 +1,301 @@
+{
+  "spike": "frappe_scoped_executor",
+  "scope": "the ERP identity the deployed executor runs as",
+  "captured_at": "2026-08-23T18:55:25.694412+00:00",
+  "result": "PASS",
+  "site": "andina-foods.v.frappe.cloud",
+  "role": "Keplaria Executor",
+  "user": "keplaria-executor@keplaria.example",
+  "what_this_proves": "The credential the deployed ingress and review services hold is a purpose-made ERP user whose rights were read back off the live site during this run: it performs every supplier operation the system needs, and it cannot delete a record, widen its own role, or reach a financial document.",
+  "not_proven_here": [
+    "That the deployed services are USING this credential. That is a Secret Manager version plus a Cloud Run revision, checked by scripts/doctor.sh and re-proven end to end by spikes/core_contracts/harness.py.",
+    "Anything about the owner credential's own scope. It is a full System Manager by design, lives only in .env.secrets, and is used only by scripts/erp.py."
+  ],
+  "probe_records_removed": {
+    "before_run": [],
+    "after_run": [
+      "File/311e4a4ddb",
+      "Communication/952dk3bq3q",
+      "Supplier/TEST Scoped Executor Probe SAS"
+    ]
+  },
+  "criteria": [
+    {
+      "id": "identity_is_not_the_site_owner",
+      "requirement": "The credential deployed services hold belongs to a user carrying one custom role, not to the site owner",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "FRAPPE_API_KEY authenticates as keplaria-executor@keplaria.example",
+          "evidence": "frappe.auth.get_logged_user"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "executor identity is not the site owner (sebastiancadena@gmail.com)",
+          "evidence": "frappe.auth.get_logged_user"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "assigned roles: ['Keplaria Executor']",
+          "evidence": "User/keplaria-executor@keplaria.example"
+        }
+      ],
+      "note": "Read back from the live site, so re-granting the owner's key to the deployed services fails this rather than passing quietly."
+    },
+    {
+      "id": "role_grants_match_the_contract",
+      "requirement": "Role 'Keplaria Executor' grants exactly the rights app/executor/frappe.py exercises, on exactly the doctypes it touches",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Communication: granted ['create', 'read']",
+          "evidence": "Custom DocPerm"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "File: granted ['create', 'read']",
+          "evidence": "Custom DocPerm"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Supplier: granted ['create', 'read', 'write']",
+          "evidence": "Custom DocPerm"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Supplier Group: granted ['read']",
+          "evidence": "Custom DocPerm"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "no permission rows outside the contract",
+          "evidence": "Custom DocPerm"
+        }
+      ],
+      "note": "Compared over every flag Frappe stores, so a right introduced by a future version is a failure by default rather than an unnoticed grant."
+    },
+    {
+      "id": "executor_path_works_on_the_scoped_credential",
+      "requirement": "Every ERP operation the deployed system performs succeeds under the scoped identity",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "leaf_supplier_group: {\"group\": \"Distributor\"}",
+          "evidence": "app/executor/frappe.py"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "create_supplier_if_absent: {\"external_id\": \"TEST Scoped Executor Probe SAS\", \"created\": true}",
+          "evidence": "app/executor/frappe.py"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "set_supplier_hold: {\"external_id\": \"TEST Scoped Executor Probe SAS\", \"created\": true}",
+          "evidence": "app/executor/frappe.py"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "clear_supplier_hold: {\"external_id\": \"TEST Scoped Executor Probe SAS\", \"created\": true}",
+          "evidence": "app/executor/frappe.py"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "send_supplier_message: {\"external_id\": \"952dk3bq3q\", \"created\": true}",
+          "evidence": "app/executor/frappe.py"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "attach_evidence: {\"external_id\": \"311e4a4ddb\", \"created\": true}",
+          "evidence": "app/executor/frappe.py"
+        }
+      ],
+      "note": "Enumerated from app/executor/frappe.py's public operations. A new operation needing a right the role lacks fails here, at the cost of one line, rather than in a deployed run."
+    },
+    {
+      "id": "destructive_rights_absent",
+      "requirement": "The executor cannot delete any record it can create",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "DELETE Supplier/TEST Scoped Executor Probe SAS -> HTTP 403 (record readable: HTTP 200)",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "DELETE Communication/952dk3bq3q -> HTTP 403 (record readable: HTTP 200)",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "DELETE File/311e4a4ddb -> HTTP 403 (record readable: HTTP 200)",
+          "evidence": "live API"
+        }
+      ],
+      "note": "Each attempt targets a record this run created and confirms it is readable first, so a 403 is a permission refusal rather than Frappe not finding the record."
+    },
+    {
+      "id": "privilege_escalation_blocked",
+      "requirement": "The executor cannot create roles, permissions or users",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "POST Role -> HTTP 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "POST Custom DocPerm -> HTTP 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "POST User -> HTTP 403",
+          "evidence": "live API"
+        }
+      ],
+      "note": "The Custom DocPerm attempt is the one that matters: it is the exact write that would widen this role, and it is the write every other criterion here depends on being refused."
+    },
+    {
+      "id": "financial_doctypes_unreachable",
+      "requirement": "The executor cannot read or write invoices, payments, ledgers or company records",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Company: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Customer: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Sales Invoice: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Purchase Invoice: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Purchase Order: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Payment Entry: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Journal Entry: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Bank Account: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Employee: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Email Account: GET 403, POST 403",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Supplier Quotation: GET 403, POST 403",
+          "evidence": "live API"
+        }
+      ]
+    },
+    {
+      "id": "inherited_desk_baseline_recorded",
+      "requirement": "Frappe's own System User baseline is measured and stated, not implied away by the word 'scoped'",
+      "proven": true,
+      "checks": [
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Contact: GET 200",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Address: GET 200",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "Item: GET 200",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "User: GET 200",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "no reachable doctype outside the recorded baseline",
+          "evidence": "live API"
+        },
+        {
+          "kind": "api",
+          "ok": true,
+          "detail": "baseline doctypes the executor can also CREATE: ['Contact']",
+          "evidence": "live API"
+        }
+      ],
+      "note": "Contact is creatable through this baseline, and Frappe creates one per Supplier anyway. It carries a supplier name, and scripts/erp.py does not read Contact rows \u2014 so the pre-recording audit cannot see a name that survives there."
+    }
+  ]
+}

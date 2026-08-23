@@ -125,7 +125,7 @@ measured and turned down.
 |---|---|---|
 | **Agent Runtime** | Native | Hosts the ADK graph as reasoning engine `keplaria`. Reaches the screening VM over a Private Service Connect (PSC) interface; that VM has no external IP and is not reachable from the internet, and keeps execution state in Agent Platform Sessions. |
 | **Agent Registry** | Native | The deployment auto-registers with no publish step; the entry is live and refreshes on redeploy. It carries the framework (`google-adk`), the runtime reference, the runtime identity principal, and the callable interfaces. Honest limit: those are the fields the Registry populates itself; it holds no owner, purpose, or tool-scope description of its own. |
-| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP credential is confined rather than spread: only the deterministic executor at the ingress holds it (no agent ever does), and the ERP's native role enforcement is proven with a deliberately unprivileged token that receives Frappe's own 403 on supplier access ([`spikes/frappe_capability/evidence.json`](spikes/frappe_capability/evidence.json)). The executor's own key is not yet role-scoped; the [ERPNext section below](#erpnext-frappe-cloud) flags it for rotation. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
+| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP credential is confined rather than spread: only the deterministic executor at the ingress holds it, and no agent ever does. That credential is scoped to the work: it belongs to a purpose-made ERP user holding one role, which grants read, write and create on supplier records and create on correspondence and attachments, and nothing else. It cannot delete a record it created, cannot widen its own permissions, and cannot read an invoice, a payment or a ledger. Those limits are measured against the live site rather than described ([`spikes/frappe_scoped_executor/evidence.json`](spikes/frappe_scoped_executor/evidence.json)), including the reads the ERP grants any signed-in user, which the check records rather than leaves implied. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
 | **Memory Bank** | Deliberately not used | Transactional Firestore owns authoritative case state (case version, event claim, approval, command outbox), and Sessions retain resumable agent history. Generative memory is not trusted with compliance facts, and Sessions are not described here as a Memory Bank equivalent; they hold different things. |
 | **Model Armor** | Measured, not adopted | Probed against this project's own corpus on 2026-08-19 and turned down on the evidence: its prompt-injection filter returns `NO_MATCH_FOUND` on the planted injection fixture that the incumbent check catches with five findings, and its data plane is unreachable from the engine's network. One filter did deliver: malicious-URI detection, with no false positives on clean fixtures. Full measurement, including the context-dilution boundary that explains the miss: [`spikes/model_armor/evidence.json`](spikes/model_armor/evidence.json). |
 | **Agent Gateway** | Not used | Ingress is an authenticated Pub/Sub push adapter on Cloud Run that refuses anonymous callers, and the human decision surface sits behind IAP. Nothing in the design needed a gateway in front of that. |
@@ -636,10 +636,18 @@ ever sitting mid-run waiting on this UI.
   drop `Authorization` on cross-host redirects).
 - Company: **Andina Foods** — currency USD, country Colombia, abbreviation
   `AF`, no demo data.
-- API credentials: Secret Manager `frappe-api-key` / `frappe-api-secret`
-  (mirrored in local `.env` as `FRAPPE_SITE` / `FRAPPE_API_KEY` /
-  `FRAPPE_API_SECRET`). These are the owner's keys; rotate once a scoped
-  executor identity exists.
+- API credentials: **two identities that are not interchangeable.** The
+  deployed services hold the scoped executor, `keplaria-executor`, whose one
+  role grants read/write/create on `Supplier`, read on `Supplier Group`, and
+  read/create on `Communication` and `File`. It reaches them from Secret
+  Manager as `frappe-api-key` / `frappe-api-secret`, and locally from
+  `.env.secrets` as `FRAPPE_API_KEY` / `FRAPPE_API_SECRET`. The site owner's
+  key is `FRAPPE_ADMIN_API_KEY` / `FRAPPE_ADMIN_API_SECRET` in `.env.secrets`
+  alone, used by `scripts/erp.py` and by nothing else, because purging a
+  record needs rights the executor deliberately lacks. Rotated on 2026-08-23;
+  before that both were the owner's key. Re-provision the identity with
+  `spikes/frappe_scoped_executor/provision.py` and re-measure it with the
+  harness beside it.
 - **Known issue:** the site's cron scheduler has never ticked (Frappe Cloud
   support ticket filed 2026-08-12), so Email Queue does not auto-flush.
   Outbound email works via API dispatch instead: queue with
