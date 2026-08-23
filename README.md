@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/github-header.png" alt="Keplaria — Put your work in orbit." width="880">
+</p>
+
 # Keplaria
 
 Agent project built on the [Google Agent Development Kit (ADK)](https://adk.dev)

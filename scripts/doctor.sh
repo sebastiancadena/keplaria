@@ -162,6 +162,43 @@ if [ -d .venv ] && [ -f site/build_site.py ]; then
   rm -rf "$tmp_site"
 fi
 
+# The name is an argument, and it was dropped once already: when the strategy
+# brief was decomposed into topic files, the section explaining why the project
+# is called Keplaria was carried into none of them, and no public surface said
+# it for weeks. A rewrite of the site copy can silently drop it again, so the
+# published page is checked for it rather than trusted.
+if [ -f site/dist/index.html ]; then
+  if grep -qi "kepler" site/dist/index.html \
+     && grep -qi "station-keeping" site/dist/index.html; then
+    ok "the site still explains the name (Kepler + station-keeping)"
+  else
+    bad "the site no longer explains the name — the orbital frame was dropped from public copy once before; see CLAUDE.md"
+  fi
+fi
+
+# The README header and the site's share card are both brand assets copied in
+# from the sibling repo. A copy can drift from its source silently, and a
+# missing file renders as a broken image on the repo's front page.
+header_src="$HOME/dev/git/keplaria-assets/assets/social/github-social-card.png"
+if [ -f docs/assets/github-header.png ] && [ -f "$header_src" ]; then
+  if cmp -s docs/assets/github-header.png "$header_src"; then
+    ok "README header matches the brand repo's card"
+  else
+    bad "docs/assets/github-header.png has drifted from the brand repo — re-copy it"
+  fi
+elif [ ! -f docs/assets/github-header.png ]; then
+  bad "docs/assets/github-header.png missing — the README header will render broken"
+fi
+
+# The brand repo is a sibling, nothing imports it, and no build fails without
+# it -- so its absence is silent until a visual artifact is quietly wrong.
+brand_guidelines="$HOME/dev/git/keplaria-assets/docs/brand-guidelines.md"
+if [ -f "$brand_guidelines" ]; then
+  ok "brand repo present (read it before any visual work)"
+else
+  meh "brand repo missing at $brand_guidelines — visual work will drift"
+fi
+
 # The public site must actually be reachable: it is the URL the video shows.
 site_code=$(curl -sS -o /dev/null -w '%{http_code}' -m 12 https://keplaria.com 2>/dev/null)
 if [ "$site_code" = "200" ]; then
