@@ -9,10 +9,10 @@
 <p><a href="/review">&larr; Review queue</a></p>
 <h1>{{ case.supplier or case.case_id }}</h1>
 <p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
-<p class="context-strip" data-testid="context-strip">One stopped payload — a
+<p class="context-strip" data-testid="context-strip">One stopped payload: a
 supplier's case. <strong>Screening</strong> rows are watchlist near-matches;
 <strong>band</strong> is the verdict deterministic policy assigned. Approve
-to release the held ERP writes, reject to refuse them — either decision is
+to release the held ERP writes, reject to refuse them; either decision is
 final for this revision of the case.</p>
 {% include "_lifecycle.html" %}
 
@@ -45,7 +45,7 @@ final for this revision of the case.</p>
 {% if case.screening.candidates %}
 <section class="panel">
   <div class="panel__header"><h2>Screening</h2></div>
-  <p class="body-small">Screened against a synthetic, rights-cleared watchlist —
+  <p class="body-small">Screened against a synthetic, rights-cleared watchlist,
      not live sanctions data. A near-match is a reason to look, not a finding.</p>
   <table>
     <thead><tr><th>Verdict</th><th>Name</th><th>Watchlist id</th><th class="num">Match</th></tr></thead>

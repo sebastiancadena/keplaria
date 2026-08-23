@@ -13,10 +13,10 @@ the routing policy enforces, so it cannot drift from what actually runs.</p>
   <p class="body-small">The scopes below are what routing and command
      dispatch actually enforce: an event whose department proposes an agent
      outside its scope, or a command outside its scope, is refused and
-     recorded — never silently dropped, never silently allowed. The
+     recorded: never silently dropped, never silently allowed. The
      department label on an event is asserted by its producer, not an
      authenticated identity: this is a policy-and-audit boundary, not a
-     security boundary. Catalog authority is per-deployment, not live —
+     security boundary. Catalog authority is per-deployment, not live:
      revoking a scope takes a deploy of a new catalog artifact, not a
      configuration flip.</p>
 </div>

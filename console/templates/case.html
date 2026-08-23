@@ -4,8 +4,8 @@
 <p><a href="/">&larr; All cases</a></p>
 <h1>{{ case.supplier or case.case_id }}</h1>
 <p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
-<p class="context-strip" data-testid="context-strip">One supplier's case —
-its payload — exactly as the system scored it. <strong>Band</strong> is the
+<p class="context-strip" data-testid="context-strip">One supplier's case,
+its payload, exactly as the system scored it. <strong>Band</strong> is the
 risk verdict deterministic policy assigned; a <strong>parked</strong> case
 has stopped for a human decision, its ERP writes held.</p>
 {% include "_lifecycle.html" %}
@@ -138,7 +138,7 @@ has stopped for a human decision, its ERP writes held.</p>
 {% if case.refused_commands %}
 <section class="panel">
   <div class="panel__header"><h2>Refused commands</h2></div>
-  <p class="body-small">Outside the case's department scope — refused and recorded
+  <p class="body-small">Outside the case's department scope: refused and recorded
      at claim time. No outbox row exists for these; the executor never sees them.</p>
   <table>
     <thead><tr><th>Action</th><th>Cycle</th></tr></thead>
