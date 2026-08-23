@@ -20,8 +20,10 @@ and nowhere else.
 
 One deployed run of that whole lifecycle: **55.3 s of machine time** and a
 single **47.7 s human approval**, against the same work done by hand in
-**663.5 s over 20 steps** (author-timed, not practitioner-reviewed — method
-and every qualifier in [the proof section](#judging-criteria--proof)).
+**663.5 s over 20 steps** — **19 of which the run removes**, the twentieth
+being the approval that policy requires a human to make (author-timed, not
+practitioner-reviewed — method and every qualifier in
+[the proof section](#judging-criteria--proof)).
 
 Built on the [Google Agent Development Kit (ADK)](https://adk.dev) for
 Python, running on the
@@ -101,7 +103,7 @@ outlive the behaviour behind it.
 
 | Criterion | What it asks | Proof in this repo |
 |---|---|---|
-| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? | The lifecycle closes: onboard → wake → request evidence → hold → validate renewal → release, over two suppliers and 380 simulated business days, in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. |
+| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? | The lifecycle closes: onboarded → active → renewal requested → held → released, over two suppliers and 380 simulated business days, in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. |
 | **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure (an extracted value with no supporting source span), injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite — 24/24 graded domain cases passing. A schema-valid but source-unsupported worker (specialist agent) value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
 | **Demo & Production Readiness** (30%) | Does the video define the friction and architecture, show an unedited live execution, and are setup, diagram, deployment and proof reproducible? | The console URL above is live. The run in `spikes/judge_run/` is a real deployment, re-run on the engine currently serving. `bash scripts/doctor.sh` checks deployment and configuration preconditions read-only and prints its own pass/fail summary; the architecture diagram is generated from committed sources, not drawn; setup is [below](#setup-from-a-fresh-clone). |
 
@@ -345,9 +347,9 @@ accordingly: record writes are idempotent; message sends are at-least-once.
 *The first two entries below prove the headline claims; the rest is
 reference for re-running any one specific proof.*
 
-- `scripts/doctor.sh` — 71 read-only checks (one fewer when the yente VM is
-  stopped, since the serving probe only runs against a running VM) covering
-  toolchain, auth,
+- `scripts/doctor.sh` — a read-only check suite that prints its own pass/fail
+  summary (one check fewer when the yente VM is stopped, since the serving
+  probe only runs against a running VM) covering toolchain, auth,
   provisioned infra, the event-flow wiring (topic, push subscription
   OIDC, ingress auth, concurrency/maxScale, retry policy), the console and
   review services, and the failure-handling infrastructure (dead-letter
@@ -491,9 +493,10 @@ live in [docs/operations.md](docs/operations.md).
 | Domain | **keplaria.com** — registered via Cloudflare Registrar (2026-08-11) |
 | Cloudflare CLI | `wrangler` (nvm-managed Node), OAuth-authenticated |
 
-The keplaria.com zone is live on Cloudflare nameservers; no DNS records point
-anywhere yet. `wrangler` is logged in as the personal account (the same
-identity as gcloud and git in this repo), with
+The keplaria.com zone is live on Cloudflare nameservers, and the domain now
+serves the generated site described [above](#keplariacom) —
+`scripts/doctor.sh` pings it as part of its checks. `wrangler` is logged in
+as the personal account (the same identity as gcloud and git in this repo), with
 write scopes for Workers, Pages, DNS routes, D1, KV, queues, email routing, and
 SSL certs, so it can deploy and wire up DNS without re-authenticating. Brand
 assets for the site live in the sibling repo `~/dev/git/keplaria-assets`.
@@ -639,9 +642,6 @@ ever sitting mid-run waiting on this UI.
   flushing on its own + fresh `Scheduled Job Log` entries.
 
 ## Availability and cost
-
-The manual baseline's 20 steps break down cleanly — **19 of which the run removes**,
-the twentieth being the approval that policy requires a human to make.
 
 **These surfaces stay up, and the screening behind them does too.** The
 sanctions-screening service runs on a private VM that used to stop every night
