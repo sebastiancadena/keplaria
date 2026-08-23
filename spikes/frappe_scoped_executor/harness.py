@@ -60,6 +60,7 @@ from spikes.frappe_scoped_executor.contract import (  # noqa: E402
 EVIDENCE = Path(__file__).resolve().parent / "evidence.json"
 PROBE = "TEST Scoped Executor Probe SAS"
 PROBE_EMAIL = "scoped-probe@keplaria.example"
+PROBE_SUBJECT = "Scoped executor probe"
 
 
 def _criterion(cid: str, requirement: str, proven: bool, checks: list[dict],
@@ -100,8 +101,13 @@ def remove_probe_records(admin) -> list[str]:
     for doctype, filters in [
         ("File", [["attached_to_doctype", "=", "Supplier"],
                   ["attached_to_name", "=", PROBE]]),
+        # Matched on subject as well as on the link: deleting the Supplier
+        # clears the dynamic link, so a run that removed the supplier first
+        # left its correspondence behind as an unlinked row that the
+        # link-based filter could no longer see.
         ("Communication", [["reference_doctype", "=", "Supplier"],
                            ["reference_name", "=", PROBE]]),
+        ("Communication", [["subject", "=", PROBE_SUBJECT]]),
         ("Contact", [["name", "like", f"{PROBE}%"]]),
     ]:
         for row in _rows(admin, doctype, filters):
@@ -200,7 +206,7 @@ def check_executor_operations(scoped) -> dict:
         ("set_supplier_hold", lambda: set_supplier_hold(scoped, PROBE, "Invoices")),
         ("clear_supplier_hold", lambda: clear_supplier_hold(scoped, PROBE)),
         ("send_supplier_message",
-         lambda: send_supplier_message(scoped, PROBE, "Scoped executor probe",
+         lambda: send_supplier_message(scoped, PROBE, PROBE_SUBJECT,
                                        "Probe body.")),
         ("attach_evidence",
          lambda: attach_evidence(scoped, PROBE, 1, PLACEHOLDER_CERTIFICATE_PDF)),
@@ -327,7 +333,7 @@ def check_high_value_doctypes(scoped) -> dict:
     )
 
 
-def check_inherited_reads(scoped) -> dict:
+def check_inherited_reads(scoped, admin) -> dict:
     """State the baseline reads plainly instead of letting the claim imply none.
 
     Frappe grants every System User a desk baseline the custom role does not
@@ -355,14 +361,30 @@ def check_inherited_reads(scoped) -> dict:
                   + (f"; found {unexpected}" if unexpected else ""),
         "evidence": "live API",
     })
-    writable = [
-        doctype for doctype in INHERITED_READS
-        if scoped.post(f"/api/resource/{doctype}", json={}).status_code < 400
-    ]
+    # Probing whether a create SUCCEEDS means performing one. Frappe accepts an
+    # empty Contact, so five earlier runs of this harness each left an
+    # anonymous Contact row on the live site — the harness generating exactly
+    # the debris the pre-recording audit exists to find. Anything the probe
+    # manages to create is removed here, on the admin credential, because the
+    # executor deliberately cannot.
+    writable, probe_debris = [], []
+    for doctype in INHERITED_READS:
+        response = scoped.post(f"/api/resource/{doctype}", json={})
+        if response.status_code >= 400:
+            continue
+        writable.append(doctype)
+        try:
+            record = response.json()["data"]["name"]
+        except (ValueError, KeyError, TypeError):
+            probe_debris.append(f"{doctype}/UNKNOWN")
+            continue
+        removed = admin.delete(f"/api/resource/{doctype}/{record}").status_code < 400
+        probe_debris.append(f"{doctype}/{record}" + ("" if removed else " NOT REMOVED"))
     checks.append({
-        "kind": "api", "ok": True,
+        "kind": "api", "ok": all("NOT REMOVED" not in d for d in probe_debris),
         "detail": f"baseline doctypes the executor can also CREATE: "
-                  f"{writable or 'none'}",
+                  f"{writable or 'none'}"
+                  + (f"; probe records removed: {probe_debris}" if probe_debris else ""),
         "evidence": "live API",
     })
     return _criterion(
@@ -390,7 +412,7 @@ def main() -> int:
                 check_destructive_rights_absent(scoped, created),
                 check_escalation_blocked(scoped),
                 check_high_value_doctypes(scoped),
-                check_inherited_reads(scoped),
+                check_inherited_reads(scoped, admin),
             ]
         finally:
             # Cleanup runs even when a criterion raises. Frappe Cloud drops a

@@ -1,7 +1,7 @@
 {
   "spike": "frappe_scoped_executor",
   "scope": "the ERP identity the deployed executor runs as",
-  "captured_at": "2026-08-23T18:55:25.694412+00:00",
+  "captured_at": "2026-08-23T19:20:41.697183+00:00",
   "result": "PASS",
   "site": "andina-foods.v.frappe.cloud",
   "role": "Keplaria Executor",
@@ -12,10 +12,13 @@
     "Anything about the owner credential's own scope. It is a full System Manager by design, lives only in .env.secrets, and is used only by scripts/erp.py."
   ],
   "probe_records_removed": {
-    "before_run": [],
+    "before_run": [
+      "Communication/53ppdg0tar",
+      "Communication/c4r795cijs"
+    ],
     "after_run": [
-      "File/311e4a4ddb",
-      "Communication/952dk3bq3q",
+      "File/6581ac7fde",
+      "Communication/5js6l5r61g",
       "Supplier/TEST Scoped Executor Probe SAS"
     ]
   },
@@ -116,13 +119,13 @@
         {
           "kind": "api",
           "ok": true,
-          "detail": "send_supplier_message: {\"external_id\": \"952dk3bq3q\", \"created\": true}",
+          "detail": "send_supplier_message: {\"external_id\": \"5js6l5r61g\", \"created\": true}",
           "evidence": "app/executor/frappe.py"
         },
         {
           "kind": "api",
           "ok": true,
-          "detail": "attach_evidence: {\"external_id\": \"311e4a4ddb\", \"created\": true}",
+          "detail": "attach_evidence: {\"external_id\": \"6581ac7fde\", \"created\": true}",
           "evidence": "app/executor/frappe.py"
         }
       ],
@@ -142,13 +145,13 @@
         {
           "kind": "api",
           "ok": true,
-          "detail": "DELETE Communication/952dk3bq3q -> HTTP 403 (record readable: HTTP 200)",
+          "detail": "DELETE Communication/5js6l5r61g -> HTTP 403 (record readable: HTTP 200)",
           "evidence": "live API"
         },
         {
           "kind": "api",
           "ok": true,
-          "detail": "DELETE File/311e4a4ddb -> HTTP 403 (record readable: HTTP 200)",
+          "detail": "DELETE File/6581ac7fde -> HTTP 403 (record readable: HTTP 200)",
           "evidence": "live API"
         }
       ],
@@ -291,7 +294,7 @@
         {
           "kind": "api",
           "ok": true,
-          "detail": "baseline doctypes the executor can also CREATE: ['Contact']",
+          "detail": "baseline doctypes the executor can also CREATE: ['Contact']; probe records removed: ['Contact/1k1hah3b46']",
           "evidence": "live API"
         }
       ],
