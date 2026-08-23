@@ -62,7 +62,7 @@ done
 
 echo "== push SA =="
 echo "  created above; roles/run.invoker on keplaria-ingress is granted after"
-echo "  that service is deployed — see README.md 'Deploying' section."
+echo "  that service is deployed — see docs/operations.md 'Deploying' section."
 
 echo "== dead-letter topic =="
 DEAD_TOPIC="keplaria-events-dead"

@@ -25,9 +25,9 @@ the way.
   variables).
 - `gcloud auth application-default login` already done (ADC).
 - The `keplaria-events` topic provisioned (`infra/events/setup.sh`) and the
-  Agent Runtime graph + Cloud Run ingress deployed and current — see the
-  README's "Deploying to Agent Runtime" section. This harness publishes
-  through the same Pub/Sub path `spikes/thin_vertical/verify.py` uses
+  Agent Runtime graph + Cloud Run ingress deployed and current — see
+  `docs/operations.md`'s "Deploying to Agent Runtime" section. This harness
+  publishes through the same Pub/Sub path `spikes/thin_vertical/verify.py` uses
   (`pubsub_v1.PublisherClient().publish(...)`); it does not call the engine
   or the ingress directly.
 - The yente screening VM reachable — with it down, `SCREENING_UNAVAILABLE`

@@ -23,7 +23,7 @@ export FIRESTORE_EMULATOR_HOST=localhost:8451
 export FIRESTORE_PROJECT_ID=keplaria
 export GOOGLE_CLOUD_PROJECT=keplaria
 export FIRESTORE_DATABASE='(default)'
-# gemini-3.6-flash is only served from the global endpoint (README
+# gemini-3.6-flash is only served from the global endpoint (docs/operations.md
 # "Operational constraints"); .env carries us-central1 for the engine.
 export GOOGLE_CLOUD_LOCATION=global
 export YENTE_BASE_URL=http://127.0.0.1:8452
