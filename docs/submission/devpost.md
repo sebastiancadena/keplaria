@@ -32,6 +32,7 @@ the demonstration video URL and the frozen commit the submission cites.
 
 | Field | Value |
 |---|---|
+| Project home | <https://keplaria.com> — front door, and <https://keplaria.com/proof> for every published number bound to the run that produced it |
 | Try it out — case console | <https://keplaria-console-bklu5jcdea-uc.a.run.app> (no sign-in) |
 | Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP) |
 | Code repository | <https://github.com/sebastiancadena/keplaria> |
