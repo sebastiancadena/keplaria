@@ -184,7 +184,8 @@ def figures(claims) -> str:
             "policy_required_interventions")
     labels = {
         "run_machine_seconds": "of machine work, one deployed run",
-        "manual_baseline_seconds": "for the same work by hand, timed",
+        "manual_baseline_seconds": "for the same work by hand, timed "
+        "(author-timed, not practitioner-reviewed)",
         "policy_required_interventions": "decision a human had to make",
     }
     out = []
@@ -212,36 +213,41 @@ person with a calendar reminder.</p>
 <p class="sub">Keplaria stays. One durable mission per supplier wakes months
 later on its own clock: it requests renewed evidence, places a reversible
 purchasing hold when a certificate lapses, checks the renewal against the
-source document, and releases the hold. An LLM coordinator <em>proposes</em>
-which specialists should run; a deterministic policy layer <em>decides</em>,
-against a versioned catalog. It stops exactly where policy requires a human
-decision &mdash; and nowhere else. Nothing reaches the ERP except through an
-outbox.</p>
+source document, and releases the hold. An LLM (large language model)
+coordinator <em>proposes</em> which specialist agents should run; a
+deterministic policy layer <em>decides</em>, against a versioned catalog.</p>
 {figures(claims)}
+<p class="sub">It stops exactly where policy requires a human decision
+&mdash; and nowhere else. Nothing reaches the ERP except through an outbox (a
+queue of pending ERP writes, released only on approval).</p>
 <div class="note"><b>Every number on this site is bound to the run that
 produced it.</b> The verification page is generated from the evidence files, not
 written by hand &mdash; so it cannot quietly disagree with them.</div>
 <div class="actions">
-<a class="btn btn--go" href="{CONSOLE}">Open the live case console</a>
+<a class="btn btn--go" href="{CONSOLE}">Open the live case console (a real
+deployment, synthetic demo suppliers)</a>
 <a class="btn" href="/proof">Verification ledger</a>
 <a class="btn" href="{REPO}">Source</a>
 </div>
 <h2>Evaluate this in three minutes</h2>
 <div class="evalgrid">
 <div class="evalstep"><a href="{CONSOLE}"><b>1&nbsp;&middot; Case console</b></a>
-<p>No sign-in. Open a case: a context strip and a lifecycle indicator
-(onboarded &rarr; active &rarr; renewal requested &rarr; held &rarr; released)
-show where it stands, and the status line says exactly what has been written
-to the ERP so far &mdash; for a parked case, nothing yet.</p></div>
+<p>No sign-in. Open a case (one supplier&rsquo;s file): a context strip and a
+lifecycle indicator (onboarded &rarr; active &rarr; renewal requested &rarr;
+held &rarr; released) show where it stands, and the status line says exactly
+what has been written to the ERP so far &mdash; for a parked case (stopped
+for a human decision &mdash; this can happen at any stage), nothing yet.</p>
+</div>
 <div class="evalstep"><a href="{REVIEW}"><b>2&nbsp;&middot; Review console</b></a>
 <p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy &mdash;
-Google&rsquo;s sign-in check in front of the service). Cases policy stopped
-wait here with their ERP writes held; approving one is what releases them.</p>
-</div>
+Google&rsquo;s sign-in check in front of the service). Cases the policy
+stopped wait here, their ERP writes held &mdash; approving is what releases
+them.</p></div>
 <div class="evalstep"><b>3&nbsp;&middot; Demonstration video</b>
-<p>Linked from the Devpost submission. One continuous, unedited take: a stop
-for a human, an approval that releases the held writes, then a simulated year
-of renewals, a hold, and a release.</p></div>
+<p>Not linked yet &mdash; it publishes with the Devpost submission, and will
+be added here then. What it shows: one continuous, unedited take &mdash; a
+stop for a human, an approval that releases the held writes, then a
+simulated year of renewals, a hold, and a release.</p></div>
 </div>
 <h2>Named for the law, not the planets</h2>
 <p class="sub">An agent that runs for minutes can afford to improvise. One that
@@ -256,10 +262,10 @@ request, a purchasing hold, a hold release. Spacecraft engineers call those
 corrections station-keeping. So do we.</p>
 <h2>What a case looks like</h2>
 <p class="sub">The console is public and read-only. A case shows what the
-coordinator proposed, what policy actually engaged, the screening candidates and
-why one of them needed a person, and every command &mdash; including the ones
-policy refused. A case stopped for a human says so plainly, and says that
-nothing has been written.</p>
+coordinator proposed, what policy actually engaged, the candidates from
+screening against a sanctions watchlist and why one of them needed a person,
+and every command &mdash; including the ones policy refused. A case stopped
+for a human says so plainly, and says that nothing has been written.</p>
 <h2>Built on</h2>
 <p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
 &middot; Cloud Run &middot; Firestore &middot; Pub/Sub &middot; ERPNext &middot;
