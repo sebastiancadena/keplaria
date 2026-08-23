@@ -20,9 +20,11 @@ the demonstration video URL and the frozen commit the submission cites.
 
 ## Tagline
 
-> Suppliers are onboarded once and stay compliant on their own — a durable
-> agent mission wakes months later, chases the expiring certificate, holds
-> purchasing when it lapses, and releases the hold once the renewal checks out.
+> Suppliers are onboarded in seconds, then governed for months: the case wakes
+> to chase the expiring certificate, holds purchasing when evidence lapses, and
+> releases the hold when the renewal checks out — every move decided by
+> deterministic policy, not by the model. Keplaria: work in orbit, not work
+> finished.
 
 ## Category
 
@@ -43,13 +45,18 @@ the demonstration video URL and the frozen commit the submission cites.
 
 ## What it does
 
-A mid-market beverage manufacturer needs a new packaging supplier approved
-before a production run. Getting that supplier into the system once is the easy
-part. The hard part starts afterwards: the food-safety certificate expires in a
-few months, and on the day it does, nobody is watching. Somebody has to
-remember, email the supplier, read what comes back, decide whether it is
-genuine, stop purchasing if it does not arrive, and start purchasing again once
-it does — on a calendar reminder, if they remember.
+A beverage manufacturer needs a new packaging supplier approved. Keplaria runs
+the onboarding — document intake, field extraction, screening against a
+synthetic, rights-cleared watchlist — and then does the part nobody builds: it
+stays. Approval was never the hard part. The hard question is whether an agent
+can remain accountable for an obligation across time. So the case does not close
+when the ERP record is created. For months afterwards it keeps governing that
+supplier — requesting certificate renewals, applying a purchasing hold when
+evidence goes overdue, releasing it when a valid renewal arrives. An LLM
+coordinator proposes which specialist agents run; a deterministic policy layer
+decides, against a versioned catalog. Nothing reaches the ERP except through an
+outbox, and on a sanctions near-match the system stops — it does not
+adjudicate.
 
 Keplaria is a durable agent workflow — a **mission** — that does that work and
 keeps doing it. One mission is created when the supplier is onboarded, and the

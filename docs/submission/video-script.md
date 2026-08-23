@@ -22,8 +22,8 @@ day-15 freeze and refill from that run.
 ### Beat 1 — The twist (0:00–0:15) — 31 words
 
 > Every supplier-onboarding tool retires the day the ERP record is created.
-> Keplaria stays. Two live suppliers, one unedited take: fifty-five seconds of
-> machine work against the eleven minutes I timed by hand.
+> Keplaria stays — for months. Two live suppliers, one unedited take: fifty-five
+> seconds of machine work against the eleven minutes I timed by hand.
 
 The qualifier is inside the claim — "I timed by hand" — spoken with confidence,
 not apology. The overlay carries the full version.
@@ -104,10 +104,15 @@ Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 
 ### Beat 5 — Close (3:30–3:45) — 38 words
 
-> Six of six steps autonomous. Twenty-two fields across the run, none rekeyed.
-> One intervention — required by policy, not failure. Fifty-five seconds against
-> six-sixty-three: a baseline I timed by hand, not yet practitioner-reviewed.
-> Keplaria. Onboarding that doesn't end. It's all at keplaria dot com.
+> Kepler didn't discover that planets move — he showed their motion obeys law.
+> Same here: launch a case once, and it stays up for months, corrected by policy,
+> not by you. Put your work in orbit. Keplaria dot com.
+
+**The scoreboard moves to the overlay, deliberately.** Fifteen seconds cannot
+hold six figures and land the name, and the overlay already carries every one of
+them with the author-timed qualifier attached. The spoken qualifier survives in
+the cold open — "the eleven minutes I timed by hand" — so the comparison is never
+voiced without it.
 
 ## 2. Shot list
 
