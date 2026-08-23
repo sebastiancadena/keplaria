@@ -14,14 +14,15 @@ Three claims were corrected against the code before this file was written. See
 "Corrections applied" at the end — do not restore the original wording.
 
 Every bracketed token must be refilled from the frozen run before recording.
-The scoreboard below still cites a 430-test suite; the suite is now 531.
+Re-measured 2026-08-22 against the current deployment; re-run again after the
+day-15 freeze and refill from that run.
 
 ## 1. Narration
 
 ### Beat 1 — The twist (0:00–0:15) — 31 words
 
 > Every supplier-onboarding tool retires the day the ERP record is created.
-> Keplaria stays. Two live suppliers, one unedited take: eighty-five seconds of
+> Keplaria stays. Two live suppliers, one unedited take: fifty-five seconds of
 > machine work against the eleven minutes I timed by hand.
 
 The qualifier is inside the claim — "I timed by hand" — spoken with confidence,
@@ -45,10 +46,9 @@ not apology. The overlay carries the full version.
 
 ### Beat 2c — The human (0:55–1:15) — 36 words
 
-> One human, one decision. Twenty-three seconds of reading, one click to
-> approve — **SYNC (ERP rows appear)** and two and a half seconds later the
-> supplier record and its evidence attachment appear in the ERP. Nothing was
-> written before that click.
+> One human, one decision. Read it, one click to approve — **SYNC (ERP rows
+> appear)** and the supplier record and its evidence attachment appear in the
+> ERP the same moment. Nothing was written before that click.
 
 ### Beat 2d — Supplier two, and the honesty line (1:15–1:45) — 52 words
 
@@ -58,7 +58,7 @@ not apology. The overlay carries the full version.
 > Fields lift straight out of the document into the ERP, none of them rekeyed.
 > Now watch a simulated year compress into the next eighty seconds.
 
-Dead-air pocket 2 lives inside this beat's 43.9-second onboarding wait.
+Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 
 ### Beat 2e — Route two: the clock (1:45–2:05) — 57 words
 
@@ -105,7 +105,7 @@ Dead-air pocket 2 lives inside this beat's 43.9-second onboarding wait.
 ### Beat 5 — Close (3:30–3:45) — 38 words
 
 > Six of six steps autonomous. Twenty-two fields across the run, none rekeyed.
-> One intervention — required by policy, not failure. Eighty-five seconds against
+> One intervention — required by policy, not failure. Fifty-five seconds against
 > six-sixty-three: a baseline I timed by hand, not yet practitioner-reviewed.
 > Keplaria. Onboarding that doesn't end. It's all at keplaria dot com.
 
@@ -126,16 +126,16 @@ Split-screen layout for the live segment:
 
 | Beat | On screen | Overlay text |
 |---|---|---|
-| 1 | Black card: "Onboarding ends when the ERP record is created." — "ends" strikes through, replaced by "begins". Title card: Keplaria. | "85.1 s of machine time vs 663.5 s by hand — a 20 steps walkthrough, 19 of which the run removes; author-timed, not practitioner-reviewed" |
+| 1 | Black card: "Onboarding ends when the ERP record is created." — "ends" strikes through, replaced by "begins". Title card: Keplaria. | "55.3 s of machine time vs 663.5 s by hand — a 20 steps walkthrough, 19 of which the run removes; author-timed, not practitioner-reviewed" |
 | 2a | Packet event chip; route strip: proposed "evidence + compliance", verdict "APPROVED 2/2" | "Deployed on Google Cloud · unedited from here" |
-| 2b | Compliance result "sanctions near-match"; case moves into Ground Control's parked column showing `create_supplier — HELD`, `attach_evidence — HELD` | "Parked in 14.1 s · ERP writes so far: 0" |
-| 2c | Cursor reads the case, clicks Approve; ERP pane: supplier row and attachment appear | "23.0 s human approval · 2.5 s execution" |
+| 2b | Compliance result "sanctions near-match"; case moves into Ground Control's parked column showing `create_supplier — HELD`, `attach_evidence — HELD` | "Parked in 13.8 s · ERP writes so far: 0" |
+| 2c | Cursor reads the case, clicks Approve; ERP pane: supplier row and attachment appear | "47.7 s human approval · 0.1 s execution" |
 | 2d | New case card labelled as a separate Payload; route strip runs again; extraction panel fills; ERP row appears; simulated-clock widget starts | "Separate case — the approval does not carry over" |
 | 2e | Sim-clock jumps; chips: `renewal_due → no action`, `renewal_due → renewal email sent` (show the outbound Communication in the ERP), `evidence_overdue → purchasing hold`; ERP row flips to Hold | "Clock events: agents engaged — none (policy only)" |
 | 2f | `certificate_received` event chip carrying the renewed document; route strip "evidence only → APPROVED 1/1"; grounding view highlights the verbatim spans; ERP hold lifts; freeze on end state | "380 simulated business days · 5 enforced hold days — hold AND release both executed in ERP · 0 human touches", then "Design intent: the supplier answers an email. No portal, no login, no account." |
 | 3 | Full-screen six-box diagram, arrows animating in flow order; then a three-row department table with permitted-agent / permitted-command columns; deployment strip | "ADK + Gemini · Agent Runtime · Cloud Run · Firestore · Pub/Sub" and "10/10 deployed rehearsals under the 130 s budget" |
 | 4 | Three fast panels: (1) trace of 503 → retry → ERP count = 1; (2) document with highlighted injection and the refusal in the trace; (3) extraction output with the worker-count field flagged "no source span" → retry → parked card in Ground Control. Trace viewer labelled "Telemetry — OpenTelemetry traces" | "0 duplicate writes after a retry" · "Refusal recorded" · "0 ERP writes" |
-| 5 | Scoreboard card, `keplaria.com` in frame (front door + `/proof` verification ledger), repo link | "6/6 steps autonomous · 20 steps by hand, 19 of which the run removes · 22 fields, 0 rekeyed · 1 policy-required intervention · 85.1 s of machine time vs 663.5 s (author-timed, not practitioner-reviewed)" |
+| 5 | Scoreboard card, `keplaria.com` in frame (front door + `/proof` verification ledger), repo link | "6/6 steps autonomous · 20 steps by hand, 19 of which the run removes · 22 fields, 0 rekeyed · 1 policy-required intervention · 55.3 s of machine time vs 663.5 s (author-timed, not practitioner-reviewed)" |
 
 ## 3. Six-box diagram
 
@@ -183,7 +183,7 @@ case on the way."
 > action queues as a command in a Firestore outbox, and an executor performs it
 > only after policy has signed it off.
 
-**Pocket 2** — during the 43.9-second onboarding of supplier two:
+**Pocket 2** — during the 21.4-second onboarding of supplier two:
 
 > Ten consecutive rehearsals of this run on the deployed system, all under the
 > hundred-thirty-second budget, before we pressed record. What you're watching is

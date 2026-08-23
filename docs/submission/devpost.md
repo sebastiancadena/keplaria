@@ -69,9 +69,9 @@ or not anyone ever opens the page.
 One deployed run of that whole loop, captured in
 [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json), covers
 two suppliers: one that parks for a human, and one that runs the full lifecycle
-from onboarding to hold release. It took **85.1 s of machine time** — including
+from onboarding to hold release. It took **55.3 s of machine time** — including
 a 43.9 s cold start — against a budget of **130s**, plus a single
-**23.0 s human approval**, which is timed separately and excluded from that
+**47.7 s human approval**, which is timed separately and excluded from that
 total because it is a person's time, not the system's.
 
 The same work done by hand took **663.5 s** across **20 steps**, timed by a
@@ -226,8 +226,12 @@ the evidence files it cites instead of trusting a number written next to them.
 **So every number in this submission has a checker.** The graded domain suite
 runs **24/24** at a **100% mean score** on a deterministic pass metric — not an
 LLM judge grading prose, but a check on whether the enforcement outcome was the
-required one. **430 passed** contract and unit tests were re-executed by the run
-that reports them, rather than quoted from a previous run. Nine contracts —
+required one. **549 passed** of 550 contract and unit tests, re-executed by the run
+that reports them rather than quoted from a previous run. The one
+failure is disclosed rather than trimmed: a console query that lists
+failed commands newest-first can push an undated row off the page once
+enough rows accumulate in a shared test database. It is a real finding
+about ranking, it is being tracked, and it writes nothing. Nine contracts —
 closed loop, duplicate and out-of-order events, provenance failure, injection
 refusal, stale and double approval, forbidden agent-to-tool edges, one ERP write
 after a retry, cataloging visible, and the eval suite — are re-verified at
