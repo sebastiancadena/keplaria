@@ -50,13 +50,13 @@ not apology. The overlay carries the full version.
 > appear)** and the supplier record and its evidence attachment appear in the
 > ERP the same moment. Nothing was written before that click.
 
-### Beat 2d — Supplier two, and the honesty line (1:15–1:45) — 52 words
+### Beat 2d — Supplier two, and the honesty line (1:15–1:45) — 55 words
 
 > Supplier two is a separate case — the approval you just saw doesn't carry
 > over, and doesn't need to. The same policy gate reads this one clean: no
 > near-match, no reason to stop, so nobody does. **SYNC (extraction panel)**
 > Fields lift straight out of the document into the ERP, none of them rekeyed.
-> Now watch a simulated year compress into the next eighty seconds.
+> Now watch a simulated year and a half compress into the next eighty seconds.
 
 Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 
@@ -69,7 +69,7 @@ Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 > is now overdue — **SYNC (hold applied)** and a purchasing hold lands in the
 > ERP. This supplier genuinely cannot be bought from.
 
-### Beat 2f — Route three: the certificate (2:05–2:25) — 63 words
+### Beat 2f — Route three: the certificate (2:05–2:25) — 64 words
 
 > **SYNC (certificate event)** Then the certificate comes back. New event, new
 > route: evidence only, no compliance; policy agrees. **SYNC (grounding view)**
@@ -78,8 +78,8 @@ Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 > station-keeping. And the supplier's side of this — by design — is answering
 > an email: no portal, no login, no account.
 >
-> **SYNC (run freezes on end state)** Three hundred eighty simulated days. Five
-> under real hold. Zero human touches.
+> **SYNC (run freezes on end state)** Three hundred eighty simulated business
+> days. Five under real hold. Zero human touches.
 
 ### Beat 3 — Architecture (2:25–2:55) — 73 words
 

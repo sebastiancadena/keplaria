@@ -43,15 +43,18 @@ Python, running on the
    organizer accounts are pre-authorized ([details below](#access-for-judges-and-testers)).
    Cases the policy stopped wait here with their ERP writes held; an
    approval is what releases them.
-3. **Watch the demonstration video** (linked from the Devpost submission) —
-   one continuous unedited take: a stop for a human, an approval releasing
-   the ERP writes the same moment, then a simulated year of renewals, a
-   hold, and a release.
+3. **Watch the demonstration video** — not linked yet: it publishes with
+   the Devpost submission and will be linked here then. What it shows: one
+   continuous unedited take — a stop for a human, an approval releasing
+   the ERP writes the same moment, then a simulated year and a half of
+   renewals, a hold, and a release.
 
 What those three show together: the model proposes, deterministic policy
 decides, a human stays in exactly the loop policy requires, and nothing
-reaches the ERP except through an approved, idempotent (safe to retry — it
-applies exactly once) command.
+reaches the ERP except through a policy-gated command from the outbox,
+safe to retry — a retried command leaves exactly one ERP record. The one
+at-least-once channel is outbound mail, which can repeat a message but
+never a record.
 
 ## Access for judges and testers
 
@@ -97,13 +100,15 @@ These three rows are the Devpost hackathon's Fortified Enterprise Fleet track
 rubric, with its published 40/30/30 weighting. This table matches each judging
 criterion to what it asks and where the proof for it lives in this repository.
 Every row points at a file that was produced by running the system, not by
-describing it. `spikes/core_contracts/harness.py` re-executes the tests it
+describing it. Proof directories live under `spikes/` — each spike is a
+self-contained proof: the harness that was run and the `evidence.json` it
+wrote. `spikes/core_contracts/harness.py` re-executes the tests it
 cites and re-reads the evidence it cites on every run, so a claim here cannot
 outlive the behaviour behind it.
 
 | Criterion | What it asks | Proof in this repo |
 |---|---|---|
-| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? Was it built for an "Unlikely Hero" outside of standard corporate roles? | The lifecycle closes: onboarded → active → renewal requested → held → released, over two suppliers and 380 simulated business days, in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. The overlooked party is the supplier side of the relationship — often a small business with no compliance department — and the system deliberately asks nothing of them: no portal, no login, no account, no training. The renewal request is a real outbound email; in this prototype the returned certificate enters as a published event, and ingesting the email reply itself is design intent, stated as such wherever the claim appears. |
+| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? Was it built for an "Unlikely Hero" outside of standard corporate roles? | The lifecycle closes: onboarded → active → renewal requested → held → released, over two suppliers and 380 simulated business days (about a year and a half), in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. The overlooked party is the supplier side of the relationship — often a small business with no compliance department — and the system deliberately asks nothing of them: no portal, no login, no account, no training. The renewal request is a real outbound email; in this prototype the returned certificate enters as a published event, and ingesting the email reply itself is design intent, stated as such wherever the claim appears. |
 | **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure (an extracted value with no supporting source span), injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite — 24/24 graded domain cases passing. A schema-valid but source-unsupported worker (specialist agent) value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
 | **Demo & Production Readiness** (30%) | Does the video define the friction and architecture, show an unedited live execution, and are setup, diagram, deployment and proof reproducible? | The console URL above is live. The run in `spikes/judge_run/` is a real deployment, re-run on the engine currently serving. `bash scripts/doctor.sh` checks deployment and configuration preconditions read-only and prints its own pass/fail summary; the architecture diagram is generated from committed sources, not drawn; setup is [below](#setup-from-a-fresh-clone). |
 
@@ -120,7 +125,7 @@ measured and turned down.
 |---|---|---|
 | **Agent Runtime** | Native | Hosts the ADK graph as reasoning engine `keplaria`. Reaches the screening VM over a Private Service Connect (PSC) interface; that VM has no external IP and is not reachable from the internet, and keeps execution state in Agent Platform Sessions. |
 | **Agent Registry** | Native | The deployment auto-registers with no publish step; the entry is live and refreshes on redeploy. It carries the framework (`google-adk`), the runtime reference, the runtime identity principal, and the callable interfaces. Honest limit: those are the fields the Registry populates itself — it holds no owner, purpose, or tool-scope description of its own. |
-| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP identity is scoped rather than trusted: it receives Frappe's native 403 on anything outside its role. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
+| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP credential is confined rather than spread: only the deterministic executor at the ingress holds it — no agent ever does — and the ERP's native role enforcement is proven with a deliberately unprivileged token that receives Frappe's own 403 on supplier access ([`spikes/frappe_capability/evidence.json`](spikes/frappe_capability/evidence.json)). The executor's own key is not yet role-scoped; the [ERPNext section below](#erpnext-frappe-cloud) flags it for rotation. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
 | **Memory Bank** | Deliberately not used | Transactional Firestore owns authoritative case state — case version, event claim, approval, command outbox — and Sessions retain resumable agent history. Generative memory is not trusted with compliance facts, and Sessions are not described here as a Memory Bank equivalent; they hold different things. |
 | **Model Armor** | Measured, not adopted | Probed against this project's own corpus on 2026-08-19 and turned down on the evidence: its prompt-injection filter returns `NO_MATCH_FOUND` on the planted injection fixture that the incumbent check catches with five findings, and its data plane is unreachable from the engine's network. One filter did deliver — malicious-URI detection, with no false positives on clean fixtures. Full measurement, including the context-dilution boundary that explains the miss: [`spikes/model_armor/evidence.json`](spikes/model_armor/evidence.json). |
 | **Agent Gateway** | Not used | Ingress is an authenticated Pub/Sub push adapter on Cloud Run that refuses anonymous callers, and the human decision surface sits behind IAP. Nothing in the design needed a gateway in front of that. |
@@ -334,7 +339,8 @@ above, not grounding.
 **Idempotency.** Every side effect is a Firestore command with a
 deterministic ID (`{case_id}:{action}`). A command already `DONE` is never
 re-driven, so a replayed event produces exactly one ERP write. ERP records
-are keyed by supplier name, so a duplicate create collides natively (409)
+are keyed by supplier name — the same deterministic external id the outbox
+reconciles against — so a duplicate create collides natively (409)
 and is reported rather than retried blindly. The one side effect without
 destination-level reconciliation is outbound renewal mail: the ERP does not
 deduplicate outbound messages, so an accepted send whose response is lost

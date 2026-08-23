@@ -88,7 +88,9 @@ itself from a mailbox is design intent, not built, and the video labels it
 that way on screen.
 
 One deployed run of that whole loop, captured in
-[`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json), covers
+[`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json)
+(in this repository a *spike* is a self-contained proof directory: the
+harness that was run and the evidence file it wrote), covers
 two suppliers: one that parks for a human, and one that runs the full lifecycle
 from onboarding to hold release. It took **55.3 s of machine time** — including
 a 43.9 s cold start — against a budget of **130s**, plus a single
@@ -115,7 +117,8 @@ What the run measured, beyond the clock:
   notice.
 - **0 duplicate writes after a retry.** A retried command leaves exactly one ERP
   record, and that is enforced rather than hoped for.
-- **380 simulated business days** of supplier lifecycle. The lifecycle clock is
+- **380 simulated business days** — about a year and a half — of supplier
+  lifecycle. The lifecycle clock is
   compressed so that months of elapsed time fit in a demonstration, and the
   compression is disclosed on screen rather than implied away.
 
@@ -158,8 +161,11 @@ deduplicate, so an accepted send whose response is lost can repeat a message
 but never a record. Generative memory is deliberately not trusted with
 compliance facts.
 Credentials come from **Secret Manager**, each service runs as its own service
-account, and the ERP identity is scoped rather than trusted — it receives the
-ERP's own 403 on anything outside its role. Traces go to **Cloud Trace** and are
+account, and the ERP credential is confined rather than spread: only the
+deterministic executor holds it — no agent ever does — and the ERP's native
+role enforcement is proven with a deliberately unprivileged token that
+receives the ERP's own 403 on supplier access. The executor's own key is not
+yet role-scoped; the repository flags it for rotation. Traces go to **Cloud Trace** and are
 load-bearing rather than decorative: a 10.6 s rise in run time was diagnosed
 node by node against them and traced to model reasoning length rather than to
 code.

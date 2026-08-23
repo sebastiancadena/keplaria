@@ -249,7 +249,7 @@ them.</p></div>
 <p>Not linked yet &mdash; it publishes with the Devpost submission, and will
 be added here then. What it shows: one continuous, unedited take &mdash; a
 stop for a human, an approval that releases the held writes, then a
-simulated year of renewals, a hold, and a release.</p></div>
+simulated year and a half of renewals, a hold, and a release.</p></div>
 </div>
 <h2>Named for the law, not the planets</h2>
 <p class="sub">An agent that runs for minutes can afford to improvise. One that
