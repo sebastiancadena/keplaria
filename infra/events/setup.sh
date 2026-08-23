@@ -13,7 +13,7 @@
 #   - Grant keplaria-pubsub-push@ roles/run.invoker on keplaria-ingress. That
 #     binding targets a Cloud Run service that doesn't exist yet the first
 #     time this script runs, so it happens after the service is deployed
-#     (see the "Deploying" section of README.md).
+#     (see docs/operations.md "Deploying" section).
 #
 # The keplaria-events-push subscription IS managed below, but only once
 # keplaria-ingress is deployed (it needs the service URL as its push

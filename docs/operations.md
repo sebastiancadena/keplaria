@@ -4,6 +4,8 @@ Build, deploy, provisioning and failure-handling runbooks. Nothing here is
 needed to evaluate the project — the [README](../README.md) is the front
 door; this file is for operating and rebuilding the system.
 
+## Runbooks
+
 ### Operational constraints
 
 - **Agent Runtime allows 1 concurrent query and 30 queries/min per
