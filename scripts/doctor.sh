@@ -199,6 +199,20 @@ else
   meh "brand repo missing at $brand_guidelines — visual work will drift"
 fi
 
+# The submission lists a code repository and a reproducible README as required
+# deliverables, and the site links the repo as "Source". Every strategy file
+# calls it "the public repo" -- but nobody ever checked, and it is private, so
+# each of those links 404s for a judge. Assumed state, never verified: the same
+# class of error as a correct consumer of state nobody read.
+repo_vis=$(gh repo view sebastiancadena/keplaria --json visibility -q .visibility 2>/dev/null)
+if [ "$repo_vis" = "PUBLIC" ]; then
+  ok "the code repository is public (judges can open the link the submission gives them)"
+elif [ -z "$repo_vis" ]; then
+  meh "could not read repo visibility (gh auth?) — verify by hand before submitting"
+else
+  bad "the code repository is $repo_vis — the submission links it and rules require a repository + reproducible README"
+fi
+
 # The public site must actually be reachable: it is the URL the video shows.
 site_code=$(curl -sS -o /dev/null -w '%{http_code}' -m 12 https://keplaria.com 2>/dev/null)
 if [ "$site_code" = "200" ]; then
