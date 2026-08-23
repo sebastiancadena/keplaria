@@ -4,30 +4,48 @@
 
 # Keplaria
 
-Agent project built on the [Google Agent Development Kit (ADK)](https://adk.dev)
-for Python, targeting the
+**Supplier compliance is not a one-time check.** Certificates expire months
+after onboarding, and someone has to notice, chase the renewal, and decide
+whether it is still safe to buy. Every onboarding tool retires the day the
+ERP record is created — the ongoing work goes back to a person with a
+calendar reminder.
+
+**Keplaria stays.** One durable mission per supplier: it onboards the
+supplier into a real ERP, then wakes months later on its own clock, requests
+renewed evidence, places a reversible purchasing hold when the certificate
+lapses, validates the renewal against the source document, and releases the
+hold. It stops exactly where policy requires a human decision — and nowhere
+else.
+
+One deployed run of that whole lifecycle: **55.3 s of machine time** and a
+single **47.7 s human approval**, against the same work done by hand in
+**663.5 s over 20 steps** (author-timed, not practitioner-reviewed — method
+and every qualifier in [the proof section](#judging-criteria--proof)).
+
+Built on the [Google Agent Development Kit (ADK)](https://adk.dev) for
+Python, running on the
 [Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start).
 
-**Continuous supplier assurance.** A supplier is onboarded once and then kept
-compliant with no one watching. The same durable mission that created the ERP
-record wakes months later on its own clock, requests renewed evidence, places a
-reversible hold when the certificate lapses, validates the renewal against the
-source document, and releases the hold. Work that a person otherwise does by hand,
-on a calendar reminder, if they remember.
+## Evaluate this in three minutes
 
-One deployed run of that whole loop: **55.3 s of machine time** — a figure that
-carries a 43.9 s cold start rather than hiding one — and a single
-**47.7 s human approval**, timed separately because it is a person's time, not
-the system's. Against an author-timed manual walkthrough of the same work that
-took **663.5 s over 20 steps** — 19 of which the run removes, the twentieth
-being the approval that policy requires a human to make. Numbers and method:
-[`spikes/judge_run/evidence.json`](spikes/judge_run/evidence.json) and
-[`spikes/manual_baseline/evidence.json`](spikes/manual_baseline/evidence.json).
-The baseline is author-timed, not practitioner-reviewed, and is labelled that
-way everywhere it is used.
+1. **Open the [case console](https://keplaria-console-bklu5jcdea-uc.a.run.app)** —
+   no sign-in. Each row is a *payload*: one supplier's case. Open one: the
+   strip at the top shows where it sits in the lifecycle (onboarded → active
+   → renewal requested → held → released), and the status line says what has
+   actually been written to the ERP — for a parked case, nothing yet.
+2. **Open [Ground Control](https://keplaria-review-bklu5jcdea-uc.a.run.app/review)**,
+   the human decision surface — Google sign-in through Cloud IAP; the two
+   organizer accounts are pre-authorized ([details below](#access-for-judges-and-testers)).
+   Cases the policy stopped wait here with their ERP writes held; an
+   approval is what releases them.
+3. **Watch the demonstration video** (linked from the Devpost submission) —
+   one continuous unedited take: a stop for a human, an approval releasing
+   the ERP writes the same moment, then a simulated year of renewals, a
+   hold, and a release.
 
-Live case console (no sign-in):
-<https://keplaria-console-bklu5jcdea-uc.a.run.app>
+What those three show together: the model proposes, deterministic policy
+decides, a human stays in exactly the loop policy requires, and nothing
+reaches the ERP except through an approved, idempotent command.
 
 ## Access for judges and testers
 
@@ -64,33 +82,16 @@ for a fresh look.
 If sign-in fails for an address listed above, that is a misconfiguration on our
 side rather than an intended refusal — please note it in the submission
 feedback. `bash scripts/doctor.sh` reports the same grant from the outside and
-will say so plainly.
-
-**These surfaces stay up, and the screening behind them does too.** The
-sanctions-screening service runs on a private VM that used to stop every night
-and wait for a human to start it, which is a poor thing to hand a reviewer who
-opens the link on a Sunday. It now carries an hourly start schedule and no stop
-schedule, so it comes back on its own within the hour whatever knocks it over.
-
-We know what that costs because we measured it rather than pricing it from a
-rate card. Gross running cost for the entire project is **$16.63** month to
-date, before any credit is applied — read from a billing budget that
-deliberately excludes credits, because every budget that includes them reports
-`$0.00` while a credit is covering the bill, which is true and tells you
-nothing. Per-SKU attribution from the billing export puts the screening VM at
-$0.134 per hour it runs and roughly $0.72 a day for everything that bills
-whether or not anything is running. The one number that had never been checked
-against a bill — the cost of keeping the agent runtime warm — turned out to be
-zero: that platform meters request-processing time, not held instances, so the
-warm pin is free. Details in
-[`spikes/cost_posture/`](spikes/cost_posture/evidence.json).
+will say so plainly. (Availability and running cost are measured separately —
+[details near the end of this file](#availability-and-cost).)
 
 ## Judging criteria → proof
 
-Every row points at a file in this repository that was produced by running the
-system, not by describing it. `spikes/core_contracts/harness.py` re-executes the
-tests it cites and re-reads the evidence it cites on every run, so a claim here
-cannot outlive the behaviour behind it.
+This table matches each judging criterion to what it asks and where the proof
+for it lives in this repository. Every row points at a file that was produced
+by running the system, not by describing it. `spikes/core_contracts/harness.py`
+re-executes the tests it cites and re-reads the evidence it cites on every run,
+so a claim here cannot outlive the behaviour behind it.
 
 | Criterion | What it asks | Proof in this repo |
 |---|---|---|
@@ -100,6 +101,8 @@ cannot outlive the behaviour behind it.
 
 ## Platform subsystem coverage
 
+Read this table by its Status column: it is an honest status report, not a
+checklist to maximize, so "deliberately not used" counts as a complete answer.
 The track names seven subsystems. This table says which are used natively, which
 are answered by a first-party equivalent, and which are deliberately not used.
 A subsystem that is not used says so and says why — including the one that was
@@ -619,3 +622,27 @@ ever sitting mid-run waiting on this UI.
   `communication.email.make`, then `email_queue.send_now` — proven in
   `spikes/frappe_capability/`. Probe for the fix: Email Queue `f7pj5o8901`
   flushing on its own + fresh `Scheduled Job Log` entries.
+
+## Availability and cost
+
+The manual baseline's 20 steps break down cleanly — **19 of which the run removes**,
+the twentieth being the approval that policy requires a human to make.
+
+**These surfaces stay up, and the screening behind them does too.** The
+sanctions-screening service runs on a private VM that used to stop every night
+and wait for a human to start it, which is a poor thing to hand a reviewer who
+opens the link on a Sunday. It now carries an hourly start schedule and no stop
+schedule, so it comes back on its own within the hour whatever knocks it over.
+
+We know what that costs because we measured it rather than pricing it from a
+rate card. Gross running cost for the entire project is **$16.63** month to
+date, before any credit is applied — read from a billing budget that
+deliberately excludes credits, because every budget that includes them reports
+`$0.00` while a credit is covering the bill, which is true and tells you
+nothing. Per-SKU attribution from the billing export puts the screening VM at
+$0.134 per hour it runs and roughly $0.72 a day for everything that bills
+whether or not anything is running. The one number that had never been checked
+against a bill — the cost of keeping the agent runtime warm — turned out to be
+zero: that platform meters request-processing time, not held instances, so the
+warm pin is free. Details in
+[`spikes/cost_posture/`](spikes/cost_posture/evidence.json).
