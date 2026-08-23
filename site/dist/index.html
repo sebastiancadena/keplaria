@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keplaria</title>
+<meta name="description" content="Supplier onboarding that does not end when the ERP record is created.">
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--void:#0B1020;--ink:#111827;--amber:#F59E0B;--amber-bright:#FBBF24;
+--star:#F8FAFC;--muted:#64748B;--clear:#34D399;
+--border:rgb(100 116 139 / .32);--hair:rgb(100 116 139 / .16)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--void);color:var(--star);
+font-family:Inter,system-ui,sans-serif;line-height:1.65;
+-webkit-font-smoothing:antialiased}
+.wrap{max-width:64rem;margin:0 auto;padding:3rem 1.5rem 5rem}
+header{display:flex;align-items:center;justify-content:space-between;
+gap:1rem;flex-wrap:wrap;margin-bottom:4rem}
+header svg{height:96px;width:auto}
+/* The lockup viewBox carries 0.5x-icon clear space, so the artwork is
+   74.74% of the element width and HALF its height. 96px tall renders a
+   ~142px-wide mark, clear of the 96px lockup minimum; 46px did not. */
+nav a{color:var(--muted);text-decoration:none;margin-left:1.5rem;font-size:.95rem}
+nav a:hover{color:var(--star)}
+h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
+font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:0 0 1.25rem;
+letter-spacing:-.02em}
+h2{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
+font-size:1.4rem;margin:3.5rem 0 1rem}
+.lede{font-size:1.2rem;max-width:44ch;color:var(--star)}
+.sub{color:var(--muted);max-width:62ch}
+.amber{color:var(--amber-bright)}
+.figures{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));
+margin:3rem 0}
+.fig{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
+background:rgb(248 250 252 / .03)}
+.fig b{display:block;font-family:"Space Grotesk",system-ui,sans-serif;
+font-size:1.7rem;font-weight:600;color:var(--amber-bright);margin-bottom:.35rem}
+.fig span{color:var(--muted);font-size:.92rem}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2.5rem 0}
+.btn{display:inline-block;padding:.7rem 1.15rem;border-radius:10px;
+border:1px solid var(--border);color:var(--star);text-decoration:none;
+font-size:.97rem}
+.btn--go{border-color:var(--amber);color:var(--amber-bright)}
+.btn:hover{background:rgb(248 250 252 / .05)}
+table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:.93rem}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:.78rem;
+letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem;
+border-bottom:1px solid var(--border)}
+td{padding:.7rem .5rem;border-bottom:1px solid var(--hair);vertical-align:top}
+.val{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--amber-bright);
+white-space:nowrap}
+.q{color:var(--muted);font-size:.86rem}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
+.note{border-left:3px solid var(--amber);padding:.85rem 1.15rem;
+background:rgb(248 250 252 / .03);border-radius:0 12px 12px 0;margin:2rem 0;
+color:var(--star)}
+footer{margin-top:5rem;padding-top:2rem;border-top:1px solid var(--hair);
+color:var(--muted);font-size:.88rem}
+a{color:var(--amber-bright)}
+.scroll{overflow-x:auto}
+</style>
+</head><body><div class="wrap">
+<header><a href="/" aria-label="Keplaria"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-128 -128 1013.52 512" role="img" aria-label="Keplaria"><g transform="rotate(-22 128 128)"><mask id="keplaria-orbit-cut-display" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256"><path fill="#fff" fill-rule="evenodd" d="M0,0 H256 V256 H0 Z M156.916185,186.982224 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z"/></mask><ellipse class="ring" cx="128" cy="128" rx="94" ry="72.004" fill="none" stroke="#F8FAFC" stroke-width="15" mask="url(#keplaria-orbit-cut-display)"/><circle cx="67.572986" cy="128" r="21" fill="#FBBF24" class="focus"/><circle cx="181.916185" cy="186.982224" r="16" fill="#F8FAFC" class="body"/></g><g transform="translate(296.96,169.216)"><path d="M66 0V700H198V422H216L443 700H612L320 355L622 0H448L216 284H198V0Z" fill="#F8FAFC" transform="translate(0.0000,0) scale(0.117760,-0.117760)"/><path d="M296 -14Q222 -14 165.5 17.5Q109 49 77.5 106.5Q46 164 46 242V254Q46 332 77.0 389.5Q108 447 164.0 478.5Q220 510 294 510Q367 510 421.0 477.5Q475 445 505.0 387.5Q535 330 535 254V211H174Q176 160 212.0 128.0Q248 96 300 96Q353 96 378.0 119.0Q403 142 416 170L519 116Q505 90 478.5 59.5Q452 29 408.0 7.5Q364 -14 296 -14ZM175 305H407Q403 348 372.5 374.0Q342 400 293 400Q242 400 212.0 374.0Q182 348 175 305Z" fill="#F8FAFC" transform="translate(72.0691,0) scale(0.117760,-0.117760)"/><path d="M70 -200V496H194V436H212Q229 465 265.0 487.5Q301 510 368 510Q428 510 479.0 480.5Q530 451 561.0 394.0Q592 337 592 256V240Q592 159 561.0 102.0Q530 45 479.0 15.5Q428 -14 368 -14Q323 -14 292.5 -3.5Q262 7 243.5 23.5Q225 40 214 57H196V-200ZM330 96Q389 96 427.5 133.5Q466 171 466 243V253Q466 325 427.0 362.5Q388 400 330 400Q272 400 233.0 362.5Q194 325 194 253V243Q194 171 233.0 133.5Q272 96 330 96Z" fill="#F8FAFC" transform="translate(140.0166,0) scale(0.117760,-0.117760)"/><path d="M70 0V700H196V0Z" fill="#F8FAFC" transform="translate(215.1475,0) scale(0.117760,-0.117760)"/><path d="M224 -14Q171 -14 129.0 4.5Q87 23 62.5 58.5Q38 94 38 145Q38 196 62.5 230.5Q87 265 130.5 282.5Q174 300 230 300H366V328Q366 363 344.0 385.5Q322 408 274 408Q227 408 204.0 386.5Q181 365 174 331L58 370Q70 408 96.5 439.5Q123 471 167.5 490.5Q212 510 276 510Q374 510 431.0 461.0Q488 412 488 319V134Q488 104 516 104H556V0H472Q435 0 411.0 18.0Q387 36 387 66V67H368Q364 55 350.0 35.5Q336 16 306.0 1.0Q276 -14 224 -14ZM246 88Q299 88 332.5 117.5Q366 147 366 196V206H239Q204 206 184.0 191.0Q164 176 164 149Q164 122 185.0 105.0Q206 88 246 88Z" fill="#F8FAFC" transform="translate(246.4717,0) scale(0.117760,-0.117760)"/><path d="M70 0V496H194V440H212Q223 470 248.5 484.0Q274 498 308 498H368V386H306Q258 386 227.0 360.5Q196 335 196 282V0Z" fill="#F8FAFC" transform="translate(314.5370,0) scale(0.117760,-0.117760)"/><path d="M70 0V496H196V0ZM133 554Q99 554 75.5 576.0Q52 598 52 634Q52 670 75.5 692.0Q99 714 133 714Q168 714 191.0 692.0Q214 670 214 634Q214 598 191.0 576.0Q168 554 133 554Z" fill="#F8FAFC" transform="translate(361.1699,0) scale(0.117760,-0.117760)"/><path d="M224 -14Q171 -14 129.0 4.5Q87 23 62.5 58.5Q38 94 38 145Q38 196 62.5 230.5Q87 265 130.5 282.5Q174 300 230 300H366V328Q366 363 344.0 385.5Q322 408 274 408Q227 408 204.0 386.5Q181 365 174 331L58 370Q70 408 96.5 439.5Q123 471 167.5 490.5Q212 510 276 510Q374 510 431.0 461.0Q488 412 488 319V134Q488 104 516 104H556V0H472Q435 0 411.0 18.0Q387 36 387 66V67H368Q364 55 350.0 35.5Q336 16 306.0 1.0Q276 -14 224 -14ZM246 88Q299 88 332.5 117.5Q366 147 366 196V206H239Q204 206 184.0 191.0Q164 176 164 149Q164 122 185.0 105.0Q206 88 246 88Z" fill="#F8FAFC" transform="translate(392.4941,0) scale(0.117760,-0.117760)"/></g></svg></a>
+<nav><a href="/proof">Verification</a><a href="https://github.com/sebastiancadena/keplaria">Source</a></nav></header>
+
+<h1>Supplier onboarding usually ends<br>when the ERP record is created.</h1>
+<p class="lede">Keplaria keeps governing that supplier for months afterwards.</p>
+<p class="sub">A fleet of agents onboards a supplier, screens it for sanctions,
+and then stays with it &mdash; requesting certificate renewals, applying a
+purchasing hold when evidence goes overdue, and releasing that hold when valid
+new evidence arrives. An LLM coordinator <em>proposes</em> which specialists
+should run; a deterministic policy layer <em>decides</em>, against a versioned
+catalog. Nothing reaches the ERP except through an outbox, and a human can stop
+any case on the way.</p>
+<div class="figures"><div class="fig"><b>55.3s</b><span>of machine work, one deployed run</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed</span></div><div class="fig"><b>1</b><span>decision a human had to make</span></div></div>
+<div class="note"><b>Every number on this site is bound to the run that
+produced it.</b> The verification page is generated from the evidence files, not
+written by hand &mdash; so it cannot quietly disagree with them.</div>
+<div class="actions">
+<a class="btn btn--go" href="https://keplaria-console-bklu5jcdea-uc.a.run.app">Open the live case console</a>
+<a class="btn" href="/proof">Verification ledger</a>
+<a class="btn" href="https://github.com/sebastiancadena/keplaria">Source</a>
+</div>
+<h2>What a case looks like</h2>
+<p class="sub">The console is public and read-only. A case shows what the
+coordinator proposed, what policy actually engaged, the screening candidates and
+why one of them needed a person, and every command &mdash; including the ones
+policy refused. A case stopped for a human says so plainly, and says that
+nothing has been written.</p>
+<h2>Built on</h2>
+<p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
+&middot; Cloud Run &middot; Firestore &middot; Pub/Sub &middot; ERPNext &middot;
+OpenTelemetry</p>
+
+<footer>
+<p>Keplaria is a hackathon project. The screening index is a <b>synthetic,
+rights-cleared watchlist</b> &mdash; no live sanctions data is indexed. The ERP is a
+real ERPNext instance holding fictional suppliers. The manual baseline is
+<b>author-timed, not practitioner-reviewed</b>.</p>
+<p>&copy; 2026 &middot; <a href="https://github.com/sebastiancadena/keplaria">source</a> &middot; <a href="/proof">every number, with its evidence</a></p>
+</footer></div></body></html>

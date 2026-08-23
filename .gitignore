@@ -3,6 +3,10 @@ __pycache__/
 *.py[oc]
 build/
 dist/
+# ...except the generated public site: it is byte-checked by doctor.sh the
+# same way architecture.svg is, and a clone with no site/dist would fail
+# that check for a reason that has nothing to do with the clone.
+!site/dist/
 wheels/
 *.egg-info
 
