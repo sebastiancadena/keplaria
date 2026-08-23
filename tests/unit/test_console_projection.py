@@ -312,3 +312,43 @@ def test_a_non_string_candidate_id_does_not_take_the_page_down():
     view = public_case(_case(screening={"candidates": [
         {"id": ["syn-co-008"], "score": 0.67, "match": False}]}), [])
     assert view["cited_candidate_ids"] == []
+
+
+# --- lifecycle position --------------------------------------------------
+
+def test_lifecycle_defaults_to_onboarding():
+    got = public_case({"case_id": "C1"})
+    assert got["lifecycle"]["step"] == "onboarding"
+    assert [s["key"] for s in got["lifecycle"]["steps"]] == [
+        "onboarding", "active", "renewal_requested", "held", "released"]
+
+
+def test_lifecycle_reads_the_persisted_state():
+    got = public_case({"case_id": "C1", "lifecycle": {"state": "held"}})
+    assert got["lifecycle"]["step"] == "held"
+    current = [s["key"] for s in got["lifecycle"]["steps"] if s["current"]]
+    assert current == ["held"]
+
+
+def test_an_active_case_with_a_cleared_hold_reads_as_released():
+    got = public_case(
+        {"case_id": "C1", "lifecycle": {"state": "active"}},
+        [{"action": "clear_hold", "status": "done", "cycle": 3}])
+    assert got["lifecycle"]["step"] == "released"
+
+
+def test_an_active_case_with_no_cleared_hold_reads_as_active():
+    got = public_case({"case_id": "C1", "lifecycle": {"state": "active"}})
+    assert got["lifecycle"]["step"] == "active"
+
+
+def test_a_quarantined_case_marks_no_step_current():
+    got = public_case({"case_id": "C1", "lifecycle": {"state": "quarantined"}})
+    assert got["lifecycle"]["quarantined"] is True
+    assert got["lifecycle"]["step"] is None
+    assert not [s for s in got["lifecycle"]["steps"] if s["current"]]
+
+
+def test_an_unknown_lifecycle_state_does_not_raise():
+    got = public_case({"case_id": "C1", "lifecycle": {"state": "wat"}})
+    assert got["lifecycle"]["step"] is None
