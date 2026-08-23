@@ -9,6 +9,7 @@ it and the ERP client stubbed the way the executor tests stub it.
 from __future__ import annotations
 
 import contextlib
+import uuid
 from datetime import datetime, timezone
 
 import pytest
@@ -282,18 +283,45 @@ def test_a_decided_case_drops_off_the_review_queue(db, case_id, client, created)
     assert case_id not in response.text
 
 
+# The cap `list_cases` is called with wherever a recent-first listing is shown.
+# The review queue must not be built on one; see the test below.
+RECENT_FIRST_CAP = 50
+
+
 def test_a_long_parked_case_still_appears_in_the_review_queue(db, case_id, client):
-    """The shared keplaria-test `cases` collection holds thousands of
-    documents, so a case with an `updated_at` this old is nowhere near the
-    50 most-recently-touched ones. That makes this the case that would
-    silently vanish if the review queue were ever built on `list_cases`
-    (recent-first, capped at 50) instead of `list_awaiting_cases` (every
-    `awaiting_approval` case, no cap). Written directly rather than through
-    `park_case`, because every real writer stamps `updated_at` with
-    `SERVER_TIMESTAMP` — there is no way to make the pipeline itself produce
-    a document this stale.
+    """A parked case must not fall out of a queue that claims to show all of
+    them. This is the case that would silently vanish if the review queue were
+    ever built on `list_cases` (recent-first, capped) instead of
+    `list_awaiting_cases` (every `awaiting_approval` case, no cap). Written
+    directly rather than through `park_case`, because every real writer stamps
+    `updated_at` with `SERVER_TIMESTAMP` — there is no way to make the pipeline
+    itself produce a document this stale.
+
+    The recent cases are SEEDED here. This test used to rely on the shared
+    database already holding thousands of documents, so that an ancient case
+    fell outside the 50 most-recently-touched ones by ambient luck. That made
+    it fail on any clean database and pass on a dirty one -- it was red on a
+    fresh emulator, green after any prior run, and was recorded twice as a
+    flake and once as a product defect before the cause was found on
+    2026-08-23. A test whose precondition is other tests' leftovers is not
+    testing what its name says.
     """
     ancient = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    recent = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    # One more than the recent-first cap the review queue must NOT be built
+    # on, so an ancient case falls outside that window by construction. Fewer
+    # would make this test pass even if the queue were capped at 50, which is
+    # the single thing it exists to catch.
+    # Deliberately NOT derived from case_id. Named `{case_id}-NEWER-n` first
+    # time round, which made the page's own seeded rows contain `case_id` as a
+    # substring -- so `case_id in response.text` was true however the queue was
+    # built, and the mutation that should have failed this test passed.
+    filler = uuid.uuid4().hex[:12]
+    newer_ids = [f"RECENT-{filler}-{n}" for n in range(RECENT_FIRST_CAP + 1)]
+    for newer in newer_ids:
+        db.collection(CASES).document(newer).set({
+            "case_id": newer, "phase": "committed", "updated_at": recent,
+        })
     db.collection(CASES).document(case_id).set({
         "case_id": case_id,
         "phase": "awaiting_approval",
@@ -301,10 +329,11 @@ def test_a_long_parked_case_still_appears_in_the_review_queue(db, case_id, clien
     })
     try:
         assert case_id in [c.get("case_id") for c in list_awaiting_cases(db)]
-        assert case_id not in [c.get("case_id") for c in list_cases(db, limit=50)], (
-            "sanity check: this case must be old enough to fall out of the "
-            "50 most-recently-touched documents, or the queue assertion "
-            "below would pass for the wrong reason"
+        assert case_id not in [
+            c.get("case_id") for c in list_cases(db, limit=RECENT_FIRST_CAP)
+        ], (
+            "sanity check: this case must fall out of the most-recently-touched "
+            "window, or the queue assertion below would pass for the wrong reason"
         )
 
         response = client.get("/review")
@@ -314,7 +343,10 @@ def test_a_long_parked_case_still_appears_in_the_review_queue(db, case_id, clien
             "to show everything awaiting a decision"
         )
     finally:
-        db.collection(CASES).document(case_id).delete()
+        # The seeded cases go too. Leaving them would make this test a source
+        # of exactly the ambient state it just stopped depending on.
+        for stray in [case_id, *newer_ids]:
+            db.collection(CASES).document(stray).delete()
 
 
 def test_a_decided_case_page_no_longer_offers_a_decision(db, case_id, client, created):
