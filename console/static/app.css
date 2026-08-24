@@ -383,7 +383,7 @@ button[value="rejected"]:hover {
 .status--executed { border-left-color: var(--clear); }
 .status__state {
   font-family: "Space Grotesk", system-ui, sans-serif;
-  font-size: 1.05rem;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: 0.14em;
   margin: 0 0 var(--space-2);
@@ -452,7 +452,9 @@ td.num, th.num { text-align: right; }
    compete with the panel title, large enough not to be a caption. */
 .provenance + .kicker { margin-top: var(--space-5); }
 .kicker + .factors { margin-top: var(--space-2); }
-.kicker { font-size: 0.9rem; opacity: 0.8; }
+/* Space Grotesk never sits below 18px (brand guidelines section 6);
+   this was 0.9rem. */
+.kicker { font-size: 18px; opacity: 0.85; }
 
 /* --- Cold-reader orientation ------------------------------------------- */
 .context-strip {
@@ -521,6 +523,33 @@ td.num, th.num { text-align: right; }
   background: rgb(248 250 252 / 0.04);
   padding: 1px 6px;
   white-space: nowrap;
+}
+
+/* An entity id -- case id, watchlist candidate id, policy id. Full
+   brightness: these are the values a reader looks things up by, unlike the
+   schema refs and paths below. */
+.lit--id {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: var(--star);
+}
+.lit--id a { text-decoration-color: rgb(245 158 11 / 0.45); }
+
+/* A measured number. Tabular figures so a column of scores aligns on the
+   decimal instead of drifting. */
+.lit--num {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: var(--star);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A department named inside a sentence. Space Grotesk is the register for an
+   organizational actor everywhere on this console, and 18px is the floor the
+   brand sets for it. */
+.lit--dept {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--star);
 }
 
 /* An event type: bare mono. It only ever appears under a column head that
@@ -800,7 +829,7 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
 /* The arrow makes each row read as the routing it describes. It is the one
    diagrammatic moment on the page, and it costs no structure. */
 .routes td::before { content: "\2192\00a0"; opacity: 0.45; }
-.routes .sep { opacity: 0.4; padding: 0 0.15em; }
+.sep { opacity: 0.4; padding: 0 0.15em; }
 .routes .none { font-weight: 600; opacity: 0.75; }
 .routes .chip { margin-left: var(--space-2); opacity: 0.75; }
 .note-under { margin-top: var(--space-4); opacity: 0.75; }

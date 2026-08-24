@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ case.case_id }} — Keplaria{% endblock %}
+{% macro agents(ids) -%}
+{% for id in ids %}<span class="lit--agent">{{ id }}</span>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
+{%- endmacro %}
 {% block content %}
 <p><a href="/">&larr; All cases</a></p>
 <h1>{{ case.supplier or case.case_id }}</h1>
-<p class="body-small mono">Payload {{ case.case_id }} · revision {{ case.case_version }}</p>
+<p class="body-small">Payload <span class="lit--id">{{ case.case_id }}</span> &middot; revision <span class="lit--num">{{ case.case_version }}</span></p>
 <p class="context-strip" data-testid="context-strip">One supplier's case,
 its payload, exactly as the system scored it. <strong>Band</strong> is the
 risk verdict deterministic policy assigned; a <strong>parked</strong> case
@@ -21,8 +24,8 @@ has stopped for a human decision, its ERP writes held.</p>
   <div class="panel__header">
     <h2>Risk verdict</h2>
   </div>
-  <p>Score <span class="mono">{{ '%.2f'|format(case.policy.score or 0) }}</span> ·
-     policy <span class="mono">{{ case.policy.policy_id }} v{{ case.policy.policy_version }}</span></p>
+  <p>Score <span class="lit--num">{{ '%.2f'|format(case.policy.score or 0) }}</span> &middot;
+     policy <span class="lit--id">{{ case.policy.policy_id }} v{{ case.policy.policy_version }}</span></p>
   <dl class="provenance">
     <dt><span class="band--{{ case.gate_band or 'review' }}">Gate verdict: {{ case.gate_band }}</span></dt>
     <dd>Set by policy. An approval is recorded beside it, never over it.</dd>
@@ -37,11 +40,11 @@ has stopped for a human decision, its ERP writes held.</p>
   {% for factor in case.policy.factors_fired %}
     <li>
       {% if factor is mapping %}
-        <span class="factor__weight mono">{{ '%+.2f'|format(factor.weight or 0) }}</span>
+        <span class="factor__weight lit--num">{{ '%+.2f'|format(factor.weight or 0) }}</span>
         <span class="factor__value">{{ factor.value }}</span>
-        <span class="factor__id mono">{{ factor.id }}</span>
+        <span class="factor__id lit--ref">{{ factor.id }}</span>
       {% else %}
-        <span class="mono">{{ factor }}</span>
+        <span class="lit--ref">{{ factor }}</span>
       {% endif %}
     </li>
   {% endfor %}
@@ -57,21 +60,21 @@ has stopped for a human decision, its ERP writes held.</p>
   <dl class="provenance">
     {% if case.routing.department %}
     <dt><span class="chip">Event</span></dt>
-    <dd>Department <span class="mono">{{ case.routing.department }}</span>
+    <dd>Department <span class="lit--dept">{{ case.routing.department }}</span>
         {%- if case.routing.department_source and case.routing.department_source != 'event' %}
         <span class="caption">(source: {{ case.routing.department_source }})</span>
         {%- endif %}</dd>
     {% endif %}
     {% if case.routing.proposed %}
     <dt><span class="chip">Model</span></dt>
-    <dd>Proposed <span class="mono">{{ case.routing.proposed|join(', ') }}</span>
+    <dd>Proposed {{ agents(case.routing.proposed) }}
         {% if case.routing.reason %}<span class="quote">&ldquo;{{ case.routing.reason }}&rdquo;
         &mdash; coordinator rationale, recorded verbatim</span>{% endif %}</dd>
     {% endif %}
     <dt><span class="chip">Policy</span></dt>
-    <dd>Engaged <span class="mono">{{ case.routing.route|join(', ') or 'none' }}</span>
-        {% if case.routing.added %}&middot; added <span class="mono">{{ case.routing.added|join(', ') }}</span>{% endif %}
-        {% if case.routing.dropped %}&middot; dropped <span class="mono">{{ case.routing.dropped|join(', ') }}</span>{% endif %}
+    <dd>Engaged {% if case.routing.route %}{{ agents(case.routing.route) }}{% else %}<span class="lit--ref">none</span>{% endif %}
+        {% if case.routing.added %}&middot; added {{ agents(case.routing.added) }}{% endif %}
+        {% if case.routing.dropped %}&middot; dropped {{ agents(case.routing.dropped) }}{% endif %}
         {% if not case.routing.added and not case.routing.dropped %}&middot; proposal accepted as-is{% endif %}</dd>
   </dl>
   {% if case.routing.refused %}<p>Refused: {{ case.routing.refused }}</p>{% endif %}
@@ -93,8 +96,8 @@ has stopped for a human decision, its ERP writes held.</p>
             {%- elif candidate.id in case.cited_candidate_ids %}<span class="verdict verdict--near">Near-match</span>
             {%- else %}<span class="verdict verdict--low">Below concern</span>{% endif %}</td>
         <td>{{ candidate.caption or '—' }}</td>
-        <td class="mono">{{ candidate.id }}</td>
-        <td class="mono num">{{ '%.2f'|format(candidate.score or 0) }}</td>
+        <td class="lit--id">{{ candidate.id }}</td>
+        <td class="lit--num num">{{ '%.2f'|format(candidate.score or 0) }}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -127,9 +130,9 @@ has stopped for a human decision, its ERP writes held.</p>
     <thead><tr><th>Action</th><th>Cycle</th><th>Status</th></tr></thead>
     <tbody>
     {% for command in case.commands %}
-      <tr><td class="mono">{{ command.action }}</td>
-          <td>{{ command.cycle }}</td>
-          <td class="mono">{{ command.status }}</td></tr>
+      <tr><td><span class="lit--command">{{ command.action }}</span></td>
+          <td class="lit--num">{{ command.cycle }}</td>
+          <td>{{ command.status }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -144,8 +147,8 @@ has stopped for a human decision, its ERP writes held.</p>
     <thead><tr><th>Action</th><th>Cycle</th></tr></thead>
     <tbody>
     {% for command in case.refused_commands %}
-      <tr><td class="mono">{{ command.action }}</td>
-          <td>{{ command.cycle }}</td></tr>
+      <tr><td><span class="lit--command">{{ command.action }}</span></td>
+          <td class="lit--num">{{ command.cycle }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
