@@ -167,7 +167,8 @@ if [ -d .venv ] && [ -f site/build_site.py ]; then
   tmp_site=$(mktemp -d)
   if KEPLARIA_SITE_OUT="$tmp_site" uv run python site/build_site.py >/dev/null 2>&1 \
      && cmp -s "$tmp_site/index.html" site/dist/index.html \
-     && cmp -s "$tmp_site/proof.html" site/dist/proof.html; then
+     && cmp -s "$tmp_site/proof.html" site/dist/proof.html \
+     && cmp -s "$tmp_site/orientation.svg" site/dist/orientation.svg; then
     ok "site/dist matches build_site.py output (keplaria.com not stale)"
   else
     bad "site/dist is STALE — rebuild: uv run python site/build_site.py && (cd site && wrangler deploy)"

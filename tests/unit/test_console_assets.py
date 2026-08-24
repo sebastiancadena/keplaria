@@ -35,9 +35,13 @@ def test_no_stylesheet_or_template_references_an_external_host():
     """Self-hosted only. No CDN, no font service, no remote image."""
     files = list((CONSOLE / "static").glob("*.css"))
     files += list((CONSOLE / "templates").glob("*.html"))
+    files += list((CONSOLE / "static").glob("*.svg"))
     assert files, "no stylesheet or template found to check"
     for path in files:
-        text = path.read_text()
+        # The SVG XML namespace is itself an "http://" literal that names no
+        # live host -- neutralise it before scanning so a vendored SVG isn't
+        # flagged for a URI nobody's browser ever resolves.
+        text = path.read_text().replace("http://www.w3.org/", "")
         for needle in ("http://", "https://", "//fonts.", "cdn."):
             assert needle not in text, f"{path.name} references {needle}"
 

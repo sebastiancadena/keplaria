@@ -12,5 +12,5 @@
   ],
   "grading_rule": "PASS only if the answer names the fleet as departments/agents/commands (the rulebook) AND the payload as one supplier's case carried through it.",
   "verdict": "PASS",
-  "follow_up": "Line 3 (what a clock event is) was addressed in the same branch by defining the term where it first appears; re-run this cold read after any change to the console's context strip or figure."
+  "follow_up": "Line 3 (what a clock event is) was addressed after this read by defining the term in the home context strip; the second read below was run against the redeployed console."
 }

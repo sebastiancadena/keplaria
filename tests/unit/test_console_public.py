@@ -369,6 +369,7 @@ def test_the_case_list_defines_the_fleet_before_linking_to_it(client):
     response = client.get("/")
     assert "The fleet is the crew and its rulebook" in response.text
     assert 'src="/static/orientation.svg"' in response.text
+    assert "raised by the calendar" in response.text
 
 
 def test_the_case_list_shows_clock_for_a_cases_latest_claimed_event(
