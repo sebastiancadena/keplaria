@@ -965,3 +965,24 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
   color: var(--muted);
   font-family: "JetBrains Mono", ui-monospace, monospace;
 }
+
+/* Exercise counts sit under the scope disc; a refusal is its own line. */
+.cell__count {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--star);
+  opacity: 0.85;
+}
+.cell__refused {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--amber-bright);
+  white-space: nowrap;
+}
+.legend .cell__count { display: inline; margin: 0 var(--space-1) 0 var(--space-3); }
+
+/* A case page links into this page by anchor; the target lights up. */
+:target { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: var(--radius-sm); }
+tr:target th, tr:target td { background: rgb(245 158 11 / 0.08); }

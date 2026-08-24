@@ -1,9 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Fleet — Keplaria{% endblock %}
 {% block content %}
-<p class="context-strip" data-testid="context-strip">What this deployment is
-allowed to run, and who may run it. This page renders the same catalog the
-routing policy enforces, so it cannot drift from what actually runs.</p>
+<p class="context-strip" data-testid="context-strip"><strong>The fleet is the crew and its rulebook:</strong> three departments, a coordinator that
+proposes, two specialist agents, and the five ERP commands they may issue.
+<strong>A payload is one supplier's case</strong>, carried through that fleet
+for months: onboarded, then renewals, a hold, a release. This page is the
+rulebook. The fleet runs one mission, the supplier-compliance workflow; the
+routing policy reads this same catalog, so the page cannot drift from what
+runs. The number in each cell is how many payloads actually exercised it:
+<a href="/">see the cases</a>.</p>
+<figure class="orientation">
+  <img src="/static/orientation.svg" width="1200" height="520"
+       alt="The fleet: departments, agents and commands. One payload: a supplier's case carried through the fleet across five lifecycle stops.">
+</figure>
 
 <div class="panel">
   <div class="panel__header">
@@ -43,6 +52,7 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
   <p class="legend body-small">
     <span class="cell cell--in" aria-hidden="true"></span> in scope
     <span class="cell cell--out" aria-hidden="true"></span> out of scope
+    <span class="cell__count">n</span> payloads that exercised the cell
   </p>
   <div class="scroll-x">
     <table class="matrix">
@@ -56,10 +66,10 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
         <tr>
           <th scope="col">Department</th>
           {% for agent_id in agent_columns %}
-          <th scope="col" class="col--mark col--agent">{{ agent_id }}</th>
+          <th scope="col" class="col--mark col--agent" id="agent-{{ agent_id }}">{{ agent_id }}</th>
           {% endfor %}
           {% for command in command_columns %}
-          <th scope="col" class="col--mark{% if loop.first %} group--split{% endif %}">
+          <th scope="col" class="col--mark{% if loop.first %} group--split{% endif %}" id="cmd-{{ command }}">
             {%- for part in command.split("_") -%}{{ part }}{%- if not loop.last -%}_<wbr>{%- endif -%}{%- endfor -%}
           </th>
           {% endfor %}
@@ -67,21 +77,24 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
       </thead>
       <tbody>
         {% for scope in scopes %}
-        <tr>
+        <tr id="dept-{{ scope.name }}">
           <th scope="row" class="matrix__dept">
             {{ scope.name }}
             <span class="matrix__desc">{{ scope.description }}</span>
           </th>
-          {% for agent_id, permitted in scope.agents %}
+          {% for agent_id, permitted, n in scope.agents %}
           <td class="col--mark col--agent">
             <span class="cell {{ 'cell--in' if permitted else 'cell--out' }}"></span>
-            <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} engage {{ agent_id }}</span>
+            <span class="cell__count">{{ n }}</span>
+            <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} engage {{ agent_id }}; engaged in {{ n }} listed cases</span>
           </td>
           {% endfor %}
-          {% for command, permitted in scope.commands %}
+          {% for command, permitted, n in scope.commands %}
           <td class="col--mark{% if loop.first %} group--split{% endif %}">
             <span class="cell {{ 'cell--in' if permitted else 'cell--out' }}"></span>
-            <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} issue {{ command }}</span>
+            <span class="cell__count">{{ n.claimed }}</span>
+            {% if n.refused %}<span class="cell__refused">{{ n.refused }} refused</span>{% endif %}
+            <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} issue {{ command }}; claimed in {{ n.claimed }} listed cases, refused {{ n.refused }} times</span>
           </td>
           {% endfor %}
         </tr>
@@ -91,6 +104,9 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
   </div>
   <p class="body-small scroll-hint">Scroll the table sideways to reach every
     column. The department name stays in place.</p>
+  <p class="body-small note-under">Counts are over the {{ population }} most recent cases the console lists, the same rows as the <a href="/">home
+    page</a>. A refusal is a command a case claimed outside its department's
+    scope: recorded on the case, never queued.</p>
 </section>
 
 <section class="panel">
@@ -104,11 +120,11 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
   <div class="scroll-x">
     <table class="routes">
       <thead>
-        <tr><th scope="col">Event type</th><th scope="col">Agents engaged</th></tr>
+        <tr><th scope="col">Event type</th><th scope="col">Agents engaged</th><th scope="col" class="num">Cases</th></tr>
       </thead>
       <tbody>
         {% for route in routes %}
-        <tr>
+        <tr id="event-{{ route.event }}">
           {# No <wbr> in an event name: test_the_fleet_view_renders_the_routing_table
              asserts the raw name as one substring. #}
           <th scope="row" class="lit--event">{{ route.event }}</th>
@@ -120,6 +136,7 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
             <span class="chip chip--word">clock event</span>{% endif %}
             {% endif %}
           </td>
+          <td class="num lit--num">{{ route.count }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -139,7 +156,7 @@ routing policy enforces, so it cannot drift from what actually runs.</p>
     <span class="caption">Reference</span>
   </div>
   {% for agent in agents %}
-  <article class="agent">
+  <article class="agent" id="agent-ref-{{ agent.id }}">
     <div class="agent__head">
       <h3>{{ agent.id }}</h3>
       <span class="chip chip--word{% if not agent.routable %} chip--exception{% endif %}">{% if agent.routable %}Routable{% else %}Fleet-wide{% endif %}</span>

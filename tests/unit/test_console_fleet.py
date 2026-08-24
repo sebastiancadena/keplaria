@@ -220,3 +220,34 @@ def test_an_unavailable_catalog_renders_an_explicit_error(
 
     assert response.status_code == 503
     assert "catalog unavailable" in response.text.lower()
+
+
+def test_the_scope_matrix_states_its_population_and_shows_counts(
+    client, install_catalog
+):
+    install_catalog(_catalog_dict())
+    response = client.get("/fleet")
+    assert response.status_code == 200
+    assert "most recent cases the console lists" in response.text
+    assert 'class="cell__count"' in response.text
+
+
+def test_the_fleet_page_carries_anchors_for_every_row_and_column(
+    client, install_catalog
+):
+    install_catalog(_catalog_dict())
+    html = client.get("/fleet").text
+    for anchor in ("dept-procurement", "dept-finance", "agent-evidence",
+                   "agent-compliance", "cmd-apply_hold",
+                   "event-new_supplier_packet"):
+        assert f'id="{anchor}"' in html, anchor
+
+
+def test_the_fleet_page_defines_the_fleet_and_names_the_mission_once(
+    client, install_catalog
+):
+    install_catalog(_catalog_dict())
+    html = client.get("/fleet").text
+    assert "The fleet is the crew and its rulebook" in html
+    assert html.count("one mission") == 1
+    assert 'src="/static/orientation.svg"' in html

@@ -77,6 +77,23 @@ def list_inbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list[
     return {case_id: load_inbox(db, case_id) for case_id in case_ids}
 
 
+def list_outbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list[dict]]:
+    """Outbox rows for the listed cases, keyed by case id.
+
+    One subcollection read per case, bounded by list_cases' limit. Not a
+    collection-group query filtered on case_id: that needs a collection-group
+    index the emulator does not enforce, so the tests would stay green while
+    the deployed page 400s.
+    """
+    out: dict[str, list[dict]] = {}
+    for case_id in case_ids:
+        if not case_id or not case_id_is_addressable(case_id):
+            continue
+        ref = db.collection(CASES).document(case_id).collection(OUTBOX)
+        out[case_id] = [snap.to_dict() or {} for snap in ref.stream()]
+    return out
+
+
 def list_cases(db: firestore.Client, limit: int = 50) -> list[dict]:
     """Recent cases, parked ones first.
 

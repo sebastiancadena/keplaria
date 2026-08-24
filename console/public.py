@@ -24,9 +24,16 @@ from app.catalog import (
     get_catalog,
 )
 from app.state.firestore import get_client
+from console.fleet_counts import exercise_counts
 from console.grouping import group_by_supplier, route_label
 from console.projection import public_case
-from console.store import list_cases, list_inbox_for, load_case, load_inbox
+from console.store import (
+    list_cases,
+    list_inbox_for,
+    list_outbox_for,
+    load_case,
+    load_inbox,
+)
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -119,6 +126,15 @@ def fleet(request: Request):
         KNOWN_COMMANDS - set(COMMAND_ORDER)
     )
 
+    # Live exercise counts, over the same bounded list the home page shows.
+    # The catalog is the rulebook; these numbers are whether it was tested.
+    db = get_client()
+    raw_cases = list_cases(db)
+    case_ids = [c.get("case_id") for c in raw_cases if c.get("case_id")]
+    commands_by_case = list_outbox_for(db, case_ids)
+    events_by_case = list_inbox_for(db, case_ids)
+    counts = exercise_counts(catalog, raw_cases, commands_by_case, events_by_case)
+
     return templates.TemplateResponse(
         request=request,
         name="fleet.html",
@@ -127,15 +143,20 @@ def fleet(request: Request):
             "agents": catalog.agents,
             "agent_columns": agent_columns,
             "command_columns": command_columns,
+            "counts": counts,
+            "population": counts["population"],
             "scopes": [
                 {
                     "name": name,
                     "description": scope.description,
                     "agents": [
-                        (a, a in scope.permitted_agents) for a in agent_columns
+                        (a, a in scope.permitted_agents,
+                         counts["departments"][name]["agents"][a])
+                        for a in agent_columns
                     ],
                     "commands": [
-                        (c, c in scope.permitted_commands)
+                        (c, c in scope.permitted_commands,
+                         counts["departments"][name]["commands"][c])
                         for c in command_columns
                     ],
                 }
@@ -150,6 +171,7 @@ def fleet(request: Request):
                     "event": event_type,
                     "agents": route,
                     "clock": event_type in CLOCK_EVENTS,
+                    "count": counts["events"].get(event_type, 0),
                 }
                 for event_type, route in catalog.event_routes.items()
             ],
