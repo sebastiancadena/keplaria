@@ -931,6 +931,37 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
   opacity: 1;
 }
 
-/* A repeated value in a sorted column is still data -- it is not removed,
-   only quieted, so nothing a reader needs disappears. */
-td.repeat { opacity: 0.4; }
+/* The orientation figure carries the whole "fleet vs payload" argument;
+   it sits between the context strip and the first panel on both pages. */
+.orientation { margin: var(--space-4) 0 var(--space-5); }
+.orientation img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+
+/* One heading row per supplier: the list's shape, not a decoration. */
+.supplier-row th {
+  text-align: left;
+  padding-top: var(--space-5);
+  border-bottom: 1px solid var(--border-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.supplier-row__name { font-size: 1.05rem; font-weight: 600; color: var(--star); }
+.supplier-row__step {
+  margin-left: var(--space-3);
+  font-size: 0.8rem;
+  color: var(--amber-bright);
+  border: 1px solid rgb(245 158 11 / 0.45);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--space-2);
+}
+.supplier-row__count {
+  margin-left: var(--space-3);
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}

@@ -24,6 +24,7 @@ from app.catalog import (
     get_catalog,
 )
 from app.state.firestore import get_client
+from console.grouping import group_by_supplier, route_label
 from console.projection import public_case
 from console.store import list_cases, load_case
 
@@ -47,18 +48,23 @@ def index(request: Request):
     # these cases are the deployed-state evidence for a gate -- a ten-run
     # streak, a retry drill, a rejection pair -- so the list is legitimately
     # repetitive, and what makes it readable is knowing the shape of the
-    # repetition before scrolling it.
+    # repetition before scrolling it: the tally, and one heading per supplier.
     phases: dict[str, int] = {}
     for case in cases:
         phase = case.get("phase") or "unknown"
         phases[phase] = phases.get(phase, 0) + 1
+    groups = group_by_supplier(cases)
+    for group in groups:
+        for case in group["cases"]:
+            case["route_label"] = route_label(case)
     return templates.TemplateResponse(
         request=request,
         name="cases.html",
         context={
-            "cases": cases,
+            "groups": groups,
+            "case_count": len(cases),
             "phase_counts": sorted(phases.items(), key=lambda kv: (-kv[1], kv[0])),
-            "supplier_count": len({c.get("supplier") for c in cases}),
+            "supplier_count": len(groups),
         },
     )
 

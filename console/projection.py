@@ -198,8 +198,12 @@ def public_case(case: dict, commands: Iterable[dict] = ()) -> dict:
         "cited_candidate_ids": _cited_candidate_ids(policy, _candidates(screening)),
         "case_version": case.get("case_version"),
         "phase": case.get("phase"),
-        "supplier": case.get("supplier"),
+        # Two plain fields the list needs: the event type decides whether an
+        # empty route is a clock event, and updated_at picks the supplier
+        # heading's current stop. Neither is rendered raw on the detail page.
+        "event_type": case.get("event_type"),
         "updated_at": case.get("updated_at"),
+        "supplier": case.get("supplier"),
         "routing": _routing(case.get("routing")),
         "screening": {
             "reachable": screening.get("reachable"),

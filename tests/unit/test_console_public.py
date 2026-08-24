@@ -303,3 +303,26 @@ def test_the_case_page_carries_strip_and_lifecycle(client, db):
 def test_the_fleet_page_carries_a_context_strip(client):
     page = client.get("/fleet").text
     assert 'data-testid="context-strip"' in page
+
+
+def test_the_case_list_groups_rows_under_a_supplier_heading(db, case_id, client):
+    _park_a_real_case(db, case_id)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'class="supplier-row"' in response.text
+    assert "1 case" in response.text
+
+
+def test_the_case_list_shows_the_route_beside_each_case(db, case_id, client):
+    """The fixture's engaged route is evidence + compliance; the Route
+    column must carry both names on the list, not only on the detail page."""
+    _park_a_real_case(db, case_id)
+    response = client.get("/")
+    row = response.text.split(case_id, 1)[1].split("</tr>", 1)[0]
+    assert "evidence" in row and "compliance" in row
+
+
+def test_the_case_list_defines_the_fleet_before_linking_to_it(client):
+    response = client.get("/")
+    assert "The fleet is the crew and its rulebook" in response.text
+    assert 'src="/static/orientation.svg"' in response.text
