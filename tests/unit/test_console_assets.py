@@ -122,3 +122,21 @@ def test_every_surface_that_embeds_the_lockup_clears_the_brand_minimum():
     assert not undersized, (
         "brand minimum is 96px wide: " + "; ".join(undersized)
     )
+
+
+def test_the_console_orientation_figure_is_the_generated_one():
+    """The console ships a COPY of docs/architecture/orientation.svg (the
+    Dockerfile copies console/, not docs/). A copy drifts; this pins it."""
+    generated = CONSOLE.parent / "docs" / "architecture" / "orientation.svg"
+    shipped = CONSOLE / "static" / "orientation.svg"
+    assert shipped.read_bytes() == generated.read_bytes()
+
+
+def test_the_orientation_figure_carries_no_text_below_the_floor():
+    """Nothing carrying meaning below 16px on the 1200-wide canvas: the
+    README renders it at 880, the console wider."""
+    import re
+    svg = (CONSOLE.parent / "docs" / "architecture" / "orientation.svg").read_text()
+    sizes = [int(s) for s in re.findall(r'font-size="(\d+)"', svg)]
+    assert sizes, "no text found"
+    assert min(sizes) >= 16

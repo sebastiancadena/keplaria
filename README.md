@@ -182,6 +182,12 @@ rebuilds `docs/architecture/architecture.svg` from the committed sources under
 Update the build script whenever a component is added or moved: the diagram
 is part of the submission and must match the deployed system.
 
+A third generated figure, `docs/architecture/orientation.svg` from
+`uv run python docs/architecture/build_orientation.py`, is the
+fleet-and-payload orientation shown near the top of this file and on the
+console; the same command refreshes the console's copy, and `doctor.sh`
+byte-checks it like the other two.
+
 ### keplaria.com
 
 The public front door and the verification ledger are two generated static
