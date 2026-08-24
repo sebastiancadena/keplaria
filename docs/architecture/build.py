@@ -334,8 +334,51 @@ S.append(
 )
 
 # ------------------------------------------------------ plane geometry
-PX, PW = 24, 1376  # planes column: x 24..1400
-SX, SW_ = 1416, 480  # sidebar column: x 1416..1896
+PX, PW = 24, 1466  # planes column: x 24..1490
+SX, SW_ = 1506, 390  # sidebar column: x 1506..1896
+
+# Everything the planes column emits from here on is laid out on the OLD
+# 1376-wide grid and remapped at the end by `shift_x` (below): the sidebar was
+# ~90 px wider than its longest line, so that width moves left and is spent
+# where the diagram was cramped -- around Firestore and inside the Agent
+# Runtime grid. Rect right edges are remapped too, so widths follow.
+PLANES_START = len(S)
+
+
+def _fx(x: float) -> float:
+    if x < 780:
+        return x
+    if x < 816:
+        return x + 40   # Firestore's right edge and the arrows that meet it
+    if x < 1004:
+        return x + 50   # Agent Runtime group edge, its first column, the reviewer
+    if x < 1186:
+        return x + 70   # second column
+    if x < 1400:
+        return x + 90   # third column, sanctions, review service, plane captions
+    return x            # sidebar: already placed by the new SX
+
+
+def _num(v: str) -> str:
+    f = _fx(float(v))
+    return str(int(f)) if f == int(f) else f"{f:g}"
+
+
+def shift_x(el: str) -> str:
+    import re as _re
+    # rect: remap x and the right edge, so width follows the mapping
+    el = _re.sub(r'(?<![\w-])x="(-?[\d.]+)"([^>]*?) width="(-?[\d.]+)"',
+                 lambda m: f'x="{_num(m.group(1))}"{m.group(2)} width="{_fx(float(m.group(1)) + float(m.group(3))) - _fx(float(m.group(1))):g}"',
+                 el)
+    # bare x-ish attributes on everything else (text, use, circle, line)
+    el = _re.sub(r'\b(cx|x1|x2)="(-?[\d.]+)"', lambda m: f'{m.group(1)}="{_num(m.group(2))}"', el)
+    el = _re.sub(r'(?<![\w-])x="(-?[\d.]+)"(?![^>]* width=)', lambda m: f'x="{_num(m.group(1))}"', el)
+    # polyline points and absolute M/L path commands
+    el = _re.sub(r'points="([^"]+)"',
+                 lambda m: 'points="' + " ".join(f"{_num(px)},{py}" for px, py in
+                                                 (pt.split(",") for pt in m.group(1).split())) + '"', el)
+    el = _re.sub(r'([ML])(-?[\d.]+),', lambda m: f"{m.group(1)}{_num(m.group(2))},", el)
+    return el
 
 A_Y, A_H = 112, 150
 B_Y, B_H = 274, 396
@@ -496,8 +539,11 @@ S.append(edge([(930, 552), (1080, 566)], MUTED, 1.6))
 S.append(edge([(950, 552), (1262, 562)], MUTED, 1.6))
 
 # --- edges inside the plane
-S.append(edge([(424, 408), (640, 408), (640, 432), (814, 432)], AMBER, 2.4, marker="amber"))
-S.append(text(530, 400, "invoke graph — 1 concurrent query", 10.5, INTER, 500, AMBER_BRIGHT, "middle", halo=True))
+# Straight, and deliberately low: at the box midline (y=408) it would land on the
+# dashed Gemini boundary and read as "ingress calls Gemini". It enters the group
+# in the gap under that boundary instead.
+S.append(edge([(424, 428), (814, 428)], AMBER, 2.4, marker="amber"))
+S.append(text(620, 420, "invoke graph — 1 concurrent query", 10.5, INTER, 500, AMBER_BRIGHT, "middle", halo=True))
 S.append(edge([(820, 520), (786, 520)], MUTED, 1.6))
 S.append(edge([(828, 588), (786, 588)], MUTED, 1.6))
 S.append(text(806, 580, "outbox", 9.5, INTER, 400, MUTED, "middle", halo=True))
@@ -715,5 +761,6 @@ for i, line in enumerate(
     S.append(text(SX + 20, 1020 + i * 16, line, 11.5, INTER, 400, STAR))
 
 S.append("</svg>")
+S[PLANES_START:] = [shift_x(e) for e in S[PLANES_START:]]
 OUT.write_text("\n".join(S))
 print(f"wrote {OUT} ({OUT.stat().st_size / 1024:.0f} KiB)")
