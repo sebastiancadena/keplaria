@@ -1,7 +1,7 @@
 # Submission video — narration script and shot list
 
 Target 3:40–3:45; hard cap 4:00. One continuous unedited live segment,
-0:15–2:25. Narration ~531 words at ~139 wpm.
+0:15–2:25. Narration ~533 words at ~139 wpm.
 
 Lines marked **SYNC** must land on the named on-screen event.
 
@@ -81,7 +81,7 @@ Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 > **SYNC (run freezes on end state)** Three hundred eighty simulated business
 > days. Five under real hold. Zero human touches.
 
-### Beat 3 — Architecture (2:25–2:55) — 83 words
+### Beat 3 — Architecture (2:25–2:55) — 85 words
 
 > Six boxes: events in; the coordinator proposes; the policy gate decides,
 > against a versioned fleet catalog; specialists reason; an outbox executes — and
