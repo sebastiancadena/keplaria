@@ -12,5 +12,18 @@
   ],
   "grading_rule": "PASS only if the answer names the fleet as departments/agents/commands (the rulebook) AND the payload as one supplier's case carried through it.",
   "verdict": "PASS",
-  "follow_up": "Line 3 (what a clock event is) was addressed after this read by defining the term in the home context strip; the second read below was run against the redeployed console."
+  "follow_up": "Line 3 (what a clock event is) was addressed after this read by defining the term in the home context strip; the second read below was run against the redeployed console.",
+  "runs": [
+    {
+      "ran_at": "2026-08-24T21:15:19+00:00",
+      "console_revision": "keplaria-console-00019-qcx",
+      "prompt_addition": "3. In the Route column some rows say 'clock'. In one sentence: what is a clock event, as far as the page tells you? If the page does not say, say so.",
+      "answer": [
+        "The fleet is the crew and rulebook (departments, a coordinator, two specialist agents, and the five ERP commands they may issue), and a payload is one supplier's case that gets carried through that fleet over months (onboarded, renewed, held, released).",
+        "Yes, the callout box at the top states both definitions in the first two sentences almost verbatim.",
+        "A clock event is one raised by the calendar rather than by a document, and the page says policy handles it with no agent engaged at all."
+      ],
+      "verdict": "PASS"
+    }
+  ]
 }
