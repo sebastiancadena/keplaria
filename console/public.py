@@ -16,7 +16,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.catalog import CatalogLoadError, get_catalog
+from app.catalog import (
+    CLOCK_EVENTS,
+    COMMAND_ORDER,
+    KNOWN_COMMANDS,
+    CatalogLoadError,
+    get_catalog,
+)
 from app.state.firestore import get_client
 from console.projection import public_case
 from console.store import list_cases, load_case
@@ -62,20 +68,58 @@ def fleet(request: Request):
             status_code=503,
         )
 
-    manifests = {agent.id: agent for agent in catalog.agents}
+    # The page used to print every department's agents in full, which meant
+    # rendering the same two manifests twice: procurement and compliance have
+    # identical agent scope, and ~400 words of duplicate prose is exactly
+    # what hid that from a reader. What differs between departments is which
+    # cells are filled, so the scope renders as a matrix and each agent is
+    # described once, below it.
+    agent_columns = list(catalog.routable_ids())
+
+    # Every command the lifecycle can issue, not only the ones some department
+    # happens to permit. A command NO department may issue is a true and
+    # load-bearing fact; sourcing the columns from the departments would
+    # render it as a missing column instead of an empty one, which reads as
+    # "no such command" rather than "nobody may issue it". Extras beyond the
+    # declared order still appear, so adding a command cannot silently drop
+    # it from this page.
+    command_columns = list(COMMAND_ORDER) + sorted(
+        KNOWN_COMMANDS - set(COMMAND_ORDER)
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="fleet.html",
         context={
             "catalog": catalog,
-            "shared_agents": [a for a in catalog.agents if not a.routable],
-            "departments": [
+            "agents": catalog.agents,
+            "agent_columns": agent_columns,
+            "command_columns": command_columns,
+            "scopes": [
                 {
                     "name": name,
-                    "scope": scope,
-                    "agents": [manifests[a] for a in scope.permitted_agents],
+                    "description": scope.description,
+                    "agents": [
+                        (a, a in scope.permitted_agents) for a in agent_columns
+                    ],
+                    "commands": [
+                        (c, c in scope.permitted_commands)
+                        for c in command_columns
+                    ],
                 }
                 for name, scope in catalog.departments.items()
+            ],
+            # Routing was absent from the fleet view entirely, though it is
+            # half of what the page claims to show: app.policy validates a
+            # proposed route against exactly this table, and app.catalog
+            # refuses to load if a clock event maps to anything at all.
+            "routes": [
+                {
+                    "event": event_type,
+                    "agents": route,
+                    "clock": event_type in CLOCK_EVENTS,
+                }
+                for event_type, route in catalog.event_routes.items()
             ],
         },
     )

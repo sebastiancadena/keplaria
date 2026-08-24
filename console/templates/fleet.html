@@ -1,77 +1,181 @@
 {% extends "base.html" %}
 {% block title %}Fleet — Keplaria{% endblock %}
 {% block content %}
-<p class="context-strip" data-testid="context-strip">The agents this
-deployment may run, grouped by department. This page renders the same catalog
-the routing policy enforces, so it cannot drift from what actually runs.</p>
+<p class="context-strip" data-testid="context-strip">What this deployment is
+allowed to run, and who may run it. This page renders the same catalog the
+routing policy enforces, so it cannot drift from what actually runs.</p>
+
 <div class="panel">
   <div class="panel__header">
     <h1>Fleet</h1>
     <span class="caption mono">{{ catalog.catalog_id }} v{{ catalog.catalog_version }}</span>
   </div>
   <p><a href="/">&larr; All cases</a></p>
-  <p class="body-small">The scopes below are what routing and command
-     dispatch actually enforce: an event whose department proposes an agent
-     outside its scope, or a command outside its scope, is refused and
-     recorded: never silently dropped, never silently allowed. The
-     department label on an event is asserted by its producer, not an
-     authenticated identity: this is a policy-and-audit boundary, not a
-     security boundary. Catalog authority is per-deployment, not live:
-     revoking a scope takes a deploy of a new catalog artifact, not a
-     configuration flip.</p>
+
+  {# Three separate load-bearing claims. As a stacked list they re-formed into
+     the one 90-word paragraph the list was introduced to break up, so they are
+     tiles. Each carries the console's eccentric-focus divider. #}
+  <dl class="facts">
+    <div>
+      <dt>Out of scope is refused, and recorded</dt>
+      <dd>An event whose department proposes an agent outside its scope, or a
+        command outside its scope, is refused and recorded. Never silently
+        dropped, never silently allowed.</dd>
+    </div>
+    <div>
+      <dt>A department is asserted, not authenticated</dt>
+      <dd>The department label on an event comes from its producer. This is a
+        policy-and-audit boundary, not a security boundary.</dd>
+    </div>
+    <div>
+      <dt>Authority ships with the deployment</dt>
+      <dd>Revoking a scope takes a deploy of a new catalog artifact, not a
+        configuration flip.</dd>
+    </div>
+  </dl>
 </div>
 
 <section class="panel">
   <div class="panel__header">
-    <h2>Fleet-wide</h2>
-    <span class="caption">Runs for every agentic event; belongs to no department scope</span>
+    <h2>What each department may do</h2>
+    <span class="caption">Enforced scope</span>
   </div>
-  {% for agent in shared_agents %}
-  <div>
-    <h3 class="mono">{{ agent.id }}
-      <span class="caption">v{{ agent.version }} · {{ agent.deployment }}</span></h3>
-    <p>{{ agent.purpose }}</p>
-    <p class="body-small">Owner: {{ agent.owner }} ·
-       In: <span class="mono">{{ agent.input_schema }}</span> ·
-       Out: <span class="mono">{{ agent.output_schema }}</span></p>
-    <p class="body-small">Tools:
-       <span class="mono">{{ agent.approved_tools|join(', ') or 'none' }}</span> ·
-       Data: <span class="mono">{{ agent.data_classes|join(', ') }}</span></p>
-    <p class="caption">Evals: {{ agent.evals.metric }} — {{ agent.evals.evidence }}</p>
+  <p class="legend body-small">
+    <span class="cell cell--in" aria-hidden="true"></span> in scope
+    <span class="cell cell--out" aria-hidden="true"></span> out of scope
+  </p>
+  <div class="scroll-x">
+    <table class="matrix">
+      <thead>
+        <tr class="matrix__groups">
+          <td></td>
+          <th scope="colgroup" colspan="{{ agent_columns|length }}"
+              class="group--agents col--agent">Agents it may engage</th>
+          <th scope="colgroup" colspan="{{ command_columns|length }}" class="group--split">Commands it may issue</th>
+        </tr>
+        <tr>
+          <th scope="col">Department</th>
+          {% for agent_id in agent_columns %}
+          <th scope="col" class="col--mark col--agent">{{ agent_id }}</th>
+          {% endfor %}
+          {% for command in command_columns %}
+          <th scope="col" class="col--mark{% if loop.first %} group--split{% endif %}">
+            {%- for part in command.split("_") -%}{{ part }}{%- if not loop.last -%}_<wbr>{%- endif -%}{%- endfor -%}
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for scope in scopes %}
+        <tr>
+          <th scope="row" class="matrix__dept">
+            {{ scope.name }}
+            <span class="matrix__desc">{{ scope.description }}</span>
+          </th>
+          {% for agent_id, permitted in scope.agents %}
+          <td class="col--mark col--agent">
+            <span class="cell {{ 'cell--in' if permitted else 'cell--out' }}"></span>
+            <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} engage {{ agent_id }}</span>
+          </td>
+          {% endfor %}
+          {% for command, permitted in scope.commands %}
+          <td class="col--mark{% if loop.first %} group--split{% endif %}">
+            <span class="cell {{ 'cell--in' if permitted else 'cell--out' }}"></span>
+            <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} issue {{ command }}</span>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+  <p class="body-small scroll-hint">Scroll the table sideways to reach every
+    column. The department name stays in place.</p>
+</section>
+
+<section class="panel">
+  <div class="panel__header">
+    <h2>Which agents an event engages</h2>
+    <span class="caption">Routing</span>
+  </div>
+  <p class="body-small">The coordinator proposes a route for every agentic
+    event; policy validates that proposal against this table before anything
+    runs.</p>
+  <div class="scroll-x">
+    <table class="routes">
+      <thead>
+        <tr><th scope="col">Event type</th><th scope="col">Agents engaged</th></tr>
+      </thead>
+      <tbody>
+        {% for route in routes %}
+        <tr>
+          {# No <wbr> in an event name: test_the_fleet_view_renders_the_routing_table
+             asserts the raw name as one substring. #}
+          <th scope="row" class="lit--event">{{ route.event }}</th>
+          <td>
+            {% if route.agents %}
+            {% for agent_id in route.agents %}<span class="lit--agent">{{ agent_id }}</span>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
+            {% else %}
+            <span class="none">None</span>{% if route.clock %}
+            <span class="chip chip--word">clock event</span>{% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="body-small scroll-hint">Scroll the table sideways to reach the
+    full route.</p>
+  <p class="body-small note-under">An event type absent from this table is
+    refused, as is a proposed agent the department may not engage. A clock
+    event carries no document to reason about, so the catalog refuses to load
+    if one routes to any agent.</p>
+</section>
+
+<section class="panel">
+  <div class="panel__header">
+    <h2>The agents</h2>
+    <span class="caption">Reference</span>
+  </div>
+  {% for agent in agents %}
+  <article class="agent">
+    <div class="agent__head">
+      <h3>{{ agent.id }}</h3>
+      <span class="chip chip--word{% if not agent.routable %} chip--exception{% endif %}">{% if agent.routable %}Routable{% else %}Fleet-wide{% endif %}</span>
+      <span class="chip">v{{ agent.version }}</span>
+      <span class="chip chip--word chip--{{ agent.deployment }}">{{ agent.deployment }}</span>
+    </div>
+    <div class="agent__prose">
+      <p>{{ agent.purpose }}</p>
+      {% if not agent.routable %}
+      <p class="body-small">Not a routing target: it runs for every agentic
+        event and belongs to no department scope.</p>
+      {% endif %}
+    </div>
+    <dl class="spec">
+      <dt>Reads</dt><dd class="lit--ref">{{ agent.input_schema }}</dd>
+      <dt>Returns</dt><dd class="lit--ref">{{ agent.output_schema }}</dd>
+      <dt>Tools</dt><dd>{% if agent.approved_tools %}{% for tool in agent.approved_tools %}<span class="lit--command">{{ tool }}</span>{% if not loop.last %} {% endif %}{% endfor %}{% else %}<span class="lit--ref">none</span>{% endif %}</dd>
+      <dt>Data</dt><dd>{% for cls in agent.data_classes %}<span class="lit--command">{{ cls }}</span>{% if not loop.last %} {% endif %}{% endfor %}</dd>
+      <dt>Owner</dt><dd>{{ agent.owner }}</dd>
+      <dt>Graded by</dt><dd><span class="lit--ref">{{ agent.evals.metric }}</span>,
+        in <span class="lit--ref">{{ agent.evals.evidence }}</span></dd>
+    </dl>
+  </article>
   {% endfor %}
 </section>
 
-{% for department in departments %}
-<section class="panel">
-  <div class="panel__header"><h2>{{ department.name }}</h2></div>
-  <p>{{ department.scope.description }}</p>
-  {% if department.agents %}
-    {% for agent in department.agents %}
-    <div>
-      <h3 class="mono">{{ agent.id }}
-        <span class="caption">v{{ agent.version }} · {{ agent.deployment }}</span></h3>
-      <p>{{ agent.purpose }}</p>
-      <p class="body-small">Owner: {{ agent.owner }} ·
-         In: <span class="mono">{{ agent.input_schema }}</span> ·
-         Out: <span class="mono">{{ agent.output_schema }}</span></p>
-      <p class="body-small">Tools:
-         <span class="mono">{{ agent.approved_tools|join(', ') or 'none' }}</span> ·
-         Data: <span class="mono">{{ agent.data_classes|join(', ') }}</span></p>
-      <p class="caption">Evals: {{ agent.evals.metric }} — {{ agent.evals.evidence }}</p>
-    </div>
-    {% endfor %}
-  {% else %}
-    <p>No agents in scope: an event labeled {{ department.name }} that
-       proposes one is refused and recorded.</p>
-  {% endif %}
-  {% if department.scope.permitted_commands %}
-  <p class="body-small">Commands in scope:
-     <span class="mono">{{ department.scope.permitted_commands|join(', ') }}</span></p>
-  {% else %}
-  <p class="body-small">No commands in scope: a command from this
-     department is refused and recorded.</p>
-  {% endif %}
-</section>
-{% endfor %}
+{# The scroll hint has to follow what the container ACTUALLY does. As a media
+   query it left a 721-812px band where the last column truncated to a single
+   letter with no scrollbar and no hint. No external references here: the
+   no-external-host asset test scans this file. #}
+<script>
+  for (const el of document.querySelectorAll(".scroll-x")) {
+    const sync = () => el.parentElement.classList.toggle(
+      "has-overflow", el.scrollWidth > el.clientWidth + 1);
+    new ResizeObserver(sync).observe(el);
+    sync();
+  }
+</script>
 {% endblock %}

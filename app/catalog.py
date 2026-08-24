@@ -40,9 +40,13 @@ DEFAULT_CATALOG_PATH = (
 # Events driven by the clock rather than by a document or an entity change.
 CLOCK_EVENTS = frozenset({"renewal_due", "evidence_overdue"})
 
-KNOWN_COMMANDS = frozenset({
+# Ordered, because the fleet view renders one column per command and a
+# frozenset would order them arbitrarily. Lifecycle order, not alphabetical:
+# the columns then read left to right the way a supplier actually moves.
+COMMAND_ORDER = (
     CREATE_SUPPLIER, ATTACH_EVIDENCE, REQUEST_RENEWAL, APPLY_HOLD, CLEAR_HOLD,
-})
+)
+KNOWN_COMMANDS = frozenset(COMMAND_ORDER)
 
 DEPLOYMENT_STATES = ("deployed", "retired", "proposed")
 

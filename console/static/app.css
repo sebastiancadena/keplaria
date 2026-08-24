@@ -471,3 +471,412 @@ td.num, th.num { text-align: right; }
 .lifecycle__step:not(:first-child)::before { content: "→ "; opacity: 0.6; }
 .lifecycle__step--current { opacity: 1; font-weight: 600; border-color: var(--amber); }
 .lifecycle__quarantined { font-size: 0.8rem; color: var(--amber-bright); }
+
+/* --- Fleet: the token system ---------------------------------------------
+   This page renders nine genuinely different kinds of token and used to give
+   them two costumes: small near-white text, and small near-white mono text.
+   Position was the only thing telling a reader what they were looking at, and
+   "compliance" -- which is BOTH a department and an agent -- was completely
+   ambiguous.
+
+   The rule: FAMILY carries the register, MARKER carries the role, colour comes
+   last. Space Grotesk = an organizational actor. JetBrains Mono = a machine
+   literal. Inter = prose and state words. Within mono the roles separate by
+   marker as well as colour, so the system survives a greyscale render -- the
+   same discipline the Approve/Reject buttons follow.
+
+   Deliberately NOT used here: --blocked. Out of scope is policy working as
+   designed, not a failure, and 17 of this matrix's 21 cells are out of scope.
+   A page that is 80% red reads as an error console and spends the colour that
+   means something in the review UI. --clear is used, once, for `deployed`,
+   which is an honestly positive operational state. */
+
+/* An agent: the page's subject, so it carries the brand accent and the mark's
+   own focus disc. */
+.lit--agent {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 600;
+  color: var(--amber-bright);
+  white-space: nowrap;
+}
+.lit--agent::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  margin-right: 0.45em;
+  vertical-align: 0.12em;
+}
+
+/* A command: a capability, something that CAN be issued. A chip reads as a
+   control that is not pressable here. */
+.lit--command {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--star);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: rgb(248 250 252 / 0.04);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+/* An event type: bare mono. It only ever appears under a column head that
+   says so, and a fourth costume would be noise. */
+.lit--event {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: var(--star);
+}
+
+/* Schema refs, repo paths, metric names: reference plumbing. Quiet on
+   purpose -- demoting these is half of the "too much text" fix. */
+.lit--ref {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--star);
+  opacity: 0.7;
+}
+
+/* .chip is mono and uppercase, which is right for a literal value and wrong
+   for an English phrase -- mono is never prose. Words get Inter. */
+.chip--word {
+  font-family: "Inter", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+}
+
+/* Deployment state: colour AND shape AND the word, never colour alone. */
+.chip--deployed { color: var(--clear); border-color: rgb(52 211 153 / 0.4); }
+.chip--proposed { color: var(--amber-bright); border-color: rgb(251 191 36 / 0.4); }
+.chip--retired  { color: var(--star); opacity: 0.55; }
+.chip--deployed::before, .chip--proposed::before, .chip--retired::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 0.5em;
+  background: currentColor;
+}
+.chip--deployed::before { border-radius: 50%; }
+.chip--proposed::before { background: none; border: 1px solid currentColor; border-radius: 50%; }
+/* square = stopped, matching the Reject control */
+.chip--retired::before { border-radius: 0; }
+
+/* Fleet-wide is the exceptional fact -- one agent of three. Accent the
+   exception, never the default. */
+.chip--exception { color: var(--amber-bright); border-color: rgb(251 191 36 / 0.4); }
+
+/* An eyebrow is a label, not a status, so accent colour is legitimate. Each
+   panel gets one anchor point of colour. */
+section.panel > .panel__header .caption,
+div.panel > .panel__header .caption { color: var(--amber-bright); }
+
+/* --- Fleet: the standing facts -------------------------------------------
+   Three stacked dt/dd pairs re-formed into the single 90-word paragraph the
+   list was introduced to break up. As tiles they read as three claims.
+
+   Each tile carries the divider this stylesheet calls its signature move and
+   which this page did not have a single instance of: the accent sits at the
+   mark's eccentricity, not the midpoint. */
+
+.facts { margin: var(--space-5) 0 0; }
+.facts > div { position: relative; padding-top: var(--space-4); }
+.facts > div::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--border-soft);
+}
+.facts > div::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--focus-stop);
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgb(245 158 11 / 0.16);
+}
+.facts dt {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+.facts dd {
+  margin: var(--space-2) 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  opacity: 0.8;
+}
+.facts > div + div { margin-top: var(--space-5); }
+@media (min-width: 880px) {
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+  .facts > div + div { margin-top: 0; }
+}
+
+/* --- Fleet: scope matrix -------------------------------------------------
+   The fleet is a matrix -- departments against the agents and commands each
+   may use -- and it rendered as a list, which meant printing the same two
+   manifests once per department that permits them. Procurement and compliance
+   have IDENTICAL agent scope, and the duplicated prose was the thing hiding
+   that. As cells the answer is one glance, and a department with no scope at
+   all reads as a row of empty rings.
+
+   In-scope is a FILLED disc and out-of-scope a HOLLOW ring, so the two part
+   by shape before colour, and each cell carries its own sentence for a
+   screen reader. */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* position:relative is LOAD-BEARING, not cosmetic. .sr-only is absolutely
+   positioned, and an overflow container does not clip an absolutely
+   positioned descendant unless it is also that descendant's containing
+   block. Without this, every per-cell sr-only sentence inside a 715px table
+   leaked its static position into the DOCUMENT's scrollable overflow: at a
+   375px viewport the whole page panned sideways to 732px. Removing this line
+   brings that back. */
+.scroll-x {
+  overflow-x: auto;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139 / 0.6) transparent;
+}
+.scroll-x::-webkit-scrollbar { height: 8px; }
+.scroll-x::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 0.5);
+  border-radius: 4px;
+}
+
+.matrix { min-width: 40rem; }
+
+.matrix__groups td { border-bottom: none; }
+.matrix__groups th {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--star);
+  text-align: center;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-hair);
+}
+.matrix__groups .group--agents { color: var(--amber-bright); }
+
+/* Column heads are agent ids and command names -- identifiers, so mono and
+   sentence case. The global th rule uppercases, which turned them into
+   shouting. */
+.matrix th.col--mark {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: center;
+  vertical-align: bottom;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+.matrix th.col--agent { color: var(--amber-bright); font-weight: 600; }
+
+/* A faint wash separates the two column groups by more than a hairline, and
+   ties the agent columns to the amber the agent tokens carry everywhere
+   else on the page. */
+.matrix .col--agent { background: rgb(251 191 36 / 0.04); }
+
+/* Top-aligned, not centred: a department with a four-line description would
+   float its marks halfway down the row, away from the name they answer. */
+.matrix td.col--mark {
+  text-align: center;
+  vertical-align: top;
+  padding-top: calc(var(--space-3) + 6px);
+}
+
+.matrix .group--split { border-left: 1px solid var(--border-soft); }
+
+/* The row label must survive a sideways pan, or scrolling the matrix on a
+   phone loses which department you are reading. */
+.matrix thead th:first-child,
+.matrix .matrix__groups td:first-child,
+.matrix tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--ink);
+}
+
+/* Space Grotesk is never set below 18px (brand guidelines section 6). This
+   was 16px. */
+.matrix__dept {
+  text-transform: none;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  vertical-align: top;
+  min-width: 13rem;
+  padding-right: var(--space-4);
+}
+
+.matrix__desc {
+  display: block;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--star);
+  opacity: 0.7;
+  margin-top: var(--space-1);
+  max-width: 32ch;
+}
+
+.matrix tbody th { border-bottom: 1px solid var(--border-hair); }
+.matrix tbody tr:last-child th { border-bottom: none; }
+.matrix tbody tr:hover td,
+.matrix tbody tr:hover th { background: rgb(248 250 252 / 0.03); }
+.matrix tbody tr:hover th { background: var(--ink); }
+
+.cell {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.cell--in { background: var(--amber); box-shadow: 0 0 0 4px rgb(245 158 11 / 0.14); }
+.cell--out { border: 1px solid var(--star); opacity: 0.45; }
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  color: var(--star);
+  opacity: 0.85;
+}
+.legend .cell { margin-left: var(--space-4); }
+.legend .cell:first-child { margin-left: 0; }
+
+/* Shown only when the container actually scrolls, set by the script in
+   fleet.html. It used to be a max-width:720px media query, which left a
+   721-812px band where the last column truncated to a single letter with no
+   scrollbar and no hint -- the state the page was reported in. */
+.scroll-hint { display: none; }
+.has-overflow > .scroll-hint {
+  display: block;
+  margin-top: var(--space-3);
+  opacity: 0.75;
+}
+
+/* --- Fleet: routing ------------------------------------------------------- */
+
+.routes th[scope="row"] {
+  text-transform: none;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+  padding-right: var(--space-5);
+}
+.routes td { font-size: 14px; line-height: 1.55; }
+/* The arrow makes each row read as the routing it describes. It is the one
+   diagrammatic moment on the page, and it costs no structure. */
+.routes td::before { content: "\2192\00a0"; opacity: 0.45; }
+.routes .sep { opacity: 0.4; padding: 0 0.15em; }
+.routes .none { font-weight: 600; opacity: 0.75; }
+.routes .chip { margin-left: var(--space-2); opacity: 0.75; }
+.note-under { margin-top: var(--space-4); opacity: 0.75; }
+
+/* --- Fleet: agent reference ----------------------------------------------
+   Each agent described once. It was described once per department that
+   permits it, which is how the page grew to twice its length while saying
+   less. Cards rather than hairline-separated runs: three identical blocks in
+   a column read as one undifferentiated wall. */
+
+.agent {
+  background: rgb(248 250 252 / 0.02);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+}
+.agent + .agent { margin-top: var(--space-4); }
+
+.agent__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.agent__head h3 {
+  margin: 0 var(--space-2) 0 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--amber-bright);
+}
+
+/* The purpose is the only sentence in the card that matters, so it is the
+   only full-brightness prose in it. */
+.agent__prose p { font-size: 16px; }
+.agent__prose .body-small { opacity: 0.75; }
+
+.spec {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0 0;
+  font-size: 14px;
+}
+.spec dt {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--star);
+  opacity: 0.5;
+  line-height: 1.9;
+}
+.spec dd { margin: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 880px) {
+  .agent {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    column-gap: var(--space-6);
+  }
+  .agent__head { grid-column: 1 / -1; }
+  .spec { margin-top: 0; }
+}
+
+@media (max-width: 880px) {
+  /* Give the marks room once the panel narrows; the description wraps
+     instead. Keeps the sideways pan short rather than eliminating it -- a
+     permission matrix legitimately pans on a phone, and with a sticky row
+     label, a real scrollbar and a hint, panning is a feature. */
+  .matrix__dept { min-width: 10rem; }
+  .matrix__desc { max-width: 26ch; }
+}
+
+@media (max-width: 640px) {
+  .spec { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .spec dt { margin-top: var(--space-3); line-height: 1.45; }
+}
