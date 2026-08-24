@@ -334,6 +334,33 @@ fi
   && ok "VM recovery drill evidence present (spikes/vm_recovery/evidence.json)" \
   || bad "no VM recovery drill evidence — screening has no managed fallback, so the snapshot restore must be a tested path, not an assumed one; bash spikes/vm_recovery/drill.sh"
 
+echo "== Frozen-artifact set (spikes/freeze) =="
+# The frozen state is one commit with six artifacts tied to it BY CONTENT
+# (each Cloud Run image is diffed against `git ls-tree` at the commit). A
+# verdict other than PASS means something deployed does not match the commit
+# the submission names. HEAD moving past the captured commit is only a WARN:
+# copy-only commits are allowed after the freeze, but re-capture if the diff
+# touches anything an image carries.
+if [ -f spikes/freeze/evidence.json ]; then
+  fz_verdict=$(python3 -c 'import json;print(json.load(open("spikes/freeze/evidence.json"))["verdict"])' 2>/dev/null)
+  fz_sha=$(python3 -c 'import json;print(json.load(open("spikes/freeze/evidence.json"))["commit"]["sha"])' 2>/dev/null)
+  if [ "$fz_verdict" = "PASS" ]; then
+    ok "frozen-artifact set captured at ${fz_sha:0:7} with verdict PASS"
+  else
+    bad "frozen-artifact set verdict is ${fz_verdict:-unreadable} — something deployed does not match the frozen commit; uv run --env-file .env --env-file .env.secrets python spikes/freeze/capture.py"
+  fi
+  if [ -n "$fz_sha" ] && [ "$(git rev-parse HEAD 2>/dev/null)" != "$fz_sha" ]; then
+    fz_touched=$(git diff --name-only "$fz_sha" HEAD -- app console ingress catalog fixtures policy constraints.txt pyproject.toml uv.lock 2>/dev/null | wc -l)
+    if [ "$fz_touched" -gt 0 ]; then
+      bad "HEAD has moved past the frozen commit ${fz_sha:0:7} and ${fz_touched} deployable path(s) changed — the captured set no longer describes this tree; re-capture"
+    else
+      meh "HEAD has moved past the frozen commit ${fz_sha:0:7} (copy/tooling only — the deployable tree is unchanged)"
+    fi
+  fi
+else
+  bad "no frozen-artifact set — the submission needs spikes/freeze/evidence.json; uv run --env-file .env --env-file .env.secrets python spikes/freeze/capture.py"
+fi
+
 echo "== Agent Runtime deploy preconditions =="
 [ -f .gcloudignore ] && grep -q '^strategy$' .gcloudignore \
   && ok ".gcloudignore excludes the private strategy symlinks" \
