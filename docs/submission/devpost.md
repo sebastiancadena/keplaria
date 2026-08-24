@@ -20,22 +20,22 @@ the demonstration video URL and the frozen commit the submission cites.
 
 ## Tagline
 
-> Suppliers are onboarded in seconds — then governed for months. Keplaria
-> wakes to chase expiring certificates, holds purchasing when evidence
-> lapses, and releases the hold when the renewal checks out. The model
-> proposes; deterministic policy decides. Work in orbit, not work finished.
+> Every onboarding tool retires the day the ERP record is created. Keplaria
+> stays: it wakes months later to chase the expiring certificate, holds
+> purchasing when the evidence lapses, and releases the hold when the renewal
+> checks out. The model proposes; deterministic policy decides.
 
 ## Category
 
-**The Fortified Enterprise Fleet.**
+**Fortified Enterprise Fleet.**
 
 ## Links
 
 | Field | Value |
 |---|---|
-| Project home | <https://keplaria.com> — front door, and <https://keplaria.com/proof> for every published number bound to the run that produced it |
-| Try it out — case console | <https://keplaria-console-bklu5jcdea-uc.a.run.app> (no sign-in) |
-| Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP) |
+| Project home | <https://keplaria.com> — the front door; <https://keplaria.com/proof> binds every published number to the run that produced it |
+| Try it out — case console | <https://keplaria-console-bklu5jcdea-uc.a.run.app> (no sign-in; cases grouped by supplier, and `/fleet` for the rulebook with live counts) |
+| Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP; the two organizer accounts are pre-authorized) |
 | Code repository | <https://github.com/sebastiancadena/keplaria> |
 | Demonstration video | TODO — record day 17, add before submitting |
 | Architecture diagram | `docs/architecture/architecture.png`, generated from committed sources by `docs/architecture/build.py` |
@@ -44,243 +44,187 @@ the demonstration video URL and the frozen commit the submission cites.
 
 ## What it does
 
-Supplier compliance is not a one-time check: certificates expire months after
-onboarding, and someone has to notice. A beverage manufacturer needs a new
-packaging supplier approved. Keplaria runs
-the onboarding (document intake, field extraction, screening against a
-synthetic, rights-cleared watchlist) and then does the part nobody builds: it
-stays. Approval was never the hard part. The hard question is whether an agent
-can remain accountable for an obligation across time. So the case does not close
-when the ERP record is created. For months afterwards it keeps governing that
-supplier: requesting certificate renewals, applying a purchasing hold when
-evidence goes overdue, releasing it when a valid renewal arrives. An LLM
-coordinator proposes which specialist agents run; a deterministic policy layer
-decides, against a versioned catalog. Nothing reaches the ERP except through an
-outbox, and on a sanctions near-match the system stops — it does not
-adjudicate.
+A beverage manufacturer needs a new packaging supplier approved before the
+Q4 run. Any agent can do that in a minute: read the packet, screen the name,
+create the record. Then the certificate of insurance expires in March, and the
+agent that created the record is long gone. Someone has to notice, chase the
+renewal, and decide whether it is still safe to buy.
 
-Keplaria is a durable agent workflow, a **mission**, that does that work and
-keeps doing it. One mission is created when the supplier is onboarded, and the
-same mission wakes on its own clock months later. It requests renewed evidence,
-places a reversible purchasing hold when the certificate goes overdue, reads the
-renewal document that eventually arrives, checks the values it extracted against
-the document they came from, screens the supplier against a watchlist, scores it
-against a versioned policy, and releases the hold. Nothing about that sequence
-is a chatbot: the system decides, and it writes those decisions into a real ERP.
+**Keplaria stays.** One durable case per supplier onboards it into a real ERP,
+then wakes months later on its own clock: it emails the supplier for renewed
+evidence, places a reversible purchasing hold when the certificate lapses,
+reads the renewal that eventually arrives, checks every extracted value against
+the document it came from, screens the name again, scores the case against a
+versioned policy, and releases the hold. None of that is a chat. The system
+decides, and it writes those decisions into the ERP.
 
-It stops for a human exactly where policy says a human must decide. A supplier
-that scores into the review band parks, and the ERP writes it would have made
-are queued rather than executed until a named reviewer approves them in
-**Ground Control**, the human decision console. Approval is what releases the
-write. A rejection is equally binding, and a protective hold is applied whether
-or not anyone ever opens the page.
+**Two nouns carry the design.** The **fleet** is the crew and its
+rulebook: three departments, a coordinator that proposes, two specialist agents
+(evidence and compliance), and the five ERP commands they may issue. A
+**payload** is one supplier's case, carried through that fleet for months. The
+coordinator model proposes which specialists an event needs; a deterministic
+policy layer decides, against a versioned catalog, and records what it
+dropped or added. The public console shows both: every case grouped under its
+supplier, and the fleet's rulebook with a live count of how many cases
+exercised each rule.
 
-A compliance relationship has two sides, and the other one is not a corporate
-role at all. The party who must keep a certificate current is often a small
-supplier: a family packaging firm with no compliance department and no room
-for one more portal. Keplaria deliberately asks nothing of them: no portal, no
-login, no account, no training. The renewal request arrives as a real email
-sent by the deployed workflow, and answering it is everything the design asks
-of them.
-One boundary is stated rather than implied: in this prototype the returned
-certificate enters the system as a published event; ingesting the reply
-itself from a mailbox is design intent, not built, and the video labels it
-that way on screen.
+**It stops exactly where policy requires a person, and nowhere else.** A
+sanctions near-match parks the case for a reviewer at **Ground Control**, the
+human decision console, with its ERP writes queued but unexecuted. One
+reviewer, one click, and the record appears in the ERP the same moment. A
+rejection is equally binding. A protective hold never waits for anyone: it is
+already applied before a reviewer opens the page, because refusing to hold a
+risky supplier during a review would invert the point of the review.
 
-One deployed run of that whole loop, captured in
-[`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json)
-(in this repository a *spike* is a self-contained proof directory: the
-harness that was run and the evidence file it wrote), covers
-two suppliers: one that parks for a human, and one that runs the full lifecycle
-from onboarding to hold release. It took **55.3 s of machine time** (including
-a 43.9 s cold start) against a budget of **130s**, plus a single
-**47.7 s human approval**, which is timed separately and excluded from that
-total because it is a person's time, not the system's.
+**The other side of the relationship is the one nobody builds for.** The party
+who has to keep a certificate current is often a small supplier with no
+compliance department and no room for one more portal. Keplaria asks nothing
+of them: no portal, no login, no account, no training. The renewal request is a
+real email sent by the deployed workflow. One boundary is stated rather than
+implied: in this prototype the returned certificate enters as a published
+event; ingesting the reply from a mailbox is design intent, not built, and the
+video labels it that way on screen.
 
-The same work done by hand took **663.5 s** across **20 steps**, timed by a
-person actually doing it, **19 of which the run removes**. The twentieth is the
-approval that policy requires a human to make. That baseline is
-**author-timed, not practitioner-reviewed**: no procurement or compliance
-practitioner reviewed the step list or the timings, and the number is labelled
-that way everywhere it appears, including here. It is a measurement, not a
-validation.
+**Measured, not asserted.** One deployed run of the whole lifecycle, two
+suppliers (one parks for a human, one runs unattended from onboarding to hold
+release), captured in
+[`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json):
 
-What the run measured, beyond the clock:
-
-- **22 fields** were entered into the ERP without a person retyping them.
-- **1 policy-required intervention**: one decision, and the system stopped for
-  it rather than deciding it.
-- **5 enforced hold days**: the window between the supplier going overdue and
-  the hold being released. It is claimed only because both the hold and its
-  release actually executed in the ERP, which is why it is a statement about
-  what the system did rather than about what a hypothetical person failed to
-  notice.
-- **0 duplicate writes after a retry.** A retried command leaves exactly one ERP
-  record, and that is enforced rather than hoped for.
-- **380 simulated business days** (about a year and a half) of supplier
-  lifecycle. The lifecycle clock is
-  compressed so that months of elapsed time fit in a demonstration, and the
-  compression is disclosed on screen rather than implied away.
+- **55.3 s of machine time** against a **130s** budget, plus a single
+  **47.7 s human approval**, timed separately because it is a person's time.
+- By hand, the same work took **663.5 s** over **20 steps**,
+  **19 of which the run removes**; the twentieth is the approval policy
+  requires. Author-timed, not practitioner-reviewed; labelled that way
+  everywhere it appears.
+- **22 fields** written to the ERP with nobody retyping them.
+- **1 policy-required intervention**, and the system stopped for it rather than
+  deciding it.
+- **5 enforced hold days**: claimed only because both the hold and its release
+  executed in the ERP.
+- **0 duplicate writes after a retry.**
+- **380 simulated business days**, about a year and a half of a supplier's
+  life, inside one recording; the compression is disclosed on screen.
 
 ## How it is built
 
-The agent graph is built on the **Google Agent Development Kit (ADK)** for
-Python and runs on **Gemini 3.6 Flash**, chosen for speed and determinism after
-a blinded comparison against a newer model that was measured and rejected.
+**Two runtimes, one boundary.** The agent graph is built on the **Google Agent
+Development Kit (ADK)** for Python, runs on **Gemini 3.6 Flash**, and is hosted
+on **Agent Runtime** as a reasoning engine: it auto-registers in **Agent
+Registry**, keeps execution state in **Agent Platform Sessions**, and reaches a
+private screening VM over **Private Service Connect** (no external IP, not
+reachable from the internet). Three **Cloud Run** services surround it: an
+authenticated **Pub/Sub** push adapter, the only component that can drive a
+state change through the graph; the public read-only case console; and the
+review console behind **Cloud IAP**, where the reviewer's identity is read from
+a signed assertion, never from a header a caller could set.
 
-The graph is hosted on **Agent Runtime** as a reasoning engine, which
-auto-registers it in **Agent Registry** with no publishing step, keeps agent
-execution state in **Agent Platform Sessions**, and reaches a private screening
-VM over a Private Service Connect interface; that VM has no external IP and is
-not reachable from the internet.
+**Separation of concerns is enforced, not described.** The fleet catalog is one
+committed, versioned artifact: every agent, the route for every event type, and
+the agents and commands each department may use. The same file that the
+console renders is the file routing enforces, so what a judge sees cataloged is
+literally what runs. A proposal that reaches across a department boundary is
+refused and recorded, never quietly corrected; a catalog that fails to load
+refuses every proposal rather than falling back to stale data. Each specialist
+has its own context and tool surface, and no agent holds a credential.
 
-Which agents may act on an event is not decided by a model. A versioned
-**fleet catalog**, one committed artifact, declares every agent, the complete
-route for each event type, and the agents each business department may engage;
-it is the same artifact the public console's `/fleet` view renders, so what a
-judge sees cataloged is literally what routing enforces. The coordinator model
-proposes a route, and deterministic policy corrects that proposal to the
-catalog's declared route, recording what it dropped and what it added as an
-audit diff on the case. A proposal that reaches across a department boundary
-(a finance-labeled event trying to engage the onboarding specialists) is
-refused and quarantined rather than corrected, and a catalog that fails to
-load refuses every proposal rather than falling back to stale data.
+**State is durable and replay-safe.** Authoritative case state lives in
+**Firestore**, transactionally: the case version, the event claim that makes
+duplicate and out-of-order events impossible, the approval keyed to the case
+version it was taken against, and the command outbox whose ids derive from the
+case and its cycle, so a retried command leaves exactly one ERP record. The one
+stated exception is outbound mail, which the ERP does not deduplicate: a lost
+response can repeat a message, never a record. Generative memory is
+deliberately not trusted with compliance facts.
 
-Three **Cloud Run** services cover everything around the graph: an authenticated
-**Pub/Sub** push adapter that is the only component able to drive a state change
-through the graph, a public read-only case console, and the authenticated review
-console behind **Cloud IAP**, where a reviewer's identity is read from a signed
-IAP assertion rather than from a header a caller could set.
+**Credentials are scoped and confined.** Secrets come from **Secret Manager**;
+each service runs as its own service account; the ERP credential belongs only
+to the deterministic executor, never to an agent, and to a purpose-made ERP
+user whose single role can read, write and create supplier records and create
+correspondence and attachments, and nothing else: it cannot delete what it
+created, widen its own permissions, or read an invoice. Those limits are
+measured against the live site on every run of the check.
 
-Authoritative case state lives in **Firestore**, transactionally: the case
-version, the event claim that makes duplicate and out-of-order events
-impossible, the approval, and the command outbox that makes ERP record writes
-idempotent: every record write reconciles against a deterministic external
-id. The one stated exception is outbound renewal mail, which the ERP does not
-deduplicate, so an accepted send whose response is lost can repeat a message
-but never a record. Generative memory is deliberately not trusted with
-compliance facts.
-Credentials come from **Secret Manager**, each service runs as its own service
-account, and the ERP credential is confined rather than spread: only the
-deterministic executor holds it, and no agent ever does. It is also scoped to
-the work. The credential belongs to a purpose-made ERP user whose single role
-grants read, write and create on supplier records and create on correspondence
-and attachments; it cannot delete what it created, cannot widen its own
-permissions, and cannot read an invoice, a payment or a ledger. The repository
-measures those limits against the live system on every run of the check rather
-than asserting them. Traces go to **Cloud Trace** and are
-load-bearing rather than decorative: a 10.6 s rise in run time was diagnosed
-node by node against them and traced to model reasoning length rather than to
-code.
+**Failures are handled where they happen.** Bounded retries with a dead-letter
+topic and an unattended sweep; a schema-valid but source-unsupported worker
+value is rejected, retried within bounds, and quarantined for a human instead
+of reaching the ERP. Traces go to **Cloud Trace** and are load-bearing: a
+10.6 s rise in run time was diagnosed node by node against them and traced to
+model reasoning length, not code.
 
-The enterprise systems are real rather than mocked: a hosted **ERPNext** site
-holds the supplier records, and a self-hosted **yente** screening service
-(backed by Elasticsearch) answers the sanctions-screening calls.
-
-The track names seven platform subsystems, and the repository README says of
-each one whether it is used natively, answered by a first-party equivalent, or
-deliberately not used, including the one that was measured and turned down. A
-subsystem that is not used says so, and says why.
+**The enterprise systems are real.** A hosted **ERPNext** site holds the
+supplier records; a self-hosted **yente** screening service answers the
+sanctions calls. The README maps each of the track's seven platform subsystems
+to native use, a first-party equivalent, or a deliberate, measured decision not
+to use it.
 
 ## Data sources
 
-**Every document, supplier, and watchlist entity in this project is synthetic
-and was authored for it.** Personal-like fields are fictional and labelled as
-such. Nothing here is customer data, production data, or a de-identified
-derivative of either.
+**Every document, supplier, and watchlist entity is synthetic and was authored
+for this project.** Nothing here is customer data, production data, or a
+de-identified derivative of either.
 
 - **Case documents** (certificates of insurance, food-safety certificates, tax
-  and bank-verification letters) are authored fixtures, stored as the redacted
-  page-text derivative the pipeline is contracted to produce. That derivative
-  is exactly what the Evidence agent receives, and every field it extracts must
-  resolve to a verbatim span of it or the case quarantines: real grounded
-  extraction, without putting anyone's records into a model prompt. Two limits
-  are deliberate and stated in the code as well as here: the PDF/OCR/redaction
-  preprocessor that would produce the same derivative from a raster scan is
-  future work, and the evidence file attached to the ERP record is a
-  well-formed placeholder PDF, not a source scan.
-- **The screening index is a synthetic watchlist** authored for this project in
-  the FollowTheMoney format, in `fixtures/watchlist/`. The screening service
-  fetches nothing from OpenSanctions and indexes no OpenSanctions content. The
-  publisher confirmed in writing that bulk download of their data would have
-  been permitted for this entry; indexing the synthetic fixture instead is a
-  deliberate determinism choice, not a licensing constraint. Their software,
-  yente, is used under its MIT licence, and no data-licence claim is made or
-  needed.
-- **The ERP** is a dedicated demonstration site holding only the synthetic
-  suppliers above. Every mutation the system makes is sandboxed to it.
+  and bank-verification letters) are authored fixtures stored as the redacted
+  page-text derivative the pipeline is contracted to produce. That is exactly
+  what the evidence agent receives, and every field it extracts must resolve to
+  a verbatim span of it or the case quarantines. Two limits are stated in the
+  code as well as here: the PDF/OCR/redaction preprocessor is future work, and
+  the file attached to the ERP record is a well-formed placeholder, not a scan.
+- **The screening index is a synthetic watchlist** in the FollowTheMoney
+  format (`fixtures/watchlist/`). The screening service indexes no
+  OpenSanctions content; the publisher confirmed in writing that bulk download
+  would have been permitted, and indexing the fixture instead is a determinism
+  choice, not a licensing constraint. yente is used under its MIT licence.
+- **The ERP** is a dedicated demonstration site holding only those synthetic
+  suppliers. Every mutation is sandboxed to it.
 
-Third-party code, assets, and AI assistance are itemised in the repository's
-`THIRD_PARTY.md`.
+Third-party code, assets, and AI assistance are itemised in `THIRD_PARTY.md`.
 
 ## Findings and learnings
 
-**The hard problem was not the agents. It was making an agent's work safe to
-replay.** Every interesting failure in this build came from the same place: an
-event arrives twice, a process dies mid-write, a retry fires after the first
-attempt already succeeded. Correct-looking agent code plus an at-least-once
-event system produces duplicate suppliers, double holds, and approvals that
-apply twice. The fix was to stop treating durability as a property of the agent
-and make it a property of the state: a transactional event claim, a case
-version, a command ledger whose ids derive from the case and its cycle, and an
-approval id derived from the case version it was taken against. **0 duplicate
-writes after a retry** is the output of that design, and it is asserted by a
-test that would fail if the design were removed.
+**The hard problem was never the agents; it was making their work safe to
+replay.** Every serious failure in this build had the same shape: an event
+arrives twice, a process dies mid-write, a retry fires after the first attempt
+already succeeded. Correct-looking agent code plus an at-least-once event system
+produces duplicate suppliers and approvals that apply twice. The fix was to stop
+treating durability as a property of the agent and make it a property of the
+state. **0 duplicate writes after a retry** is the output of that design, and a
+test would fail if the design were removed.
 
-**Grounding an extraction is not the same as trusting it.** An agent that obeys
-an instruction hidden inside a document will cite a genuine span for the value
-it was told to produce; the provenance check passes, because the provenance is
-real. So the injection defence had to sit somewhere else entirely: a tainted
-document can never reach an agent-resolvable state key, and the extraction is
-skipped rather than second-guessed. That separation is now a contract, not a
-convention.
+**Grounding is not trust.** An agent that obeys an instruction hidden in a
+document will cite a genuine span for the value it was told to produce, and the
+provenance check passes, because the provenance is real. So the injection
+defence sits elsewhere: a tainted document never reaches a state key an agent
+can read. A managed prompt-injection filter was measured against the same
+corpus before being adopted; it missed the planted injection the existing check
+catches, because a few lines of ordinary certificate prose ahead of it dilute
+the match. Turned down on that evidence, measurement published.
 
-**A commercial safety filter is not automatically better than the check you
-already have.** Before adopting a managed prompt-injection filter, it was
-measured against this project's own corpus at the most sensitive setting
-available. It returned no match on the planted injection fixture that the
-existing check catches with five findings, and the reason turned out to be
-context dilution: the payload matches on its own, survives 89 characters of
-prepended certificate prose, and dies at 108. It was turned down on that
-evidence and the measurement is published alongside the decision. One of its
-filters did work well, and that one remains a candidate.
+**A model can read perfectly and still be unusable.** An open-weights Gemma 4
+read **6 of 6** test documents correctly, including the one with a planted
+instruction beside a decoy date, and returned the required output structure on
+**0 of 6**, in three different shapes across identical calls. The same weights
+run locally, where generation is constrained to the schema, scored full marks
+on both. What differed was how the model was served, not how it read. Not
+adopted; measurement published.
 
-**A model can read a document perfectly and still be unusable.** An
-open-weights Gemma 4 was evaluated for the extraction step, which requires
-every value to arrive with the verbatim span of page text supporting it, in a
-fixed structure a deterministic validator checks before anything is believed.
-Served through Vertex AI it read **6 of 6** test documents correctly, including
-the one with no expiry date to find and the one carrying a planted instruction
-beside a decoy date, and it returned the required structure on **0 of 6**, in
-three different shapes across otherwise identical calls. The same weights run
-locally, where the runtime constrains generation to that structure, scored full
-marks on both columns. What differed was how the model was served, not how it
-read. It was not adopted, and the measurement is published alongside the
-decision.
+**Evidence rots quietly.** A committed evaluation score once outlived the
+behaviour it graded by two days, and a routine cleanup once deleted the only
+live records proving a contract about deployed state. So the harness now
+discovers what it verifies instead of naming it, and re-runs everything it
+cites.
 
-**Evidence rots quietly.** A committed evaluation score outlived the behaviour
-it graded by two days without anything looking wrong, and a routine cleanup once
-deleted the live records that were the only proof of a contract about deployed
-state. Both taught the same lesson: a proof that names one hardcoded record can
-be destroyed by ordinary maintenance. The harness now discovers what it verifies
-rather than citing it, re-executes the tests it cites on every run, and re-reads
-the evidence files it cites instead of trusting a number written next to them.
-
-**So every number in this submission has a checker.** The graded domain suite
-runs **24/24** at a **100% mean score** on a deterministic pass metric: not an
-LLM judge grading prose, but a check on whether the enforcement outcome was the
-required one. **549 passed** of 550 contract and unit tests, re-executed by the run
-that reports them rather than quoted from a previous run. The one
-failure is disclosed rather than trimmed: a console query that lists
-failed commands newest-first can push an undated row off the page once
-enough rows accumulate in a shared test database. It is a real finding
-about ranking, it is being tracked, and it writes nothing. Nine contracts
-(closed loop, duplicate and out-of-order events, provenance failure, injection
-refusal, stale and double approval, forbidden agent-to-tool edges, one ERP write
-after a retry, cataloging visible, and the eval suite) are re-verified at
-capture time. And a claim ledger in `docs/proof/` binds every public number,
-including all of the above, to the evidence file and field that produced it, so
-a number that drifts from its source is reported rather than published.
+**Every number here has a checker.** The graded domain suite runs **24/24** at
+a **100%** mean score on a deterministic pass metric: whether the enforcement
+outcome was the required one, not whether a model liked the prose.
+**549 passed** of 550 contract and unit tests, re-executed by the run that
+reports them; the one failure, later traced to a shared test database rather
+than to the product, is disclosed rather than trimmed. **Nine contracts**,
+from replay safety to one-ERP-write-after-a-retry, are re-verified at capture
+time. Ten consecutive deployed runs, two of them cold starts, finished inside
+the budget before anything was recorded. And a claim ledger binds every public
+number above to the evidence file and field that produced it, so a number that
+drifts from its source is reported rather than published.
 
 ## Built With
 
