@@ -909,3 +909,28 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
   .spec { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .spec dt { margin-top: var(--space-3); line-height: 1.45; }
 }
+
+/* --- Case list: the shape of the list ------------------------------------
+   Most of these cases are deployed-state evidence for a gate: a ten-run
+   streak, a retry drill, a rejection pair. The list is legitimately
+   repetitive -- twelve consecutive rows can carry the same supplier -- so
+   the fix is not to hide rows but to stop the repetition shouting, and to
+   say what the repetition IS before a reader scrolls it. */
+
+.tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-5);
+}
+.tally__item { color: var(--star); opacity: 0.75; }
+.tally__count {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: var(--amber-bright);
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* A repeated value in a sorted column is still data -- it is not removed,
+   only quieted, so nothing a reader needs disappears. */
+td.repeat { opacity: 0.4; }

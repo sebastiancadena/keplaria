@@ -43,8 +43,23 @@ def healthz() -> dict:
 def index(request: Request):
     db = get_client()
     cases = [public_case(case) for case in list_cases(db)]
+    # A count alone ("29 case(s)") says nothing a reader can use. Most of
+    # these cases are the deployed-state evidence for a gate -- a ten-run
+    # streak, a retry drill, a rejection pair -- so the list is legitimately
+    # repetitive, and what makes it readable is knowing the shape of the
+    # repetition before scrolling it.
+    phases: dict[str, int] = {}
+    for case in cases:
+        phase = case.get("phase") or "unknown"
+        phases[phase] = phases.get(phase, 0) + 1
     return templates.TemplateResponse(
-        request=request, name="cases.html", context={"cases": cases}
+        request=request,
+        name="cases.html",
+        context={
+            "cases": cases,
+            "phase_counts": sorted(phases.items(), key=lambda kv: (-kv[1], kv[0])),
+            "supplier_count": len({c.get("supplier") for c in cases}),
+        },
     )
 
 

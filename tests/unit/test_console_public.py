@@ -239,6 +239,29 @@ def test_the_detail_page_shows_a_command_refused_by_department(db, case_id, clie
     assert "refused and recorded" in response.text
 
 
+def test_the_case_list_says_the_shape_of_the_list_before_a_reader_scrolls(
+    db, case_id, client
+):
+    """A bare total ("29 case(s)") is a number, not information.
+
+    Most cases in this deployment are the deployed-state evidence for a
+    gate, so the list is legitimately repetitive and a reader needs to know
+    the shape of that repetition before scrolling it. Asserting on the
+    phase's own name keeps this honest: a tally hardcoded in the template
+    could not name a phase the fixture happens to be in.
+    """
+    _park_a_real_case(db, case_id)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "suppliers" in response.text
+    assert "awaiting approval" in response.text, (
+        "the tally must name the phase the parked fixture is actually in, "
+        "with its underscore rendered for a reader"
+    )
+
+
 def test_an_unknown_case_is_a_404(client):
     """A judge mistyping a case id must land on the rendered not_found.html
     page, not FastAPI's default `{"detail": ...}` JSON body. Asserting only
