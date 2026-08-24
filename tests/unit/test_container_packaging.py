@@ -89,3 +89,49 @@ def test_images_carrying_app_also_carry_its_runtime_data(dockerfile: Path) -> No
         f"container while every test here still passes — the container is the "
         f"only place the difference is visible."
     )
+
+
+# --- dependency pins -------------------------------------------------------
+#
+# Both Dockerfiles install from a per-service pyproject.toml, which has version
+# FLOORS, not pins. On 2026-08-24 google-cloud-firestore 2.29.0 (and its
+# api-core / auth siblings) was released between two console builds two hours
+# apart; the second image resolved it and every Firestore query failed with
+# "400 Invalid database id %28default%29". The fix is a constraints file
+# exported from uv.lock; these tests keep it wired in and keep it fresh.
+
+_ROOT = Path(__file__).resolve().parents[2]
+_CONSTRAINTS = _ROOT / "constraints.txt"
+
+
+def _pins(text: str) -> dict[str, str]:
+    return dict(
+        line.split("==", 1) for line in text.splitlines()
+        if "==" in line and not line.startswith(("#", "-"))
+    )
+
+
+@pytest.mark.parametrize("dockerfile", sorted(_ROOT.glob("*/Dockerfile")), ids=lambda p: p.parent.name)
+def test_every_pip_install_is_constrained(dockerfile: Path) -> None:
+    text = dockerfile.read_text()
+    installs = [l for l in text.splitlines() if "pip install" in l]
+    assert installs, f"{dockerfile}: no install line found"
+    for line in installs:
+        assert "-c /srv/constraints.txt" in line, f"{dockerfile}: unconstrained install: {line}"
+    assert "COPY constraints.txt /srv/constraints.txt" in text
+
+
+def test_constraints_match_the_lock() -> None:
+    import subprocess
+    exported = subprocess.run(
+        ["uv", "export", "--frozen", "--no-hashes", "--no-dev", "--no-emit-project",
+         "--format", "requirements-txt"],
+        cwd=_ROOT, check=True, capture_output=True, text=True,
+    ).stdout
+    want, have = _pins(exported), _pins(_CONSTRAINTS.read_text())
+    drift = {k: (have.get(k), v) for k, v in want.items() if have.get(k) != v}
+    assert not drift, (
+        "constraints.txt drifted from uv.lock; regenerate with\n"
+        "  uv export --frozen --no-hashes --no-dev --no-emit-project --format requirements-txt"
+        " | grep -vE '^(#|-e|\\s*$)' > constraints.txt\n" + str(drift)
+    )

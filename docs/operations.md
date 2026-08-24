@@ -641,6 +641,17 @@ deploy both. Deploy by **digest**, not `:latest` — `:latest` moves, and two
 services silently ending up on different builds is exactly what the one-image
 design exists to prevent.
 
+Both Dockerfiles install under `constraints.txt`, exported from `uv.lock`, so a
+build resolves the same versions the test suite ran against. Without it, on
+2026-08-24 two console builds two hours apart got different
+`google-cloud-firestore` releases and the second one failed every query with
+`400 Invalid database id %28default%29`. After any `uv add` / `uv lock`:
+
+```bash
+uv export --frozen --no-hashes --no-dev --no-emit-project --format requirements-txt \
+  | grep -vE '^(#|-e|\s*$)' > constraints.txt   # the packaging test fails if you forget
+```
+
 ```bash
 # 1. Cheap local check first — this catches an import error in seconds
 # rather than after a three-minute build.
