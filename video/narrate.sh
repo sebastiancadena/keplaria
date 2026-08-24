@@ -27,6 +27,9 @@ set -euo pipefail
 SCRIPT=${1:?usage: narrate.sh <script.txt> <out.wav> [target_seconds] [semitones]}
 OUT=${2:?usage: narrate.sh <script.txt> <out.wav> [target_seconds] [semitones]}
 TARGET=${3:-0}
+# Absolute paths: the TTS call below cd's into the tool repo, so a relative
+# script or output path silently pointed nowhere (found 2026-08-24).
+SCRIPT=$(realpath "$SCRIPT"); OUT=$(realpath -m "$OUT")
 SEMITONES=${4:--2}
 
 VIDEO_REPO=${KEPLARIA_VIDEO_REPO:-$HOME/dev/git/byteql-video}
