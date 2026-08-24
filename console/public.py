@@ -16,14 +16,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.catalog import (
-    CLOCK_EVENTS,
-    COMMAND_ORDER,
-    KNOWN_COMMANDS,
-    CatalogLoadError,
-    get_catalog,
-)
+from app.catalog import CLOCK_EVENTS, CatalogLoadError, get_catalog
 from app.state.firestore import get_client
+from console.fleet_counts import command_columns as fleet_command_columns
 from console.fleet_counts import exercise_counts
 from console.grouping import group_by_supplier, route_label
 from console.projection import public_case
@@ -121,10 +116,9 @@ def fleet(request: Request):
     # render it as a missing column instead of an empty one, which reads as
     # "no such command" rather than "nobody may issue it". Extras beyond the
     # declared order still appear, so adding a command cannot silently drop
-    # it from this page.
-    command_columns = list(COMMAND_ORDER) + sorted(
-        KNOWN_COMMANDS - set(COMMAND_ORDER)
-    )
+    # it from this page. One helper, shared with console.fleet_counts, so the
+    # column order and the count keys can never drift apart.
+    command_columns = fleet_command_columns()
 
     # Live exercise counts, over the same bounded list the home page shows.
     # The catalog is the rulebook; these numbers are whether it was tested.

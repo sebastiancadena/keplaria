@@ -1,0 +1,3 @@
+{% macro agents(ids) -%}
+{% for id in ids %}<span class="lit--agent">{{ id }}</span>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
+{%- endmacro %}

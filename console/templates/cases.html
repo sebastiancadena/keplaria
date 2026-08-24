@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Cases — Keplaria{% endblock %}
+{% from "_agents.html" import agents %}
 {% block content %}
 <p class="context-strip" data-testid="context-strip"><strong>The fleet is the crew and its rulebook:</strong> three departments, a coordinator that
 proposes, two specialist agents, and the five ERP commands they may issue.
@@ -42,7 +43,7 @@ page</a>.</p>
       {% for case in group.cases %}
       <tr>
         <td class="lit--id"><a href="/cases/{{ case.case_id }}">{{ case.case_id }}</a></td>
-        <td>{% if case.route_label.agents %}{% for id in case.route_label.agents %}<span class="lit--agent">{{ id }}</span>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
+        <td>{% if case.route_label.agents %}{{ agents(case.route_label.agents) }}
             {% elif case.route_label.clock %}<span class="lit--ref">clock</span>
             {% else %}<span class="none">&mdash;</span>{% endif %}</td>
         <td class="lit--ref">{{ case.phase }}</td>

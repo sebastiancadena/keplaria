@@ -29,7 +29,6 @@ CONSOLE_COPY = HERE.parent.parent / "console" / "static" / "orientation.svg"
 W, H = 1200, 520
 
 VOID = "#0B1020"
-INK = "#111827"
 AMBER = "#F59E0B"
 AMBER_BRIGHT = "#FBBF24"
 STAR = "#F8FAFC"

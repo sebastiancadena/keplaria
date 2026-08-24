@@ -7,6 +7,8 @@ suite; this project has already paid that bill once.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -306,11 +308,39 @@ def test_the_fleet_page_carries_a_context_strip(client):
 
 
 def test_the_case_list_groups_rows_under_a_supplier_heading(db, case_id, client):
+    """A bare "1 case" substring also matches inside "21 cases", so the
+    count assertion is anchored to the full `supplier-row__count">N
+    case(s)</span>` fragment, which cannot collide that way regardless of N.
+
+    N itself is not assumed to be 1: `db` is session-scoped, every
+    `_park_a_real_case` call reuses the same "Andes Foods" supplier with no
+    teardown, and the list is a top-50-by-recency window, so this heading's
+    displayed count is whatever the shared Firestore state happens to hold
+    -- it grows across a session and can even drop if an older "Andes
+    Foods" row falls out of the window as a newer one enters. What the test
+    can assert without depending on session history is internal
+    consistency: the displayed N equals the number of case rows actually
+    grouped under this heading, and this test's own freshly parked case_id
+    is one of them.
+    """
     _park_a_real_case(db, case_id)
     response = client.get("/")
+
     assert response.status_code == 200
     assert 'class="supplier-row"' in response.text
-    assert "1 case" in response.text
+
+    _, _, after = response.text.partition("Andes Foods")
+    assert after, "no Andes Foods heading rendered"
+    # This heading's own section: from right after its name to the next
+    # supplier-row heading (or the end of the table).
+    section = after.split('class="supplier-row"', 1)[0]
+
+    match = re.search(r'supplier-row__count">(\d+) cases?</span>', section)
+    assert match, section
+    displayed = int(match.group(1))
+    row_links = section.count('href="/cases/')
+    assert row_links == displayed, (displayed, row_links, section)
+    assert f'href="/cases/{case_id}"' in section
 
 
 def test_the_case_list_shows_the_route_beside_each_case(db, case_id, client):

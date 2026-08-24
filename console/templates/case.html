@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ case.case_id }} — Keplaria{% endblock %}
-{% macro agents(ids) -%}
-{% for id in ids %}<span class="lit--agent">{{ id }}</span>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
-{%- endmacro %}
+{% from "_agents.html" import agents %}
 {% block content %}
 <p><a href="/">&larr; All cases</a></p>
 <h1>{{ case.supplier or case.case_id }}</h1>

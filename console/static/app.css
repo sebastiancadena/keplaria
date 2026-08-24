@@ -829,6 +829,7 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
 /* The arrow makes each row read as the routing it describes. It is the one
    diagrammatic moment on the page, and it costs no structure. */
 .routes td::before { content: "\2192\00a0"; opacity: 0.45; }
+.routes td.num::before { content: none; }
 .sep { opacity: 0.4; padding: 0 0.15em; }
 .routes .none { font-weight: 600; opacity: 0.75; }
 .routes .chip { margin-left: var(--space-2); opacity: 0.75; }

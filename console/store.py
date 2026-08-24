@@ -72,7 +72,8 @@ def list_inbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list[
 
     One `load_inbox` call per id -- there is no collection-group shortcut
     that stays scoped to exactly this set of cases -- bounded by whatever
-    list already produced `case_ids` (list_cases' own `limit`).
+    list already produced `case_ids` (list_cases' own `limit`). Every id in
+    `case_ids` is a key in the result, an unaddressable one mapped to `[]`.
     """
     return {case_id: load_inbox(db, case_id) for case_id in case_ids}
 
@@ -83,11 +84,15 @@ def list_outbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list
     One subcollection read per case, bounded by list_cases' limit. Not a
     collection-group query filtered on case_id: that needs a collection-group
     index the emulator does not enforce, so the tests would stay green while
-    the deployed page 400s.
+    the deployed page 400s. Every id in `case_ids` is a key in the result,
+    the same guarantee `list_inbox_for` makes, an unaddressable one mapped to
+    `[]` rather than dropped -- a caller indexing the result by every id it
+    passed in never has to guard a missing key.
     """
     out: dict[str, list[dict]] = {}
     for case_id in case_ids:
         if not case_id or not case_id_is_addressable(case_id):
+            out[case_id] = []
             continue
         ref = db.collection(CASES).document(case_id).collection(OUTBOX)
         out[case_id] = [snap.to_dict() or {} for snap in ref.stream()]

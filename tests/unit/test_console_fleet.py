@@ -230,6 +230,7 @@ def test_the_scope_matrix_states_its_population_and_shows_counts(
     assert response.status_code == 200
     assert "most recent cases the console lists" in response.text
     assert 'class="cell__count"' in response.text
+    assert "counts once on each row" in response.text
 
 
 def test_the_fleet_page_carries_anchors_for_every_row_and_column(

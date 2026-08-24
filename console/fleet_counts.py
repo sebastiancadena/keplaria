@@ -16,7 +16,10 @@ from __future__ import annotations
 from app.catalog import COMMAND_ORDER, KNOWN_COMMANDS
 
 
-def _command_columns() -> list[str]:
+def command_columns() -> list[str]:
+    """Every command the lifecycle can issue, in lifecycle order, extras
+    sorted after. The one place this list is built -- console.public's
+    fleet view imports it rather than recomputing the same expression."""
     return list(COMMAND_ORDER) + sorted(KNOWN_COMMANDS - set(COMMAND_ORDER))
 
 
@@ -27,7 +30,7 @@ def exercise_counts(
     events_by_case: dict[str, list[dict]],
 ) -> dict:
     agents = list(catalog.routable_ids())
-    commands = _command_columns()
+    commands = command_columns()
     departments = {
         name: {
             "agents": {a: 0 for a in agents},
