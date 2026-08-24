@@ -59,7 +59,7 @@ def load_inbox(db: firestore.Client, case_id: str) -> list[dict]:
     """Every event this case has claimed, from its inbox subcollection.
     claim_event writes event_type and case_version here, never onto the
     case document, so this is the only place a case's event types live."""
-    if not case_id_is_addressable(case_id):
+    if not case_id or not case_id_is_addressable(case_id):
         return []
     return [
         snap.to_dict() or {}

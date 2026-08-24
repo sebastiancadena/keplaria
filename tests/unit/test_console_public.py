@@ -376,3 +376,25 @@ def test_the_case_list_shows_clock_for_a_cases_latest_claimed_event(
     row = response.text.split(case_id, 1)[1].split("</tr>", 1)[0]
     assert ">clock<" in row
     assert "lit--agent" not in row
+
+
+def test_the_detail_page_says_which_fleet_scope_carried_the_case(db, case_id, client):
+    _park_a_real_case(db, case_id)
+    html = client.get(f"/cases/{case_id}").text
+    assert 'href="/fleet#dept-dept-sentinel-7"' in html
+    assert "Carried by the fleet" in html
+
+
+def test_every_fleet_anchor_the_detail_page_links_to_exists(db, case_id, client):
+    """Cross-check, not a list: render both pages and compare hrefs to ids.
+    The fixture department is a sentinel absent from the real catalog, so
+    that one anchor is excused explicitly; every other link must land."""
+    import re
+    _park_a_real_case(db, case_id)
+    detail = client.get(f"/cases/{case_id}").text
+    fleet = client.get("/fleet").text
+    ids = set(re.findall(r'id="([^"]+)"', fleet))
+    hrefs = set(re.findall(r'href="/fleet#([^"]+)"', detail))
+    assert hrefs, "the detail page links nowhere into the fleet"
+    missing = {h for h in hrefs if h not in ids and h != "dept-dept-sentinel-7"}
+    assert not missing, missing

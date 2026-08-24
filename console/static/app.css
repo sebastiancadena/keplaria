@@ -559,6 +559,15 @@ td.num, th.num { text-align: right; }
   color: var(--star);
 }
 
+/* When a literal doubles as a link into the fleet page, the default `a`
+   underline clashes with the chip look (.lit--command) and the dept/event
+   costumes above -- a dotted underline reads as "linked" without fighting
+   either. */
+a.lit--agent, a.lit--dept, a.lit--command, a.lit--event {
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+
 /* Schema refs, repo paths, metric names: reference plumbing. Quiet on
    purpose -- demoting these is half of the "too much text" fix. */
 .lit--ref {
