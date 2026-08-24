@@ -563,9 +563,14 @@ td.num, th.num { text-align: right; }
    underline clashes with the chip look (.lit--command) and the dept/event
    costumes above -- a dotted underline reads as "linked" without fighting
    either. */
-a.lit--agent, a.lit--dept, a.lit--command, a.lit--event {
+a.lit--agent, a.lit--dept, a.lit--event {
   text-decoration: none;
   border-bottom: 1px dotted currentColor;
+}
+a.lit--command {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
 }
 
 /* Schema refs, repo paths, metric names: reference plumbing. Quiet on
