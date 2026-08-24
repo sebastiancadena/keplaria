@@ -559,6 +559,20 @@ td.num, th.num { text-align: right; }
   color: var(--star);
 }
 
+/* When a literal doubles as a link into the fleet page, the default `a`
+   underline clashes with the chip look (.lit--command) and the dept/event
+   costumes above -- a dotted underline reads as "linked" without fighting
+   either. */
+a.lit--agent, a.lit--dept, a.lit--event {
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+a.lit--command {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
 /* Schema refs, repo paths, metric names: reference plumbing. Quiet on
    purpose -- demoting these is half of the "too much text" fix. */
 .lit--ref {
@@ -829,8 +843,9 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
 /* The arrow makes each row read as the routing it describes. It is the one
    diagrammatic moment on the page, and it costs no structure. */
 .routes td::before { content: "\2192\00a0"; opacity: 0.45; }
+.routes td.num::before { content: none; }
 .sep { opacity: 0.4; padding: 0 0.15em; }
-.routes .none { font-weight: 600; opacity: 0.75; }
+.none, .routes .none { font-weight: 600; opacity: 0.75; }
 .routes .chip { margin-left: var(--space-2); opacity: 0.75; }
 .note-under { margin-top: var(--space-4); opacity: 0.75; }
 
@@ -931,6 +946,58 @@ div.panel > .panel__header .caption { color: var(--amber-bright); }
   opacity: 1;
 }
 
-/* A repeated value in a sorted column is still data -- it is not removed,
-   only quieted, so nothing a reader needs disappears. */
-td.repeat { opacity: 0.4; }
+/* The orientation figure carries the whole "fleet vs payload" argument;
+   it sits between the context strip and the first panel on both pages. */
+.orientation { margin: var(--space-4) 0 var(--space-5); }
+.orientation img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+
+/* One heading row per supplier: the list's shape, not a decoration. */
+.supplier-row th {
+  text-align: left;
+  padding-top: var(--space-5);
+  border-bottom: 1px solid var(--border-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.supplier-row__name { font-size: 1.05rem; font-weight: 600; color: var(--star); }
+.supplier-row__step {
+  margin-left: var(--space-3);
+  font-size: 0.8rem;
+  color: var(--amber-bright);
+  border: 1px solid rgb(245 158 11 / 0.45);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--space-2);
+}
+.supplier-row__count {
+  margin-left: var(--space-3);
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Exercise counts sit under the scope disc; a refusal is its own line. */
+.cell__count {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--star);
+  opacity: 0.85;
+}
+.cell__refused {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--amber-bright);
+  white-space: nowrap;
+}
+.legend .cell__count { display: inline; margin: 0 var(--space-1) 0 var(--space-3); }
+
+/* A case page links into this page by anchor; the target lights up. */
+:target { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: var(--radius-sm); }
+tr:target th, tr:target td { background: rgb(245 158 11 / 0.08); }

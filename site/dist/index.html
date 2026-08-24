@@ -58,7 +58,7 @@ nav a:hover{color:var(--star)}
 .sec{display:grid;grid-template-columns:minmax(0,1fr)}
 .secbody>*{max-width:var(--measure)}
 .secbody>h1,.secbody>.figures,.secbody>.evalgrid,.secbody>.actions,
-.secbody>.scroll{max-width:none}
+.secbody>.scroll,.secbody>.figure{max-width:none}
 
 h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
 font-size:clamp(2rem,4.4vw,3.25rem);line-height:1.12;margin:0 0 1.5rem;
@@ -80,6 +80,8 @@ font-size:2rem;font-weight:600;color:var(--amber-bright);line-height:1.1;
 margin-bottom:.4rem}
 .fig span{display:block;color:var(--muted);font-size:.9rem;line-height:1.5;
 max-width:17rem}
+.figure{display:block;width:100%;height:auto;margin:1.25rem 0;
+border:1px solid rgba(100,116,139,.32);border-radius:12px}
 .evalgrid{display:grid;gap:2rem 2.5rem;
 grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:.75rem 0 0}
 .evalstep{border-top:1px solid var(--border);padding:1rem 0 0}
@@ -190,11 +192,11 @@ synthetic demo data.</p>
 <section class="sec"><h2>Evaluate this in three minutes</h2>
 <div class="secbody"><div class="evalgrid">
 <div class="evalstep"><a href="https://keplaria-console-bklu5jcdea-uc.a.run.app"><b>1&nbsp;&middot; Case console</b></a>
-<p>No sign-in. Open a case: one supplier&rsquo;s file, which the console
-calls a payload. A context strip and a lifecycle indicator (onboarded
-&rarr; active &rarr; renewal requested &rarr; held &rarr; released) show
-where it stands, and the status line says exactly what has been written to
-the ERP so far. For a parked case, stopped for a human decision at any
+<p>No sign-in. Cases are grouped by supplier; each row is one payload, one
+supplier&rsquo;s case. Open one: a context strip and a lifecycle indicator
+(onboarded &rarr; active &rarr; renewal requested &rarr; held &rarr; released)
+show where it stands, and the status line says exactly what has been written
+to the ERP so far. For a parked case, stopped for a human decision at any
 stage, that is nothing yet.</p>
 </div>
 <div class="evalstep"><a href="https://keplaria-review-bklu5jcdea-uc.a.run.app/review"><b>2&nbsp;&middot; Review console
@@ -220,12 +222,21 @@ once and have it stay up without constant thrust. When compliance decays and a
 certificate nears expiry, policy fires a small correction: a renewal
 request, a purchasing hold, a hold release. Spacecraft engineers call those
 corrections station-keeping. So do we.</p></div></section>
-<section class="sec"><h2>What a case looks like</h2>
-<div class="secbody"><p class="sub">The console is public and read-only. A case shows what the
+<section class="sec"><h2>The fleet and the payload</h2>
+<div class="secbody"><p class="sub"><strong>The fleet is the crew and its
+rulebook:</strong> three departments, a coordinator that proposes, two
+specialist agents, and the five ERP commands they may issue. <strong>A
+payload is one supplier&rsquo;s case</strong>, carried through that fleet for
+months: onboarded, then renewals, a hold, a release.</p>
+<img class="figure" src="/orientation.svg" width="1200" height="520"
+     alt="The fleet: departments, agents and commands. One payload: a supplier's case carried through the fleet across five lifecycle stops.">
+<p class="sub">The console is public and read-only. A case shows what the
 coordinator proposed, what policy actually engaged, the candidates from
 screening against a sanctions watchlist and why one of them needed a person,
 and every command, including the ones policy refused. A case stopped
-for a human says so plainly, and says that nothing has been written.</p></div></section>
+for a human says so plainly, and says that nothing has been written. The
+<a href="https://keplaria-console-bklu5jcdea-uc.a.run.app/fleet">fleet page</a> is the rulebook, with a count of
+how many cases exercised each rule.</p></div></section>
 <section class="sec"><h2>Built on</h2>
 <div class="secbody"><p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
 &middot; Cloud Run &middot; Firestore &middot; Pub/Sub &middot; ERPNext &middot;

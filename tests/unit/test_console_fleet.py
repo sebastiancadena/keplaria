@@ -220,3 +220,92 @@ def test_an_unavailable_catalog_renders_an_explicit_error(
 
     assert response.status_code == 503
     assert "catalog unavailable" in response.text.lower()
+
+
+def test_the_scope_matrix_states_its_population_and_shows_counts(
+    client, install_catalog
+):
+    install_catalog(_catalog_dict())
+    response = client.get("/fleet")
+    assert response.status_code == 200
+    assert "most recent cases the console lists" in response.text
+    assert 'class="cell__count"' in response.text
+    assert "counts once on each row" in response.text
+
+
+def test_the_fleet_page_carries_anchors_for_every_row_and_column(
+    client, install_catalog
+):
+    install_catalog(_catalog_dict())
+    html = client.get("/fleet").text
+    for anchor in ("dept-procurement", "dept-finance", "agent-evidence",
+                   "agent-compliance", "cmd-apply_hold",
+                   "event-new_supplier_packet"):
+        assert f'id="{anchor}"' in html, anchor
+
+
+def test_an_out_of_scope_cell_nobody_tried_shows_no_visible_count(
+    client, install_catalog, monkeypatch
+):
+    """A ring with a number nobody earned reads as evidence; finance may
+    engage no agent and issue no command, so with nothing in the stores its
+    row must show empty rings, not visible zeros. The screen-reader text
+    stays unconditional -- only the printed span is gated."""
+    import console.public as public_module
+
+    monkeypatch.setattr(public_module, "list_cases", lambda db: [])
+    monkeypatch.setattr(public_module, "list_outbox_for", lambda db, ids: {})
+    monkeypatch.setattr(public_module, "list_inbox_for", lambda db, ids: {})
+    monkeypatch.setattr(public_module, "get_client", lambda: object())
+    install_catalog(_catalog_dict())
+
+    html = client.get("/fleet").text
+
+    start = html.index('id="dept-finance"')
+    row = html[start:html.index("</tr>", start)]
+    assert "cell__count" not in row
+
+
+def test_the_command_matrix_counts_one_case_once_across_duplicate_outbox_rows(
+    client, install_catalog, monkeypatch
+):
+    """The view has to render the store-derived count, not a stand-in --
+    two outbox rows for the same case's attach_evidence must still show 1,
+    the same dedupe C1 fixed in console.fleet_counts.exercise_counts."""
+    import console.public as public_module
+
+    raw_case = {
+        "case_id": "FX-1",
+        "routing": {"department": "procurement", "route": ["evidence"]},
+    }
+    outbox = {"FX-1": [{"action": "attach_evidence"}, {"action": "attach_evidence"}]}
+    inbox = {"FX-1": [{"event_type": "certificate_received", "case_version": 1}]}
+
+    monkeypatch.setattr(public_module, "list_cases", lambda db: [raw_case])
+    monkeypatch.setattr(public_module, "list_outbox_for", lambda db, ids: outbox)
+    monkeypatch.setattr(public_module, "list_inbox_for", lambda db, ids: inbox)
+    monkeypatch.setattr(public_module, "get_client", lambda: object())
+    install_catalog(_catalog_dict())
+
+    html = client.get("/fleet").text
+
+    dept_start = html.index('id="dept-procurement"')
+    dept_row = html[dept_start:html.index("</tr>", dept_start)]
+    assert 'id="cmd-attach_evidence"' in html  # column exists, position-independent below
+    assert (
+        "attach_evidence; claimed in 1 listed cases" in dept_row
+    ), "two outbox rows for one case must still count as one claimed case"
+
+    event_start = html.index('id="event-certificate_received"')
+    event_row = html[event_start:html.index("</tr>", event_start)]
+    assert '<td class="num lit--num">1</td>' in event_row
+
+
+def test_the_fleet_page_defines_the_fleet_and_names_the_mission_once(
+    client, install_catalog
+):
+    install_catalog(_catalog_dict())
+    html = client.get("/fleet").text
+    assert "The fleet is the crew and its rulebook" in html
+    assert html.count("one mission") == 1
+    assert 'src="/static/orientation.svg"' in html

@@ -7,6 +7,8 @@ suite; this project has already paid that bill once.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -75,6 +77,19 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     assert response.status_code == 200
     assert "Gate verdict: review" in response.text
     assert "create_supplier" in response.text
+
+
+def test_the_fleet_counts_are_store_derived_not_fabricated(db, case_id):
+    """/fleet's per-cell counts have to come from the real outbox rows a
+    parked case claims, not from a number the view invents. This fixture's
+    park (see _park_a_real_case) supplies no evidence, so decide() claims
+    only create_supplier -- attach_evidence needs a certificate_expiry that
+    is never in the picture here."""
+    _park_a_real_case(db, case_id)
+    from console.store import list_outbox_for
+    assert {r["action"] for r in list_outbox_for(db, [case_id])[case_id]} == {
+        "create_supplier"
+    }
 
 
 def test_the_case_list_links_to_the_fleet_page(client):
@@ -162,8 +177,8 @@ def test_the_templates_refuse_a_withheld_field_the_view_model_hands_them(
 
     real = public.public_case
 
-    def leaky(case, commands=()):
-        view = real(case, commands)
+    def leaky(case, commands=(), events=()):
+        view = real(case, commands, events)
         view["screening"]["endpoint"] = "http://10.10.0.2:8000"
         view["approval"] = {**(view.get("approval") or {}), "actor": "reviewer@example.com"}
         return view
@@ -303,3 +318,97 @@ def test_the_case_page_carries_strip_and_lifecycle(client, db):
 def test_the_fleet_page_carries_a_context_strip(client):
     page = client.get("/fleet").text
     assert 'data-testid="context-strip"' in page
+
+
+def test_the_case_list_groups_rows_under_a_supplier_heading(db, case_id, client):
+    """A bare "1 case" substring also matches inside "21 cases", so the
+    count assertion is anchored to the full `supplier-row__count">N
+    case(s)</span>` fragment, which cannot collide that way regardless of N.
+
+    N itself is not assumed to be 1: `db` is session-scoped, every
+    `_park_a_real_case` call reuses the same "Andes Foods" supplier with no
+    teardown, and the list is a top-50-by-recency window, so this heading's
+    displayed count is whatever the shared Firestore state happens to hold
+    -- it grows across a session and can even drop if an older "Andes
+    Foods" row falls out of the window as a newer one enters. What the test
+    can assert without depending on session history is internal
+    consistency: the displayed N equals the number of case rows actually
+    grouped under this heading, and this test's own freshly parked case_id
+    is one of them.
+    """
+    _park_a_real_case(db, case_id)
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'class="supplier-row"' in response.text
+
+    _, _, after = response.text.partition("Andes Foods")
+    assert after, "no Andes Foods heading rendered"
+    # This heading's own section: from right after its name to the next
+    # supplier-row heading (or the end of the table).
+    section = after.split('class="supplier-row"', 1)[0]
+
+    match = re.search(r'supplier-row__count">(\d+) cases?</span>', section)
+    assert match, section
+    displayed = int(match.group(1))
+    row_links = section.count('href="/cases/')
+    assert row_links == displayed, (displayed, row_links, section)
+    assert f'href="/cases/{case_id}"' in section
+
+
+def test_the_case_list_shows_the_route_beside_each_case(db, case_id, client):
+    """The fixture's engaged route is evidence + compliance; the Route
+    column must carry both names on the list, not only on the detail page."""
+    _park_a_real_case(db, case_id)
+    response = client.get("/")
+    row = response.text.split(case_id, 1)[1].split("</tr>", 1)[0]
+    assert "evidence" in row and "compliance" in row
+
+
+def test_the_case_list_defines_the_fleet_before_linking_to_it(client):
+    response = client.get("/")
+    assert "The fleet is the crew and its rulebook" in response.text
+    assert 'src="/static/orientation.svg"' in response.text
+    assert "raised by the calendar" in response.text
+
+
+def test_the_case_list_shows_clock_for_a_cases_latest_claimed_event(
+    db, case_id, client
+):
+    """event_type lives on the inbox subcollection (see claim_event in
+    app/state/firestore.py), never on the case document, so this only
+    passes if the list view actually reads the inbox. The fixture's
+    onboarding routing block (evidence + compliance, still on the case
+    document) must not leak into the Route column once a later clock event
+    (renewal_due) has been claimed -- that routing is not what the clock
+    event did."""
+    _park_a_real_case(db, case_id)
+    claim_event(db, case_id, "EVT-2", {
+        "event_type": "renewal_due", "supplier": "Andes Foods",
+    })
+    response = client.get("/")
+    row = response.text.split(case_id, 1)[1].split("</tr>", 1)[0]
+    assert ">clock<" in row
+    assert "lit--agent" not in row
+
+
+def test_the_detail_page_says_which_fleet_scope_carried_the_case(db, case_id, client):
+    _park_a_real_case(db, case_id)
+    html = client.get(f"/cases/{case_id}").text
+    assert 'href="/fleet#dept-dept-sentinel-7"' in html
+    assert "Carried by the fleet" in html
+
+
+def test_every_fleet_anchor_the_detail_page_links_to_exists(db, case_id, client):
+    """Cross-check, not a list: render both pages and compare hrefs to ids.
+    The fixture department is a sentinel absent from the real catalog, so
+    that one anchor is excused explicitly; every other link must land."""
+    import re
+    _park_a_real_case(db, case_id)
+    detail = client.get(f"/cases/{case_id}").text
+    fleet = client.get("/fleet").text
+    ids = set(re.findall(r'id="([^"]+)"', fleet))
+    hrefs = set(re.findall(r'href="/fleet#([^"]+)"', detail))
+    assert hrefs, "the detail page links nowhere into the fleet"
+    missing = {h for h in hrefs if h not in ids and h != "dept-dept-sentinel-7"}
+    assert not missing, missing

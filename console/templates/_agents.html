@@ -1,0 +1,3 @@
+{% macro agents(ids) -%}
+{% for id in ids %}<a class="lit--agent" href="/fleet#agent-{{ id }}">{{ id }}</a>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
+{%- endmacro %}

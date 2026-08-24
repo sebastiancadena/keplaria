@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from google.cloud import firestore
 
-from app.state.firestore import CASES, OUTBOX
+from app.state.firestore import CASES, INBOX, OUTBOX
 
 
 def case_id_is_addressable(case_id: str) -> bool:
@@ -53,6 +53,50 @@ def load_case(db: firestore.Client, case_id: str) -> tuple[dict | None, list[dic
     ]
     commands.sort(key=lambda c: (c.get("cycle") or 0, c.get("action") or ""))
     return snap.to_dict() or {}, commands
+
+
+def load_inbox(db: firestore.Client, case_id: str) -> list[dict]:
+    """Every event this case has claimed, from its inbox subcollection.
+    claim_event writes event_type and case_version here, never onto the
+    case document, so this is the only place a case's event types live."""
+    if not case_id or not case_id_is_addressable(case_id):
+        return []
+    return [
+        snap.to_dict() or {}
+        for snap in db.collection(CASES).document(case_id).collection(INBOX).stream()
+    ]
+
+
+def list_inbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list[dict]]:
+    """Inbox rows for several cases at once, keyed by case_id.
+
+    One `load_inbox` call per id -- there is no collection-group shortcut
+    that stays scoped to exactly this set of cases -- bounded by whatever
+    list already produced `case_ids` (list_cases' own `limit`). Every id in
+    `case_ids` is a key in the result, an unaddressable one mapped to `[]`.
+    """
+    return {case_id: load_inbox(db, case_id) for case_id in case_ids}
+
+
+def list_outbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list[dict]]:
+    """Outbox rows for the listed cases, keyed by case id.
+
+    One subcollection read per case, bounded by list_cases' limit. Not a
+    collection-group query filtered on case_id: that needs a collection-group
+    index the emulator does not enforce, so the tests would stay green while
+    the deployed page 400s. Every id in `case_ids` is a key in the result,
+    the same guarantee `list_inbox_for` makes, an unaddressable one mapped to
+    `[]` rather than dropped -- a caller indexing the result by every id it
+    passed in never has to guard a missing key.
+    """
+    out: dict[str, list[dict]] = {}
+    for case_id in case_ids:
+        if not case_id or not case_id_is_addressable(case_id):
+            out[case_id] = []
+            continue
+        ref = db.collection(CASES).document(case_id).collection(OUTBOX)
+        out[case_id] = [snap.to_dict() or {} for snap in ref.stream()]
+    return out
 
 
 def list_cases(db: firestore.Client, limit: int = 50) -> list[dict]:

@@ -16,12 +16,21 @@ pinned directly instead.
 
 from __future__ import annotations
 
-from console.store import case_id_is_addressable, load_case
+from console.store import case_id_is_addressable, load_case, load_inbox
 
 
 def test_a_case_id_containing_a_slash_is_not_addressable():
     assert case_id_is_addressable("FOO/BAR") is False
     assert case_id_is_addressable("TEST-abc123") is True
+
+
+def test_load_inbox_returns_empty_for_a_falsy_case_id(db):
+    """list_outbox_for guards `not case_id or not case_id_is_addressable(case_id)`;
+    load_inbox only guarded the second half. A falsy id is addressable
+    (`"" not in "/"` is True) so it fell through to `.document("")`, which
+    Firestore rejects. list_inbox_for's docstring promises every id in its
+    input maps to a list, including a falsy one -- make that literally true."""
+    assert load_inbox(db, "") == []
 
 
 def test_loading_an_unaddressable_case_id_is_refused_not_a_crash(db):

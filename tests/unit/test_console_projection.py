@@ -352,3 +352,28 @@ def test_a_quarantined_case_marks_no_step_current():
 def test_an_unknown_lifecycle_state_does_not_raise():
     got = public_case({"case_id": "C1", "lifecycle": {"state": "wat"}})
     assert got["lifecycle"]["step"] is None
+
+
+# --- event type, read from the inbox subcollection -----------------------
+#
+# claim_event (app/state/firestore.py) writes event_type and case_version
+# onto an inbox document, never onto the case document itself. A real case
+# therefore always has case.get("event_type") == None; public_case must
+# derive it from the `events` passed in instead.
+
+def test_the_event_type_comes_from_the_highest_case_version_inbox_row():
+    view = public_case(
+        {"case_id": "C1"},
+        events=[
+            {"event_type": "new_supplier_packet", "case_version": 1},
+            {"event_type": "renewal_due", "case_version": 2},
+        ],
+    )
+    assert view["event_type"] == "renewal_due"
+    assert view["event_types"] == ["new_supplier_packet", "renewal_due"]
+
+
+def test_a_case_with_no_claimed_events_has_no_event_type():
+    view = public_case({"case_id": "C1"})
+    assert view["event_type"] is None
+    assert view["event_types"] == []

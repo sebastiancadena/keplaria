@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 {% block title %}{{ case.case_id }} — Keplaria{% endblock %}
-{% macro agents(ids) -%}
-{% for id in ids %}<span class="lit--agent">{{ id }}</span>{% if not loop.last %}<span class="sep">·</span>{% endif %}{% endfor %}
-{%- endmacro %}
+{% from "_agents.html" import agents %}
 {% block content %}
 <p><a href="/">&larr; All cases</a></p>
 <h1>{{ case.supplier or case.case_id }}</h1>
 <p class="body-small">Payload <span class="lit--id">{{ case.case_id }}</span> &middot; revision <span class="lit--num">{{ case.case_version }}</span></p>
+{% if case.routing and case.routing.department %}
+<p class="body-small">Carried by the fleet's
+  <a class="lit--dept" href="/fleet#dept-{{ case.routing.department }}">{{ case.routing.department }}</a>
+  scope{% if case.event_type %}, on a
+  <a class="lit--event" href="/fleet#event-{{ case.event_type }}">{{ case.event_type }}</a>
+  event{% endif %}.</p>
+{% endif %}
 <p class="context-strip" data-testid="context-strip">One supplier's case,
 its payload, exactly as the system scored it. <strong>Band</strong> is the
 risk verdict deterministic policy assigned; a <strong>parked</strong> case
@@ -60,7 +65,7 @@ has stopped for a human decision, its ERP writes held.</p>
   <dl class="provenance">
     {% if case.routing.department %}
     <dt><span class="chip">Event</span></dt>
-    <dd>Department <span class="lit--dept">{{ case.routing.department }}</span>
+    <dd>Department <a class="lit--dept" href="/fleet#dept-{{ case.routing.department }}">{{ case.routing.department }}</a>
         {%- if case.routing.department_source and case.routing.department_source != 'event' %}
         <span class="caption">(source: {{ case.routing.department_source }})</span>
         {%- endif %}</dd>
@@ -130,7 +135,7 @@ has stopped for a human decision, its ERP writes held.</p>
     <thead><tr><th>Action</th><th>Cycle</th><th>Status</th></tr></thead>
     <tbody>
     {% for command in case.commands %}
-      <tr><td><span class="lit--command">{{ command.action }}</span></td>
+      <tr><td><a class="lit--command" href="/fleet#cmd-{{ command.action }}">{{ command.action }}</a></td>
           <td class="lit--num">{{ command.cycle }}</td>
           <td>{{ command.status }}</td></tr>
     {% endfor %}
@@ -147,7 +152,7 @@ has stopped for a human decision, its ERP writes held.</p>
     <thead><tr><th>Action</th><th>Cycle</th></tr></thead>
     <tbody>
     {% for command in case.refused_commands %}
-      <tr><td><span class="lit--command">{{ command.action }}</span></td>
+      <tr><td><a class="lit--command" href="/fleet#cmd-{{ command.action }}">{{ command.action }}</a></td>
           <td class="lit--num">{{ command.cycle }}</td></tr>
     {% endfor %}
     </tbody>

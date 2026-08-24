@@ -1,7 +1,7 @@
 # Submission video — narration script and shot list
 
 Target 3:40–3:45; hard cap 4:00. One continuous unedited live segment,
-0:15–2:25. Narration ~521 words at ~139 wpm.
+0:15–2:25. Narration ~533 words at ~139 wpm.
 
 Lines marked **SYNC** must land on the named on-screen event.
 
@@ -81,15 +81,19 @@ Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
 > **SYNC (run freezes on end state)** Three hundred eighty simulated business
 > days. Five under real hold. Zero human touches.
 
-### Beat 3 — Architecture (2:25–2:55) — 73 words
+### Beat 3 — Architecture (2:25–2:55) — 85 words
 
 > Six boxes: events in; the coordinator proposes; the policy gate decides,
 > against a versioned fleet catalog; specialists reason; an outbox executes — and
 > Ground Control can pause the flow before the ERP. Three departments —
 > procurement, compliance, finance — each with a permitted-agent and a
 > permitted-command list; finance's events engage no agents, and an out-of-list
-> request is refused and recorded. All of it deployed: ADK agents with Gemini, on
-> Agent Runtime, Cloud Run, Firestore, and Pub/Sub.
+> request is refused and recorded. That table is the fleet: the crew and its
+> rulebook. Every case you just watched was one payload carried through it.
+> All of it deployed on Google Cloud.
+
+The stack list moved to the overlay; spoken, it cost the ten words the
+fleet definition needs, and the overlay already carries every product name.
 
 ### Beat 4 — Failure and safety (2:55–3:30) — 88 words
 
@@ -138,7 +142,7 @@ Split-screen layout for the live segment:
 | 2d | New case card labelled as a separate Payload; route strip runs again; extraction panel fills; ERP row appears; simulated-clock widget starts | "Separate case — the approval does not carry over" |
 | 2e | Sim-clock jumps; chips: `renewal_due → no action`, `renewal_due → renewal email sent` (show the outbound Communication in the ERP), `evidence_overdue → purchasing hold`; ERP row flips to Hold | "Clock events: agents engaged — none (policy only)" |
 | 2f | `certificate_received` event chip carrying the renewed document; route strip "evidence only → APPROVED 1/1"; grounding view highlights the verbatim spans; ERP hold lifts; freeze on end state | "380 simulated business days · 5 enforced hold days — hold AND release both executed in ERP · 0 human touches", then "Design intent: the supplier answers an email. No portal, no login, no account." |
-| 3 | Full-screen six-box diagram, arrows animating in flow order; then a three-row department table with permitted-agent / permitted-command columns; deployment strip | "ADK + Gemini · Agent Runtime · Cloud Run · Firestore · Pub/Sub" and "10/10 deployed rehearsals under the 130 s budget" |
+| 3 | Full-screen six-box diagram, arrows animating in flow order; then the `/fleet` scope matrix (three departments, permitted-agent / permitted-command columns, exercise counts); cross-fade to supplier one's Routing panel on the console as 'carried through it' lands; deployment strip | "ADK + Gemini · Agent Runtime · Cloud Run · Firestore · Pub/Sub" and "10/10 deployed rehearsals under the 130 s budget" |
 | 4 | Three fast panels: (1) trace of 503 → retry → ERP count = 1; (2) document with highlighted injection and the refusal in the trace; (3) extraction output with the worker-count field flagged "no source span" → retry → parked card in Ground Control. Trace viewer labelled "Telemetry — OpenTelemetry traces" | "0 duplicate writes after a retry" · "Refusal recorded" · "0 ERP writes" |
 | 5 | Scoreboard card, `keplaria.com` in frame (front door + `/proof` verification ledger), repo link | "6/6 steps autonomous · 20 steps by hand, 19 of which the run removes · 22 fields, 0 rekeyed · 1 policy-required intervention · 55.3 s of machine time vs 663.5 s (author-timed, not practitioner-reviewed)" |
 

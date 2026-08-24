@@ -16,16 +16,19 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.catalog import (
-    CLOCK_EVENTS,
-    COMMAND_ORDER,
-    KNOWN_COMMANDS,
-    CatalogLoadError,
-    get_catalog,
-)
+from app.catalog import CLOCK_EVENTS, CatalogLoadError, get_catalog
 from app.state.firestore import get_client
+from console.fleet_counts import command_columns as fleet_command_columns
+from console.fleet_counts import exercise_counts
+from console.grouping import group_by_supplier, route_label
 from console.projection import public_case
-from console.store import list_cases, load_case
+from console.store import (
+    list_cases,
+    list_inbox_for,
+    list_outbox_for,
+    load_case,
+    load_inbox,
+)
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -42,23 +45,39 @@ def healthz() -> dict:
 @api.get("/", response_class=HTMLResponse)
 def index(request: Request):
     db = get_client()
-    cases = [public_case(case) for case in list_cases(db)]
+    raw_cases = list_cases(db)
+    # event_type lives on each case's inbox subcollection, never on the case
+    # document itself (see console.store.load_inbox), so the list view has
+    # to fetch it separately -- one inbox read per case already on the page,
+    # never an unbounded scan.
+    inbox_by_case = list_inbox_for(
+        db, [c.get("case_id") for c in raw_cases if c.get("case_id")]
+    )
+    cases = [
+        public_case(case, events=inbox_by_case.get(case.get("case_id"), []))
+        for case in raw_cases
+    ]
     # A count alone ("29 case(s)") says nothing a reader can use. Most of
     # these cases are the deployed-state evidence for a gate -- a ten-run
     # streak, a retry drill, a rejection pair -- so the list is legitimately
     # repetitive, and what makes it readable is knowing the shape of the
-    # repetition before scrolling it.
+    # repetition before scrolling it: the tally, and one heading per supplier.
     phases: dict[str, int] = {}
     for case in cases:
         phase = case.get("phase") or "unknown"
         phases[phase] = phases.get(phase, 0) + 1
+    groups = group_by_supplier(cases)
+    for group in groups:
+        for case in group["cases"]:
+            case["route_label"] = route_label(case)
     return templates.TemplateResponse(
         request=request,
         name="cases.html",
         context={
-            "cases": cases,
+            "groups": groups,
+            "case_count": len(cases),
             "phase_counts": sorted(phases.items(), key=lambda kv: (-kv[1], kv[0])),
-            "supplier_count": len({c.get("supplier") for c in cases}),
+            "supplier_count": len(groups),
         },
     )
 
@@ -97,10 +116,18 @@ def fleet(request: Request):
     # render it as a missing column instead of an empty one, which reads as
     # "no such command" rather than "nobody may issue it". Extras beyond the
     # declared order still appear, so adding a command cannot silently drop
-    # it from this page.
-    command_columns = list(COMMAND_ORDER) + sorted(
-        KNOWN_COMMANDS - set(COMMAND_ORDER)
-    )
+    # it from this page. One helper, shared with console.fleet_counts, so the
+    # column order and the count keys can never drift apart.
+    command_columns = fleet_command_columns()
+
+    # Live exercise counts, over the same bounded list the home page shows.
+    # The catalog is the rulebook; these numbers are whether it was tested.
+    db = get_client()
+    raw_cases = list_cases(db)
+    case_ids = [c.get("case_id") for c in raw_cases if c.get("case_id")]
+    commands_by_case = list_outbox_for(db, case_ids)
+    events_by_case = list_inbox_for(db, case_ids)
+    counts = exercise_counts(catalog, raw_cases, commands_by_case, events_by_case)
 
     return templates.TemplateResponse(
         request=request,
@@ -110,15 +137,20 @@ def fleet(request: Request):
             "agents": catalog.agents,
             "agent_columns": agent_columns,
             "command_columns": command_columns,
+            "counts": counts,
+            "population": counts["population"],
             "scopes": [
                 {
                     "name": name,
                     "description": scope.description,
                     "agents": [
-                        (a, a in scope.permitted_agents) for a in agent_columns
+                        (a, a in scope.permitted_agents,
+                         counts["departments"][name]["agents"][a])
+                        for a in agent_columns
                     ],
                     "commands": [
-                        (c, c in scope.permitted_commands)
+                        (c, c in scope.permitted_commands,
+                         counts["departments"][name]["commands"][c])
                         for c in command_columns
                     ],
                 }
@@ -133,6 +165,7 @@ def fleet(request: Request):
                     "event": event_type,
                     "agents": route,
                     "clock": event_type in CLOCK_EVENTS,
+                    "count": counts["events"].get(event_type, 0),
                 }
                 for event_type, route in catalog.event_routes.items()
             ],
@@ -154,8 +187,9 @@ def case_detail(case_id: str, request: Request):
             context={"case_id": case_id},
             status_code=404,
         )
+    events = load_inbox(db, case_id)
     return templates.TemplateResponse(
         request=request,
         name="case.html",
-        context={"case": public_case(case, commands)},
+        context={"case": public_case(case, commands, events)},
     )

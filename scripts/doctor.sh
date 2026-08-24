@@ -81,7 +81,7 @@ LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-
 # The generated architecture.svg is excluded because its base64 font payloads
 # false-positive the risk-id pattern; every human-readable string in it comes
 # from docs/architecture/build.py, which IS grepped.
-leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' ':!docs/architecture/judge-diagram.svg' 2>/dev/null)
+leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' ':!docs/architecture/judge-diagram.svg' ':!docs/architecture/orientation.svg' ':!console/static/orientation.svg' ':!site/dist/orientation.svg' 2>/dev/null)
 [ -z "$leak_files" ] \
   && ok "no private planning vocabulary in the tracked tree" \
   || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
@@ -147,6 +147,19 @@ if [ -d .venv ] && [ -f docs/architecture/build_judge_diagram.py ]; then
   rm -f "$tmp_jsvg"
 fi
 
+# The orientation figure is on every judge-facing surface. Same byte-compare;
+# the console copy is pinned to the generated file by a unit test.
+if [ -d .venv ] && [ -f docs/architecture/build_orientation.py ]; then
+  tmp_osvg=$(mktemp)
+  if KEPLARIA_ORIENTATION_OUT="$tmp_osvg" uv run python docs/architecture/build_orientation.py >/dev/null 2>&1 \
+     && cmp -s "$tmp_osvg" docs/architecture/orientation.svg; then
+    ok "orientation.svg matches build_orientation.py (fleet-and-payload figure not stale)"
+  else
+    bad "orientation.svg does NOT match build_orientation.py — regenerate: uv run python docs/architecture/build_orientation.py"
+  fi
+  rm -f "$tmp_osvg"
+fi
+
 # The public site states every number this project makes. It is generated from
 # the claim ledger, so the failure mode is not a wrong number -- it is a page
 # built before the ledger last changed. Same byte-compare as the diagrams.
@@ -154,7 +167,8 @@ if [ -d .venv ] && [ -f site/build_site.py ]; then
   tmp_site=$(mktemp -d)
   if KEPLARIA_SITE_OUT="$tmp_site" uv run python site/build_site.py >/dev/null 2>&1 \
      && cmp -s "$tmp_site/index.html" site/dist/index.html \
-     && cmp -s "$tmp_site/proof.html" site/dist/proof.html; then
+     && cmp -s "$tmp_site/proof.html" site/dist/proof.html \
+     && cmp -s "$tmp_site/orientation.svg" site/dist/orientation.svg; then
     ok "site/dist matches build_site.py output (keplaria.com not stale)"
   else
     bad "site/dist is STALE — rebuild: uv run python site/build_site.py && (cd site && wrangler deploy)"
