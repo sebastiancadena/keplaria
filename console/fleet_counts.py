@@ -40,6 +40,19 @@ def exercise_counts(
     }
     events = {event_type: 0 for event_type in catalog.event_routes}
 
+    # Two attribution choices worth stating, because each answers a
+    # different question than it looks like it answers:
+    #
+    # (a) An agent cell counts a case that ever engaged the agent, including
+    #     through a routing block a later clock event did not rewrite. The
+    #     home page's Route column deliberately labels such a case "clock"
+    #     instead -- that column answers "what raised the latest event", this
+    #     one answers "has this agent ever worked the case".
+    #
+    # (b) Commands and refusals are attributed to the department the case
+    #     document last recorded in routing.department, the only department
+    #     persisted per case -- not to the department enforcement read off
+    #     the triggering event at claim time, which can differ case by case.
     for case in cases:
         case_id = case.get("case_id")
         seen_event_types = {
@@ -55,12 +68,18 @@ def exercise_counts(
         for agent in routing.get("route") or []:
             if agent in dept["agents"]:
                 dept["agents"][agent] += 1
-        for row in commands_by_case.get(case_id, []):
-            action = row.get("action")
+        # A case can carry several outbox rows for the same action --
+        # command ids are cycle-scoped (app/state/commands.py:50-58) -- so
+        # both loops dedupe to one case per action before counting.
+        claimed_actions = {row.get("action") for row in commands_by_case.get(case_id, [])}
+        for action in claimed_actions:
             if action in dept["commands"]:
                 dept["commands"][action]["claimed"] += 1
-        for refused in case.get("refused_commands") or []:
-            action = refused.get("action") if isinstance(refused, dict) else None
+        refused_actions = {
+            r.get("action") for r in (case.get("refused_commands") or [])
+            if isinstance(r, dict)
+        }
+        for action in refused_actions:
             if action in dept["commands"]:
                 dept["commands"][action]["refused"] += 1
 

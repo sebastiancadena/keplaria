@@ -85,14 +85,14 @@ runs. The number in each cell is how many payloads actually exercised it:
           {% for agent_id, permitted, n in scope.agents %}
           <td class="col--mark col--agent">
             <span class="cell {{ 'cell--in' if permitted else 'cell--out' }}"></span>
-            <span class="cell__count">{{ n }}</span>
+            {% if permitted or n %}<span class="cell__count">{{ n }}</span>{% endif %}
             <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} engage {{ agent_id }}; engaged in {{ n }} listed cases</span>
           </td>
           {% endfor %}
           {% for command, permitted, n in scope.commands %}
           <td class="col--mark{% if loop.first %} group--split{% endif %}">
             <span class="cell {{ 'cell--in' if permitted else 'cell--out' }}"></span>
-            <span class="cell__count">{{ n.claimed }}</span>
+            {% if permitted or n.claimed or n.refused %}<span class="cell__count">{{ n.claimed }}</span>{% endif %}
             {% if n.refused %}<span class="cell__refused">{{ n.refused }} refused</span>{% endif %}
             <span class="sr-only">{{ scope.name }} {{ 'may' if permitted else 'may not' }} issue {{ command }}; claimed in {{ n.claimed }} listed cases, refused {{ n.refused }} times</span>
           </td>

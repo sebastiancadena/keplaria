@@ -79,6 +79,19 @@ def test_the_detail_page_shows_the_gate_verdict_and_the_commands(db, case_id, cl
     assert "create_supplier" in response.text
 
 
+def test_the_fleet_counts_are_store_derived_not_fabricated(db, case_id):
+    """/fleet's per-cell counts have to come from the real outbox rows a
+    parked case claims, not from a number the view invents. This fixture's
+    park (see _park_a_real_case) supplies no evidence, so decide() claims
+    only create_supplier -- attach_evidence needs a certificate_expiry that
+    is never in the picture here."""
+    _park_a_real_case(db, case_id)
+    from console.store import list_outbox_for
+    assert {r["action"] for r in list_outbox_for(db, [case_id])[case_id]} == {
+        "create_supplier"
+    }
+
+
 def test_the_case_list_links_to_the_fleet_page(client):
     """The fleet page (this branch's surface) was otherwise unreachable by
     navigation — no template linked to it and it offered no way back."""

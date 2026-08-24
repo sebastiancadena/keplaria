@@ -41,10 +41,11 @@ def test_command_cells_count_claimed_outbox_rows_and_refusals_separately():
         _case("A", "procurement", ["evidence"]),
         _case("F", "finance", [], refused=("create_supplier", "apply_hold")),
     ], {
-        "A": [{"action": "create_supplier"}, {"action": "attach_evidence"}],
+        "A": [{"action": "create_supplier"}, {"action": "attach_evidence"}, {"action": "attach_evidence"}],
     }, {})
     proc = counts["departments"]["procurement"]["commands"]
     assert proc["create_supplier"] == {"claimed": 1, "refused": 0}
+    assert proc["attach_evidence"]["claimed"] == 1  # two outbox rows for the same case, one case
     assert proc["request_renewal"] == {"claimed": 0, "refused": 0}
     fin = counts["departments"]["finance"]["commands"]
     assert fin["create_supplier"] == {"claimed": 0, "refused": 1}
