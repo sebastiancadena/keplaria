@@ -82,73 +82,139 @@ GROUPS = (
 CSS = """
 :root{--void:#0B1020;--ink:#111827;--amber:#F59E0B;--amber-bright:#FBBF24;
 --star:#F8FAFC;--muted:#64748B;--clear:#34D399;
---border:rgb(100 116 139 / .32);--hair:rgb(100 116 139 / .16)}
+--border:rgb(100 116 139 / .32);--hair:rgb(100 116 139 / .16);
+--axis:rgb(100 116 139 / .38);
+--rail:11rem;--gutter:3rem;--measure:100%;--indent:0rem}
 *{box-sizing:border-box}
 body{margin:0;background:var(--void);color:var(--star);
 font-family:Inter,system-ui,sans-serif;line-height:1.65;
 -webkit-font-smoothing:antialiased}
-.wrap{max-width:64rem;margin:0 auto;padding:3rem 1.5rem 5rem}
+:focus-visible{outline:2px solid var(--amber-bright);outline-offset:3px}
+
+/* ONE LEFT EDGE, AND ONLY ONE.
+   Every block starts on the same vertical axis; the only thing that varies is
+   how far RIGHT it runs -- one measure for prose, the full span for evidence.
+   Before this, blocks were centred at seven different max-widths (56rem, 52ch,
+   62ch, 41rem, two full-width flex rows and the table), which put a ragged edge
+   on BOTH sides of every one of them. Narrow viewports collapsed them all to
+   the same width and hid it; a wide display turned the page into an accordion.
+   Section headings hang in the margin LEFT of the axis. Nothing else crosses
+   it -- not the header, not the footer, not a card grid. If you add a block,
+   it goes in a .secbody and inherits the axis; do not give it its own
+   max-width and margin:auto. */
+.wrap{max-width:38rem;margin:0 auto;padding:3rem 1.5rem 5rem}
 header{display:flex;align-items:center;justify-content:space-between;
-gap:1rem;flex-wrap:wrap;margin-bottom:4rem}
+gap:1rem;flex-wrap:wrap;margin:0 0 4.5rem var(--indent)}
 header svg{height:96px;width:auto}
 /* The lockup viewBox carries 0.5x-icon clear space, so the artwork is
    74.74% of the element width and HALF its height. 96px tall renders a
    ~142px-wide mark, clear of the 96px lockup minimum; 46px did not. */
 nav a{color:var(--muted);text-decoration:none;margin-left:1.5rem;font-size:.95rem}
 nav a:hover{color:var(--star)}
-/* One centred narrative column. Body text stays left-set for measure, but
-   every prose block shares the same centred axis as the card grids, which
-   deliberately break out wider. */
+
+/* A section is a heading plus its body. The heading moves into the margin at
+   the widest stage; below that it simply sits above the body. Each section is
+   its own grid so the heading top-aligns with its body without the two of them
+   negotiating margins across a shared row. */
+.axis{position:relative}
+.sec{display:grid;grid-template-columns:minmax(0,1fr)}
+.secbody>*{max-width:var(--measure)}
+.secbody>h1,.secbody>.figures,.secbody>.evalgrid,.secbody>.actions,
+.secbody>.scroll{max-width:none}
+
 h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:0 auto 1.25rem;
-max-width:56rem;text-align:center;letter-spacing:-.02em}
+font-size:clamp(2rem,4.4vw,3.25rem);line-height:1.12;margin:0 0 1.5rem;
+letter-spacing:-.02em;position:relative}
 h2{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-font-size:1.4rem;max-width:41rem;margin:3.5rem auto 1rem}
-.lede{font-size:1.2rem;max-width:52ch;margin-left:auto;margin-right:auto;
-text-align:center;color:var(--star)}
-.sub{color:var(--muted);max-width:62ch;margin-left:auto;margin-right:auto}
+font-size:1.4rem;margin:3.5rem 0 1rem;letter-spacing:-.01em}
+.lede{font-size:1.22rem;margin:0 0 1.5rem;color:var(--star)}
+.sub{color:var(--muted);margin:0 0 1.25rem}
 .amber{color:var(--amber-bright)}
-.figures{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));
-margin:3rem 0}
-.fig{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
-background:rgb(248 250 252 / .03)}
+
+/* Cards were boxes: a border on four sides broadcasts a block's width, which
+   is the thing this page is trying to stop doing. A single rule along the top
+   states the column and leaves the left edge to the axis. */
+.figures{display:grid;gap:2rem 2.5rem;
+grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));margin:2.75rem 0}
+.fig{border-top:1px solid var(--border);padding:1rem 0 0}
 .fig b{display:block;font-family:"Space Grotesk",system-ui,sans-serif;
-font-size:1.7rem;font-weight:600;color:var(--amber-bright);margin-bottom:.35rem}
-.fig span{color:var(--muted);font-size:.92rem}
-.evalgrid{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
-margin:2rem 0}
-.evalstep{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
-background:rgb(248 250 252 / .03)}
+font-size:2rem;font-weight:600;color:var(--amber-bright);line-height:1.1;
+margin-bottom:.4rem}
+.fig span{display:block;color:var(--muted);font-size:.9rem;line-height:1.5;
+max-width:17rem}
+.evalgrid{display:grid;gap:2rem 2.5rem;
+grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:.75rem 0 0}
+.evalstep{border-top:1px solid var(--border);padding:1rem 0 0}
 .evalstep a{text-decoration:none}
 .evalstep b{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-color:var(--amber-bright)}
+font-size:1.125rem;color:var(--amber-bright)}
 .evalstep a:hover b{text-decoration:underline}
 .evalstep p{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
-.actions{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;
-margin:2.5rem 0}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2.5rem 0 0}
+.aside{color:var(--muted);font-size:.88rem;margin:.9rem 0 0}
 .btn{display:inline-block;padding:.7rem 1.15rem;border-radius:10px;
 border:1px solid var(--border);color:var(--star);text-decoration:none;
 font-size:.97rem}
 .btn--go{border-color:var(--amber);color:var(--amber-bright)}
 .btn:hover{background:rgb(248 250 252 / .05)}
-table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:.93rem}
+table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:.93rem;
+table-layout:fixed;min-width:32rem}
+th:nth-child(1){width:42%}th:nth-child(2){width:22%}
+th:nth-child(3){width:36%}
+td:nth-child(2),td:nth-child(3){overflow-wrap:anywhere}
 th{text-align:left;font-weight:600;color:var(--muted);font-size:.78rem;
-letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem;
+letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem .6rem 0;
 border-bottom:1px solid var(--border)}
-td{padding:.7rem .5rem;border-bottom:1px solid var(--hair);vertical-align:top}
-.grouplead td{padding:1.4rem .5rem .5rem;color:var(--star);font-weight:600;
+td{padding:.7rem .5rem .7rem 0;border-bottom:1px solid var(--hair);
+vertical-align:top}
+.grouplead td{padding:1.6rem 0 .5rem;color:var(--star);font-weight:600;
 font-size:.95rem;border-bottom:1px solid var(--border)}
-.val{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--amber-bright);
-white-space:nowrap}
+.val{font-family:"JetBrains Mono",ui-monospace,monospace;
+color:var(--amber-bright)}
 .q{color:var(--muted);font-size:.86rem}
 code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
-.note{border-left:3px solid var(--amber);padding:.85rem 1.15rem;
-background:rgb(248 250 252 / .03);border-radius:0 12px 12px 0;
-max-width:41rem;margin:2rem auto;color:var(--star)}
-footer{margin-top:5rem;padding-top:2rem;border-top:1px solid var(--hair);
-color:var(--muted);font-size:.88rem}
+.note{border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+padding:1.1rem 0;margin:2.25rem 0;color:var(--star)}
+footer{margin:5rem 0 0 var(--indent);padding-top:2rem;
+border-top:1px solid var(--hair);color:var(--muted);font-size:.88rem}
 a{color:var(--amber-bright)}
 .scroll{overflow-x:auto}
+
+/* Stage 2: still one column, but prose holds its measure while evidence runs
+   the full width. Same left edge for both. */
+@media (min-width:60rem){
+.wrap{max-width:56rem;padding:3.5rem 2rem 6rem}
+:root{--measure:34rem}
+}
+
+/* Stage 3: the heading moves into the margin and the axis is drawn. */
+@media (min-width:78rem){
+:root{--indent:calc(var(--rail) + var(--gutter))}
+.wrap{max-width:72rem;padding:4rem 2rem 7rem}
+.sec{grid-template-columns:var(--rail) minmax(0,var(--measure)) minmax(0,1fr);
+column-gap:var(--gutter)}
+.sec>h2{grid-column:1;align-self:start;text-align:right;position:relative;
+margin:0;padding-top:.2rem;font-size:1.125rem;line-height:1.4;
+text-wrap:balance;
+letter-spacing:0;color:var(--star)}
+.sec>.secbody{grid-column:2/-1}
+.sec+.sec{margin-top:4.5rem}
+/* The axis, and the corrections applied along it. The disc punches a gap in
+   the hairline exactly as the mark's orbital ring breaks around the body
+   crossing it (brand guidelines, BODY_GAP). */
+.axis::before{content:"";position:absolute;
+left:calc(var(--rail) + var(--gutter)/2);top:.6rem;bottom:0;width:1px;
+background:linear-gradient(var(--axis) calc(100% - 7rem),transparent);
+transform-origin:top;
+animation:axis-draw .9s cubic-bezier(.2,.7,.3,1) both}
+.sec>h2::after,.sec--hero h1::before{content:"";position:absolute;
+width:7px;height:7px;border-radius:50%;background:var(--amber);
+box-shadow:0 0 0 6px var(--void)}
+.sec>h2::after{top:.62rem;right:calc(var(--gutter)/-2 - 3.5px)}
+.sec--hero h1::before{top:.44em;left:calc(var(--gutter)/-2 - 3.5px)}
+}
+@keyframes axis-draw{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){.axis::before{animation:none}}
 """
 
 
@@ -177,7 +243,7 @@ def shell(title: str, body: str, desc: str, canonical: str) -> str:
 </head><body><div class="wrap">
 <header><a href="/" aria-label="Keplaria">{lockup}</a>
 <nav><a href="/proof">Verification</a><a href="{REPO}">Source</a></nav></header>
-{body}
+<main class="axis">{body}</main>
 <footer>
 <p>Keplaria is a hackathon project. The screening index is a <b>synthetic,
 rights-cleared watchlist</b>; no live sanctions data is indexed. The ERP is a
@@ -213,6 +279,7 @@ def index(claims) -> str:
     return shell(
         "Keplaria",
         f"""
+<section class="sec sec--hero"><div class="secbody">
 <h1>Supplier compliance doesn&rsquo;t end at onboarding. Most tools do.</h1>
 <p class="lede">Certificates expire months after a supplier is onboarded, and
 every onboarding tool retires the day the ERP record is created (enterprise
@@ -234,13 +301,15 @@ queue of pending ERP writes, released only on approval).</p>
 produced it.</b> The verification page is generated from the evidence files,
 not written by hand, so it cannot quietly disagree with them.</div>
 <div class="actions">
-<a class="btn btn--go" href="{CONSOLE}">Open the live case console (a real
-deployment, synthetic demo suppliers)</a>
+<a class="btn btn--go" href="{CONSOLE}">Open the case console</a>
 <a class="btn" href="/proof">Verification ledger</a>
 <a class="btn" href="{REPO}">Source</a>
 </div>
-<h2>Evaluate this in three minutes</h2>
-<div class="evalgrid">
+<p class="aside">The case console is a real deployment. The suppliers in it are
+synthetic demo data.</p>
+</div></section>
+<section class="sec"><h2>Evaluate this in three minutes</h2>
+<div class="secbody"><div class="evalgrid">
 <div class="evalstep"><a href="{CONSOLE}"><b>1&nbsp;&middot; Case console</b></a>
 <p>No sign-in. Open a case: one supplier&rsquo;s file, which the console
 calls a payload. A context strip and a lifecycle indicator (onboarded
@@ -260,9 +329,9 @@ them.</p></div>
 added here then. What it shows: one continuous, unedited take. A stop for
 a human, an approval that releases the held writes, then a simulated year
 and a half of renewals, a hold, and a release.</p></div>
-</div>
-<h2>Named for the law, not the planets</h2>
-<p class="sub">An agent that runs for minutes can afford to improvise. One that
+</div></div></section>
+<section class="sec"><h2>Named for the law, not the planets</h2>
+<div class="secbody"><p class="sub">An agent that runs for minutes can afford to improvise. One that
 stays accountable for months cannot. That is why the model only
 <em>proposes</em> here, and a versioned, deterministic policy <em>decides</em>.
 The name marks that line. Kepler&rsquo;s breakthrough was not noticing that
@@ -271,15 +340,15 @@ law: predictable, calculable, correctable. That is what lets you launch a case
 once and have it stay up without constant thrust. When compliance decays and a
 certificate nears expiry, policy fires a small correction: a renewal
 request, a purchasing hold, a hold release. Spacecraft engineers call those
-corrections station-keeping. So do we.</p>
-<h2>What a case looks like</h2>
-<p class="sub">The console is public and read-only. A case shows what the
+corrections station-keeping. So do we.</p></div></section>
+<section class="sec"><h2>What a case looks like</h2>
+<div class="secbody"><p class="sub">The console is public and read-only. A case shows what the
 coordinator proposed, what policy actually engaged, the candidates from
 screening against a sanctions watchlist and why one of them needed a person,
 and every command, including the ones policy refused. A case stopped
-for a human says so plainly, and says that nothing has been written.</p>
-<h2>Built on</h2>
-<p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
+for a human says so plainly, and says that nothing has been written.</p></div></section>
+<section class="sec"><h2>Built on</h2>
+<div class="secbody"><p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
 &middot; Cloud Run &middot; Firestore &middot; Pub/Sub &middot; ERPNext &middot;
 OpenTelemetry</p>
 """,
@@ -314,6 +383,7 @@ def proof(claims) -> str:
     return shell(
         "Verification — Keplaria",
         f"""
+<section class="sec sec--hero"><div class="secbody">
 <h1>Every number, and the run that produced it.</h1>
 <p class="sub">This page is generated from <code>docs/proof/claims.toml</code>
 and the evidence files it points at. It is not written by hand. The same
@@ -326,6 +396,7 @@ would be a false green.</div>
 <div class="scroll">
 <table><thead><tr><th>Claim</th><th>Value</th><th>Evidence</th></tr></thead>
 <tbody>{"".join(rows)}</tbody></table></div>
+</div></section>
 """,
         "Every public number Keplaria states, bound to the run that produced it.",
         "https://keplaria.com/proof",

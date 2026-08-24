@@ -20,78 +20,145 @@
 <style>
 :root{--void:#0B1020;--ink:#111827;--amber:#F59E0B;--amber-bright:#FBBF24;
 --star:#F8FAFC;--muted:#64748B;--clear:#34D399;
---border:rgb(100 116 139 / .32);--hair:rgb(100 116 139 / .16)}
+--border:rgb(100 116 139 / .32);--hair:rgb(100 116 139 / .16);
+--axis:rgb(100 116 139 / .38);
+--rail:11rem;--gutter:3rem;--measure:100%;--indent:0rem}
 *{box-sizing:border-box}
 body{margin:0;background:var(--void);color:var(--star);
 font-family:Inter,system-ui,sans-serif;line-height:1.65;
 -webkit-font-smoothing:antialiased}
-.wrap{max-width:64rem;margin:0 auto;padding:3rem 1.5rem 5rem}
+:focus-visible{outline:2px solid var(--amber-bright);outline-offset:3px}
+
+/* ONE LEFT EDGE, AND ONLY ONE.
+   Every block starts on the same vertical axis; the only thing that varies is
+   how far RIGHT it runs -- one measure for prose, the full span for evidence.
+   Before this, blocks were centred at seven different max-widths (56rem, 52ch,
+   62ch, 41rem, two full-width flex rows and the table), which put a ragged edge
+   on BOTH sides of every one of them. Narrow viewports collapsed them all to
+   the same width and hid it; a wide display turned the page into an accordion.
+   Section headings hang in the margin LEFT of the axis. Nothing else crosses
+   it -- not the header, not the footer, not a card grid. If you add a block,
+   it goes in a .secbody and inherits the axis; do not give it its own
+   max-width and margin:auto. */
+.wrap{max-width:38rem;margin:0 auto;padding:3rem 1.5rem 5rem}
 header{display:flex;align-items:center;justify-content:space-between;
-gap:1rem;flex-wrap:wrap;margin-bottom:4rem}
+gap:1rem;flex-wrap:wrap;margin:0 0 4.5rem var(--indent)}
 header svg{height:96px;width:auto}
 /* The lockup viewBox carries 0.5x-icon clear space, so the artwork is
    74.74% of the element width and HALF its height. 96px tall renders a
    ~142px-wide mark, clear of the 96px lockup minimum; 46px did not. */
 nav a{color:var(--muted);text-decoration:none;margin-left:1.5rem;font-size:.95rem}
 nav a:hover{color:var(--star)}
-/* One centred narrative column. Body text stays left-set for measure, but
-   every prose block shares the same centred axis as the card grids, which
-   deliberately break out wider. */
+
+/* A section is a heading plus its body. The heading moves into the margin at
+   the widest stage; below that it simply sits above the body. Each section is
+   its own grid so the heading top-aligns with its body without the two of them
+   negotiating margins across a shared row. */
+.axis{position:relative}
+.sec{display:grid;grid-template-columns:minmax(0,1fr)}
+.secbody>*{max-width:var(--measure)}
+.secbody>h1,.secbody>.figures,.secbody>.evalgrid,.secbody>.actions,
+.secbody>.scroll{max-width:none}
+
 h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:0 auto 1.25rem;
-max-width:56rem;text-align:center;letter-spacing:-.02em}
+font-size:clamp(2rem,4.4vw,3.25rem);line-height:1.12;margin:0 0 1.5rem;
+letter-spacing:-.02em;position:relative}
 h2{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-font-size:1.4rem;max-width:41rem;margin:3.5rem auto 1rem}
-.lede{font-size:1.2rem;max-width:52ch;margin-left:auto;margin-right:auto;
-text-align:center;color:var(--star)}
-.sub{color:var(--muted);max-width:62ch;margin-left:auto;margin-right:auto}
+font-size:1.4rem;margin:3.5rem 0 1rem;letter-spacing:-.01em}
+.lede{font-size:1.22rem;margin:0 0 1.5rem;color:var(--star)}
+.sub{color:var(--muted);margin:0 0 1.25rem}
 .amber{color:var(--amber-bright)}
-.figures{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));
-margin:3rem 0}
-.fig{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
-background:rgb(248 250 252 / .03)}
+
+/* Cards were boxes: a border on four sides broadcasts a block's width, which
+   is the thing this page is trying to stop doing. A single rule along the top
+   states the column and leaves the left edge to the axis. */
+.figures{display:grid;gap:2rem 2.5rem;
+grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));margin:2.75rem 0}
+.fig{border-top:1px solid var(--border);padding:1rem 0 0}
 .fig b{display:block;font-family:"Space Grotesk",system-ui,sans-serif;
-font-size:1.7rem;font-weight:600;color:var(--amber-bright);margin-bottom:.35rem}
-.fig span{color:var(--muted);font-size:.92rem}
-.evalgrid{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
-margin:2rem 0}
-.evalstep{border:1px solid var(--border);border-radius:14px;padding:1.25rem;
-background:rgb(248 250 252 / .03)}
+font-size:2rem;font-weight:600;color:var(--amber-bright);line-height:1.1;
+margin-bottom:.4rem}
+.fig span{display:block;color:var(--muted);font-size:.9rem;line-height:1.5;
+max-width:17rem}
+.evalgrid{display:grid;gap:2rem 2.5rem;
+grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:.75rem 0 0}
+.evalstep{border-top:1px solid var(--border);padding:1rem 0 0}
 .evalstep a{text-decoration:none}
 .evalstep b{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;
-color:var(--amber-bright)}
+font-size:1.125rem;color:var(--amber-bright)}
 .evalstep a:hover b{text-decoration:underline}
 .evalstep p{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
-.actions{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;
-margin:2.5rem 0}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:2.5rem 0 0}
+.aside{color:var(--muted);font-size:.88rem;margin:.9rem 0 0}
 .btn{display:inline-block;padding:.7rem 1.15rem;border-radius:10px;
 border:1px solid var(--border);color:var(--star);text-decoration:none;
 font-size:.97rem}
 .btn--go{border-color:var(--amber);color:var(--amber-bright)}
 .btn:hover{background:rgb(248 250 252 / .05)}
-table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:.93rem}
+table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:.93rem;
+table-layout:fixed;min-width:32rem}
+th:nth-child(1){width:42%}th:nth-child(2){width:22%}
+th:nth-child(3){width:36%}
+td:nth-child(2),td:nth-child(3){overflow-wrap:anywhere}
 th{text-align:left;font-weight:600;color:var(--muted);font-size:.78rem;
-letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem;
+letter-spacing:.07em;text-transform:uppercase;padding:.6rem .5rem .6rem 0;
 border-bottom:1px solid var(--border)}
-td{padding:.7rem .5rem;border-bottom:1px solid var(--hair);vertical-align:top}
-.grouplead td{padding:1.4rem .5rem .5rem;color:var(--star);font-weight:600;
+td{padding:.7rem .5rem .7rem 0;border-bottom:1px solid var(--hair);
+vertical-align:top}
+.grouplead td{padding:1.6rem 0 .5rem;color:var(--star);font-weight:600;
 font-size:.95rem;border-bottom:1px solid var(--border)}
-.val{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--amber-bright);
-white-space:nowrap}
+.val{font-family:"JetBrains Mono",ui-monospace,monospace;
+color:var(--amber-bright)}
 .q{color:var(--muted);font-size:.86rem}
 code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
-.note{border-left:3px solid var(--amber);padding:.85rem 1.15rem;
-background:rgb(248 250 252 / .03);border-radius:0 12px 12px 0;
-max-width:41rem;margin:2rem auto;color:var(--star)}
-footer{margin-top:5rem;padding-top:2rem;border-top:1px solid var(--hair);
-color:var(--muted);font-size:.88rem}
+.note{border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+padding:1.1rem 0;margin:2.25rem 0;color:var(--star)}
+footer{margin:5rem 0 0 var(--indent);padding-top:2rem;
+border-top:1px solid var(--hair);color:var(--muted);font-size:.88rem}
 a{color:var(--amber-bright)}
 .scroll{overflow-x:auto}
+
+/* Stage 2: still one column, but prose holds its measure while evidence runs
+   the full width. Same left edge for both. */
+@media (min-width:60rem){
+.wrap{max-width:56rem;padding:3.5rem 2rem 6rem}
+:root{--measure:34rem}
+}
+
+/* Stage 3: the heading moves into the margin and the axis is drawn. */
+@media (min-width:78rem){
+:root{--indent:calc(var(--rail) + var(--gutter))}
+.wrap{max-width:72rem;padding:4rem 2rem 7rem}
+.sec{grid-template-columns:var(--rail) minmax(0,var(--measure)) minmax(0,1fr);
+column-gap:var(--gutter)}
+.sec>h2{grid-column:1;align-self:start;text-align:right;position:relative;
+margin:0;padding-top:.2rem;font-size:1.125rem;line-height:1.4;
+text-wrap:balance;
+letter-spacing:0;color:var(--star)}
+.sec>.secbody{grid-column:2/-1}
+.sec+.sec{margin-top:4.5rem}
+/* The axis, and the corrections applied along it. The disc punches a gap in
+   the hairline exactly as the mark's orbital ring breaks around the body
+   crossing it (brand guidelines, BODY_GAP). */
+.axis::before{content:"";position:absolute;
+left:calc(var(--rail) + var(--gutter)/2);top:.6rem;bottom:0;width:1px;
+background:linear-gradient(var(--axis) calc(100% - 7rem),transparent);
+transform-origin:top;
+animation:axis-draw .9s cubic-bezier(.2,.7,.3,1) both}
+.sec>h2::after,.sec--hero h1::before{content:"";position:absolute;
+width:7px;height:7px;border-radius:50%;background:var(--amber);
+box-shadow:0 0 0 6px var(--void)}
+.sec>h2::after{top:.62rem;right:calc(var(--gutter)/-2 - 3.5px)}
+.sec--hero h1::before{top:.44em;left:calc(var(--gutter)/-2 - 3.5px)}
+}
+@keyframes axis-draw{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){.axis::before{animation:none}}
 </style>
 </head><body><div class="wrap">
 <header><a href="/" aria-label="Keplaria"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-128 -128 1013.52 512" role="img" aria-label="Keplaria"><g transform="rotate(-22 128 128)"><mask id="keplaria-orbit-cut-display" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256"><path fill="#fff" fill-rule="evenodd" d="M0,0 H256 V256 H0 Z M156.916185,186.982224 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z"/></mask><ellipse class="ring" cx="128" cy="128" rx="94" ry="72.004" fill="none" stroke="#F8FAFC" stroke-width="15" mask="url(#keplaria-orbit-cut-display)"/><circle cx="67.572986" cy="128" r="21" fill="#FBBF24" class="focus"/><circle cx="181.916185" cy="186.982224" r="16" fill="#F8FAFC" class="body"/></g><g transform="translate(296.96,169.216)"><path d="M66 0V700H198V422H216L443 700H612L320 355L622 0H448L216 284H198V0Z" fill="#F8FAFC" transform="translate(0.0000,0) scale(0.117760,-0.117760)"/><path d="M296 -14Q222 -14 165.5 17.5Q109 49 77.5 106.5Q46 164 46 242V254Q46 332 77.0 389.5Q108 447 164.0 478.5Q220 510 294 510Q367 510 421.0 477.5Q475 445 505.0 387.5Q535 330 535 254V211H174Q176 160 212.0 128.0Q248 96 300 96Q353 96 378.0 119.0Q403 142 416 170L519 116Q505 90 478.5 59.5Q452 29 408.0 7.5Q364 -14 296 -14ZM175 305H407Q403 348 372.5 374.0Q342 400 293 400Q242 400 212.0 374.0Q182 348 175 305Z" fill="#F8FAFC" transform="translate(72.0691,0) scale(0.117760,-0.117760)"/><path d="M70 -200V496H194V436H212Q229 465 265.0 487.5Q301 510 368 510Q428 510 479.0 480.5Q530 451 561.0 394.0Q592 337 592 256V240Q592 159 561.0 102.0Q530 45 479.0 15.5Q428 -14 368 -14Q323 -14 292.5 -3.5Q262 7 243.5 23.5Q225 40 214 57H196V-200ZM330 96Q389 96 427.5 133.5Q466 171 466 243V253Q466 325 427.0 362.5Q388 400 330 400Q272 400 233.0 362.5Q194 325 194 253V243Q194 171 233.0 133.5Q272 96 330 96Z" fill="#F8FAFC" transform="translate(140.0166,0) scale(0.117760,-0.117760)"/><path d="M70 0V700H196V0Z" fill="#F8FAFC" transform="translate(215.1475,0) scale(0.117760,-0.117760)"/><path d="M224 -14Q171 -14 129.0 4.5Q87 23 62.5 58.5Q38 94 38 145Q38 196 62.5 230.5Q87 265 130.5 282.5Q174 300 230 300H366V328Q366 363 344.0 385.5Q322 408 274 408Q227 408 204.0 386.5Q181 365 174 331L58 370Q70 408 96.5 439.5Q123 471 167.5 490.5Q212 510 276 510Q374 510 431.0 461.0Q488 412 488 319V134Q488 104 516 104H556V0H472Q435 0 411.0 18.0Q387 36 387 66V67H368Q364 55 350.0 35.5Q336 16 306.0 1.0Q276 -14 224 -14ZM246 88Q299 88 332.5 117.5Q366 147 366 196V206H239Q204 206 184.0 191.0Q164 176 164 149Q164 122 185.0 105.0Q206 88 246 88Z" fill="#F8FAFC" transform="translate(246.4717,0) scale(0.117760,-0.117760)"/><path d="M70 0V496H194V440H212Q223 470 248.5 484.0Q274 498 308 498H368V386H306Q258 386 227.0 360.5Q196 335 196 282V0Z" fill="#F8FAFC" transform="translate(314.5370,0) scale(0.117760,-0.117760)"/><path d="M70 0V496H196V0ZM133 554Q99 554 75.5 576.0Q52 598 52 634Q52 670 75.5 692.0Q99 714 133 714Q168 714 191.0 692.0Q214 670 214 634Q214 598 191.0 576.0Q168 554 133 554Z" fill="#F8FAFC" transform="translate(361.1699,0) scale(0.117760,-0.117760)"/><path d="M224 -14Q171 -14 129.0 4.5Q87 23 62.5 58.5Q38 94 38 145Q38 196 62.5 230.5Q87 265 130.5 282.5Q174 300 230 300H366V328Q366 363 344.0 385.5Q322 408 274 408Q227 408 204.0 386.5Q181 365 174 331L58 370Q70 408 96.5 439.5Q123 471 167.5 490.5Q212 510 276 510Q374 510 431.0 461.0Q488 412 488 319V134Q488 104 516 104H556V0H472Q435 0 411.0 18.0Q387 36 387 66V67H368Q364 55 350.0 35.5Q336 16 306.0 1.0Q276 -14 224 -14ZM246 88Q299 88 332.5 117.5Q366 147 366 196V206H239Q204 206 184.0 191.0Q164 176 164 149Q164 122 185.0 105.0Q206 88 246 88Z" fill="#F8FAFC" transform="translate(392.4941,0) scale(0.117760,-0.117760)"/></g></svg></a>
 <nav><a href="/proof">Verification</a><a href="https://github.com/sebastiancadena/keplaria">Source</a></nav></header>
-
+<main class="axis">
+<section class="sec sec--hero"><div class="secbody">
 <h1>Every number, and the run that produced it.</h1>
 <p class="sub">This page is generated from <code>docs/proof/claims.toml</code>
 and the evidence files it points at. It is not written by hand. The same
@@ -104,7 +171,8 @@ would be a false green.</div>
 <div class="scroll">
 <table><thead><tr><th>Claim</th><th>Value</th><th>Evidence</th></tr></thead>
 <tbody><tr class="grouplead"><td colspan="3">The run's own clock, compared against the same work timed by hand.</td></tr><tr><td>Machine time for one deployed run of the whole lifecycle<div class="q">machine time only; the human approval is timed separately and excluded</div></td><td><span class="val">55.3 s of machine time</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>The single human approval the same run required</td><td><span class="val">47.7 s human approval</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>The budget one deployed run must finish inside</td><td><span class="val">130s</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>The same work done by hand, timed<div class="q">author-timed, not practitioner-reviewed</div></td><td><span class="val">663.5 s</span></td><td class="mono">spikes/manual_baseline/evidence.json</td></tr><tr><td>Steps in the hand-done walkthrough<div class="q">author-timed, not practitioner-reviewed</div></td><td><span class="val">20 steps</span></td><td class="mono">spikes/manual_baseline/evidence.json</td></tr><tr><td>Steps of that walkthrough the run removes<div class="q">measured against an author-timed baseline, not a practitioner-reviewed one</div></td><td><span class="val">19 of which the run removes</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>Business days the two cases span<div class="q">the lifecycle clock is compressed, and the compression is disclosed on screen</div></td><td><span class="val">380 simulated business days</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr class="grouplead"><td colspan="3">Checks this run re-executes every time it reports them, not numbers quoted from an earlier pass.</td></tr><tr><td>Contracts re-verified at capture time</td><td><span class="val">nine contracts</span></td><td class="mono">spikes/core_contracts/evidence.json</td></tr><tr><td>Graded domain cases, all passing<div class="q">a deterministic pass metric; re-run the suite before citing it</div></td><td><span class="val">24/24</span></td><td class="mono">spikes/domain_evals/evidence.json</td></tr><tr><td>Mean score across the graded domain suite<div class="q">a deterministic pass metric; re-run the suite before citing it</div></td><td><span class="val">100%</span></td><td class="mono">spikes/domain_evals/evidence.json</td></tr><tr><td>Contract and unit tests re-executed by the run that reports them<div class="q">re-executed by the harness, not quoted from a previous run</div></td><td><span class="val">549 passed</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr class="grouplead"><td colspan="3">What that run actually wrote to the ERP (enterprise resource planning: the system of record for suppliers and purchasing), and what it refused to write twice.</td></tr><tr><td>Fields entered into the ERP without a human retyping them</td><td><span class="val">22 fields</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>Days a non-compliant supplier was actually held from purchasing<div class="q">claimed only where both the hold and its release executed in the ERP</div></td><td><span class="val">5 enforced hold days</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>Decisions policy requires a human to make</td><td><span class="val">1 policy-required intervention</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr><td>Duplicate ERP writes after a retry</td><td><span class="val">0 duplicate writes after a retry</span></td><td class="mono">spikes/judge_run/evidence.json</td></tr><tr class="grouplead"><td colspan="3">What running this project costs to operate, kept here for traceability even where it hasn&rsquo;t been turned into a prose claim anywhere else yet.</td></tr><tr><td>Gross running cost for the whole project, month to date<div class="q">before credits, measured from the billing account rather than from published rates</div></td><td><span class="val">$16.63</span></td><td class="mono">spikes/cost_posture/evidence.json</td></tr><tr><td>Cloud credit remaining<div class="q">console-only; no API exposes the balance, so it is passed in when the measurement is taken</div></td><td><span class="val">$138.09</span></td><td class="mono">spikes/cost_posture/evidence.json</td></tr><tr><td>Measured daily uptime of the screening VM</td><td><span class="val">5.6 h/day</span></td><td class="mono">spikes/cost_posture/evidence.json</td></tr><tr class="grouplead"><td colspan="3">A second Google model, measured against this project&rsquo;s own documents. Reading them correctly was not enough to adopt it, so both halves of that result are published together.</td></tr><tr><td>Documents an open-weights Gemma read correctly, served by Vertex AI<div class="q">paired with gemma_format_conformant and never quotable without it: this number is the content the model read, after key renaming, and says nothing about whether it returned the required structure</div></td><td><span class="val">6 of 6</span></td><td class="mono">spikes/gemma_extraction/evidence.json</td></tr><tr><td>The same documents on which that model returned the required output format<div class="q">paired with gemma_content_correct and never quotable without it: alone it reads as a model that could not extract, which the measurement disproves</div></td><td><span class="val">0 of 6</span></td><td class="mono">spikes/gemma_extraction/evidence.json</td></tr><tr><td>The same Gemma weights run locally, where the runtime constrains generation to the required structure<div class="q">author workstation, not Google Cloud; carries no deployment claim</div></td><td><span class="val">6 of 6</span></td><td class="mono">spikes/gemma_extraction/evidence.json</td></tr><tr><td>Median time for one served-Gemma extraction, against the deployed step&#x27;s own median</td><td><span class="val">8.8 s</span></td><td class="mono">spikes/gemma_extraction/evidence.json</td></tr><tr class="grouplead"><td colspan="3">Statements a human read and confirmed by hand, because no automatic check can settle them.</td></tr><tr><td>The ERP hold was written minutes before the rejection committed</td><td><span class="q">read the evidence file</span></td><td class="mono">spikes/hitl_reject/evidence.json</td></tr><tr><td>The graded suite passed 8/8 when the generation pin was measured</td><td><span class="q">read the evidence file</span></td><td class="mono">spikes/domain_evals/evidence.json</td></tr><tr><td>Reasoning tokens fell to effectively none and the timed sequence shortened</td><td><span class="q">read the evidence file</span></td><td class="mono">spikes/gemini_37_eval/evidence.json</td></tr><tr class="grouplead"><td colspan="3">What the published build-piece article already said, checked here against the run it described at the time.</td></tr><tr><td>The build piece states the graded suite passed 8/8 with reasoning pinned off</td><td><span class="q">read the evidence file</span></td><td class="mono">spikes/domain_evals/evidence.json</td></tr><tr><td>The build piece states a two-supplier run dropped from 85 to 57 seconds</td><td><span class="q">read the evidence file</span></td><td class="mono">spikes/gemini_37_eval/evidence.json</td></tr></tbody></table></div>
-
+</div></section>
+</main>
 <footer>
 <p>Keplaria is a hackathon project. The screening index is a <b>synthetic,
 rights-cleared watchlist</b>; no live sanctions data is indexed. The ERP is a
