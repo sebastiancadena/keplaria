@@ -32,10 +32,16 @@ Python, running on the
 ## Evaluate this in three minutes
 
 1. **Open the [case console](https://keplaria-console-bklu5jcdea-uc.a.run.app)**
-   (no sign-in). Each row is a *payload*: one supplier's case. Open one: the
-   strip at the top shows where it sits in the lifecycle (onboarded → active
-   → renewal requested → held → released), and the status line says what has
-   actually been written to the ERP; for a parked case, nothing yet.
+   (no sign-in). **The fleet is the crew and its rulebook:** three
+   departments, a coordinator that proposes, two specialist agents, and the
+   five ERP commands they may issue. **A payload is one supplier's case**,
+   carried through that fleet for months. The console lists payloads
+   grouped by supplier; the [fleet page](https://keplaria-console-bklu5jcdea-uc.a.run.app/fleet)
+   is the rulebook, with a count of how many cases exercised each rule.
+   Open a case: the strip at the top shows where it sits in the lifecycle
+   (onboarded → active → renewal requested → held → released), and the
+   status line says what has actually been written to the ERP; for a
+   parked case, nothing yet.
 2. **Open [Ground Control](https://keplaria-review-bklu5jcdea-uc.a.run.app/review)**,
    the human decision surface. Sign-in is Google, through Cloud IAP
    (Identity-Aware Proxy: Google's sign-in gate in front of the service);
@@ -55,6 +61,8 @@ reaches the ERP except through a policy-gated command from the outbox,
 safe to retry: a retried command leaves exactly one ERP record. The one
 at-least-once channel is outbound mail, which can repeat a message but
 never a record.
+
+![How the fleet and a payload relate](docs/architecture/orientation.svg)
 
 ## Access for judges and testers
 

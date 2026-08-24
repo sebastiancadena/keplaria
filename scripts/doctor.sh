@@ -81,7 +81,7 @@ LEAK_RE='flight plan|architecture-contracts|risk-register|gates-and-cut|scoring-
 # The generated architecture.svg is excluded because its base64 font payloads
 # false-positive the risk-id pattern; every human-readable string in it comes
 # from docs/architecture/build.py, which IS grepped.
-leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' ':!docs/architecture/judge-diagram.svg' ':!docs/architecture/orientation.svg' ':!console/static/orientation.svg' 2>/dev/null)
+leak_files=$(git grep -lEi -I "$LEAK_RE" -- ':!strategy' ':!scripts/doctor.sh' ':!docs/architecture/architecture.svg' ':!docs/architecture/judge-diagram.svg' ':!docs/architecture/orientation.svg' ':!console/static/orientation.svg' ':!site/dist/orientation.svg' 2>/dev/null)
 [ -z "$leak_files" ] \
   && ok "no private planning vocabulary in the tracked tree" \
   || bad "private planning vocabulary in tracked files: $(echo "$leak_files" | tr '\n' ' ')"
