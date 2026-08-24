@@ -37,7 +37,7 @@ the demonstration video URL and the frozen commit the submission cites.
 | Try it out — case console | <https://keplaria-console-bklu5jcdea-uc.a.run.app> (no sign-in; cases grouped by supplier, and the fleet page for the rulebook with live counts) |
 | Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP; the two organizer accounts are pre-authorized) |
 | Code repository | <https://github.com/sebastiancadena/keplaria> |
-| Demonstration video | TODO — record day 17, add before submitting |
+| Demonstration video | TODO — add before submitting |
 | Architecture diagram | uploaded as a submission image; it is generated from committed sources in the repository, so it cannot drift from the deployed system |
 
 ---
@@ -167,16 +167,11 @@ holds the supplier records and a self-hosted **yente** screening service
 answers the sanctions calls, but every document, supplier, and watchlist
 entity is synthetic and was authored for this project; nothing is customer
 data or a de-identified derivative of it. Case documents are authored
-fixtures stored as the redacted page-text derivative the pipeline is
-contracted to produce, and every field extracted from them must resolve to a
-verbatim span or the case quarantines. The screening index is a synthetic
-watchlist in the FollowTheMoney format; no OpenSanctions content is indexed
-(the publisher confirmed in writing that bulk download would have been
-permitted; indexing the fixture instead is a determinism choice). The ERP is a
-dedicated demonstration site, and every mutation is sandboxed to it.
-Third-party code, assets, and AI assistance are itemised in the repository;
-its README maps each of the track's seven platform subsystems to native use, a
-first-party equivalent, or a deliberate, measured decision not to use it.
+fixtures, and every field extracted from them must resolve to a verbatim span
+or the case quarantines. The screening index is a synthetic watchlist; no
+OpenSanctions content is indexed. The ERP is a dedicated demonstration site,
+and every mutation is sandboxed to it. Third-party code, assets, and AI
+assistance are itemised in the repository.
 
 ## Challenges we ran into
 
@@ -215,7 +210,7 @@ runs **24/24** at a **100%** mean score on a deterministic pass metric: whether
 the enforcement outcome was the required one, not whether a model liked the
 prose. **549 passed** of 550 contract and unit tests, re-executed by the run
 that reports them; the one failure, later traced to a shared test database
-rather than to the product, is disclosed rather than trimmed.
+rather than to the product, is disclosed.
 **Nine contracts**, from replay safety to one ERP write after a retry, are
 re-verified at capture time. Ten consecutive deployed runs, two of them cold starts,
 finished inside the budget before anything was recorded. And a claim ledger
@@ -226,10 +221,10 @@ it, so a number that drifts from its source is reported rather than published.
 reviewer signed in through IAP: the ERP hold was written eleven minutes before
 the rejection that withheld everything else, both timestamps server-side.
 
-**A console a stranger can read in ten seconds.** The case console was graded
-by zero-context readers until one could say, unprompted, what the fleet is,
-what a payload is, and how they relate. The record of those reads is in the
-repository beside the rest of the evidence.
+**A console a stranger can read.** Two readers with no context were given the
+case console's URL and nothing else; both said what the fleet is, what a
+payload is, and how they relate, and both said the page told them in under ten
+seconds. Their verbatim answers are kept in the repository as evidence.
 
 ## What we learned
 
@@ -247,19 +242,13 @@ run locally, where generation is constrained to the schema, scored full marks
 on both. What differed was how the model was served, not how it read. Not
 adopted; measurement published.
 
-**A number you did not re-run is not evidence.** Twice a green result outlived
-the thing it proved. The habit that fixed it, re-executing every proof the
-moment it is cited, cost more than any feature and is the one thing from this
-build we would carry into production first.
-
 ## What's next for Keplaria
 
 Each of these is stated as a limit today, on the surface that would otherwise
 overclaim it.
 
-- **Ingest the supplier's reply.** The renewal request is a real outbound
-  email; the returned certificate currently enters as a published event.
-  Reading it from the mailbox is the first thing to build.
+- **Ingest the supplier's reply from the mailbox.** It is the first thing to
+  build; today the returned certificate enters as a published event.
 - **A real document preprocessor.** Documents are page-text fixtures; the
   PDF, OCR and redaction stage that would produce the same derivative from a
   scan is next.
