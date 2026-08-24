@@ -24,7 +24,8 @@ text{white-space:pre}
 <text x="48" y="251" font-family="JetBrains Mono" font-size="22" font-weight="500" fill="#F8FAFC" text-anchor="start">finance</text>
 <circle cx="262" cy="244" r="7" fill="none" stroke="#F8FAFC" stroke-opacity="0.45"/>
 <circle cx="288" cy="244" r="7" fill="none" stroke="#F8FAFC" stroke-opacity="0.45"/>
-<text x="48" y="300" font-family="Inter" font-size="16" font-weight="400" fill="#64748B" text-anchor="start">finance engages no agents and issues no command</text>
+<text x="48" y="292" font-family="Inter" font-size="16" font-weight="400" fill="#64748B" text-anchor="start">finance engages no agents</text>
+<text x="48" y="312" font-family="Inter" font-size="16" font-weight="400" fill="#64748B" text-anchor="start">and issues no command</text>
 <polyline points="322,198 424,198" fill="none" stroke="#F59E0B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <rect x="440" y="128" width="200" height="44" rx="8" fill="rgba(17,24,39,0.92)" stroke="rgba(100,116,139,0.55)" stroke-width="1"/><text x="540.0" y="157.0" font-family="JetBrains Mono" font-size="20" font-weight="500" fill="#FBBF24" text-anchor="middle">coordinator</text>
 <text x="652" y="158" font-family="Inter" font-size="18" font-weight="400" fill="#64748B" text-anchor="start">proposes a route</text>

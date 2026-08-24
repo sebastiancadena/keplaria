@@ -133,8 +133,10 @@ for i, (name, in_scope) in enumerate(DEPTS):
     S.append(text(48, y + 7, name, 22, MONO, 500, STAR))
     S.append(cell(262, y, in_scope))
     S.append(cell(288, y, in_scope))
-S.append(text(48, 300, "finance engages no agents and issues no command",
-              16, INTER, 400, MUTED))
+# Two lines: on one line this note ran to x~438 and collided with the agents
+# column's note at x=440 (found 2026-08-24).
+S.append(text(48, 292, "finance engages no agents", 16, INTER, 400, MUTED))
+S.append(text(48, 312, "and issues no command", 16, INTER, 400, MUTED))
 
 S.append(edge([(322, 198), (424, 198)]))
 
