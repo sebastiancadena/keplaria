@@ -26,7 +26,7 @@ from app.catalog import (
 from app.state.firestore import get_client
 from console.grouping import group_by_supplier, route_label
 from console.projection import public_case
-from console.store import list_cases, load_case
+from console.store import list_cases, list_inbox_for, load_case, load_inbox
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -43,7 +43,18 @@ def healthz() -> dict:
 @api.get("/", response_class=HTMLResponse)
 def index(request: Request):
     db = get_client()
-    cases = [public_case(case) for case in list_cases(db)]
+    raw_cases = list_cases(db)
+    # event_type lives on each case's inbox subcollection, never on the case
+    # document itself (see console.store.load_inbox), so the list view has
+    # to fetch it separately -- one inbox read per case already on the page,
+    # never an unbounded scan.
+    inbox_by_case = list_inbox_for(
+        db, [c.get("case_id") for c in raw_cases if c.get("case_id")]
+    )
+    cases = [
+        public_case(case, events=inbox_by_case.get(case.get("case_id"), []))
+        for case in raw_cases
+    ]
     # A count alone ("29 case(s)") says nothing a reader can use. Most of
     # these cases are the deployed-state evidence for a gate -- a ten-run
     # streak, a retry drill, a rejection pair -- so the list is legitimately
@@ -160,8 +171,9 @@ def case_detail(case_id: str, request: Request):
             context={"case_id": case_id},
             status_code=404,
         )
+    events = load_inbox(db, case_id)
     return templates.TemplateResponse(
         request=request,
         name="case.html",
-        context={"case": public_case(case, commands)},
+        context={"case": public_case(case, commands, events)},
     )

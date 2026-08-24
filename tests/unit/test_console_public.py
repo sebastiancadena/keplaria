@@ -162,8 +162,8 @@ def test_the_templates_refuse_a_withheld_field_the_view_model_hands_them(
 
     real = public.public_case
 
-    def leaky(case, commands=()):
-        view = real(case, commands)
+    def leaky(case, commands=(), events=()):
+        view = real(case, commands, events)
         view["screening"]["endpoint"] = "http://10.10.0.2:8000"
         view["approval"] = {**(view.get("approval") or {}), "actor": "reviewer@example.com"}
         return view
@@ -326,3 +326,23 @@ def test_the_case_list_defines_the_fleet_before_linking_to_it(client):
     response = client.get("/")
     assert "The fleet is the crew and its rulebook" in response.text
     assert 'src="/static/orientation.svg"' in response.text
+
+
+def test_the_case_list_shows_clock_for_a_cases_latest_claimed_event(
+    db, case_id, client
+):
+    """event_type lives on the inbox subcollection (see claim_event in
+    app/state/firestore.py), never on the case document, so this only
+    passes if the list view actually reads the inbox. The fixture's
+    onboarding routing block (evidence + compliance, still on the case
+    document) must not leak into the Route column once a later clock event
+    (renewal_due) has been claimed -- that routing is not what the clock
+    event did."""
+    _park_a_real_case(db, case_id)
+    claim_event(db, case_id, "EVT-2", {
+        "event_type": "renewal_due", "supplier": "Andes Foods",
+    })
+    response = client.get("/")
+    row = response.text.split(case_id, 1)[1].split("</tr>", 1)[0]
+    assert ">clock<" in row
+    assert "lit--agent" not in row

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from google.cloud import firestore
 
-from app.state.firestore import CASES, OUTBOX
+from app.state.firestore import CASES, INBOX, OUTBOX
 
 
 def case_id_is_addressable(case_id: str) -> bool:
@@ -53,6 +53,28 @@ def load_case(db: firestore.Client, case_id: str) -> tuple[dict | None, list[dic
     ]
     commands.sort(key=lambda c: (c.get("cycle") or 0, c.get("action") or ""))
     return snap.to_dict() or {}, commands
+
+
+def load_inbox(db: firestore.Client, case_id: str) -> list[dict]:
+    """Every event this case has claimed, from its inbox subcollection.
+    claim_event writes event_type and case_version here, never onto the
+    case document, so this is the only place a case's event types live."""
+    if not case_id_is_addressable(case_id):
+        return []
+    return [
+        snap.to_dict() or {}
+        for snap in db.collection(CASES).document(case_id).collection(INBOX).stream()
+    ]
+
+
+def list_inbox_for(db: firestore.Client, case_ids: list[str]) -> dict[str, list[dict]]:
+    """Inbox rows for several cases at once, keyed by case_id.
+
+    One `load_inbox` call per id -- there is no collection-group shortcut
+    that stays scoped to exactly this set of cases -- bounded by whatever
+    list already produced `case_ids` (list_cases' own `limit`).
+    """
+    return {case_id: load_inbox(db, case_id) for case_id in case_ids}
 
 
 def list_cases(db: firestore.Client, limit: int = 50) -> list[dict]:

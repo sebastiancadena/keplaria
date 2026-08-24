@@ -38,11 +38,18 @@ def group_by_supplier(cases: list[dict]) -> list[dict]:
 
 
 def route_label(case: dict) -> dict:
-    """What the Route column shows: the engaged agents, or that a clock
-    event engaged none, or nothing at all when the case has no routing."""
+    """What the Route column shows: the engaged agents, or that the case's
+    latest claimed event is a clock event, or nothing at all.
+
+    The clock check comes first and short-circuits the routing block: when
+    the latest event is a clock event, `routing` on the document may still
+    be a stale block left over from an earlier (non-clock) event, and that
+    stale route is not what the latest event did. Only when the latest
+    event is not a clock event do the routing block's agents apply.
+    """
+    if case.get("event_type") in CLOCK_EVENTS:
+        return {"agents": [], "clock": True}
     routing = case.get("routing")
     if not routing:
         return {"agents": [], "clock": False}
-    agents = list(routing.get("route") or [])
-    clock = not agents and (case.get("event_type") in CLOCK_EVENTS)
-    return {"agents": agents, "clock": clock}
+    return {"agents": list(routing.get("route") or []), "clock": False}

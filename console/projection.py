@@ -178,7 +178,24 @@ def _cited_candidate_ids(policy: dict, candidates: list[dict]) -> list[str]:
     ]
 
 
-def public_case(case: dict, commands: Iterable[dict] = ()) -> dict:
+def _latest_event_type(events: list[dict]) -> str | None:
+    """The event_type of the inbox row with the highest case_version.
+
+    claim_event writes event_type and case_version onto an inbox document
+    (`cases/{case_id}/inbox/{event_id}`), never onto the case document
+    itself -- so `case.get("event_type")` is always None against a real
+    case, and the inbox is the only place this fact lives. None when the
+    case has claimed no events yet.
+    """
+    if not events:
+        return None
+    latest = max(events, key=lambda e: e.get("case_version") or 0)
+    return latest.get("event_type")
+
+
+def public_case(
+    case: dict, commands: Iterable[dict] = (), events: Iterable[dict] = ()
+) -> dict:
     """Project a raw case document to the public view model."""
     effective, gate, approval_id = effective_band(case)
     # Materialised once: `commands` is an Iterable and the status derivation
@@ -186,6 +203,7 @@ def public_case(case: dict, commands: Iterable[dict] = ()) -> dict:
     # second reader with nothing, and the page would silently show no
     # commands on exactly the cases that have them.
     commands = list(commands)
+    events = list(events)
     screening = case.get("screening") or {}
     injection = case.get("injection") or {}
     policy = case.get("policy") or {}
@@ -198,10 +216,12 @@ def public_case(case: dict, commands: Iterable[dict] = ()) -> dict:
         "cited_candidate_ids": _cited_candidate_ids(policy, _candidates(screening)),
         "case_version": case.get("case_version"),
         "phase": case.get("phase"),
-        # Two plain fields the list needs: the event type decides whether an
-        # empty route is a clock event, and updated_at picks the supplier
-        # heading's current stop. Neither is rendered raw on the detail page.
-        "event_type": case.get("event_type"),
+        # The event type decides whether an empty route is a clock event,
+        # and updated_at picks the supplier heading's current stop. Neither
+        # is rendered raw on the detail page. event_type is read from the
+        # inbox, not the case document -- see _latest_event_type.
+        "event_type": _latest_event_type(events),
+        "event_types": sorted({e.get("event_type") for e in events if e.get("event_type")}),
         "updated_at": case.get("updated_at"),
         "supplier": case.get("supplier"),
         "routing": _routing(case.get("routing")),

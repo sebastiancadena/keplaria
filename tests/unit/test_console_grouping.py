@@ -45,6 +45,10 @@ def test_a_case_without_a_supplier_still_groups():
 def test_route_label_distinguishes_agents_clock_and_absent():
     assert route_label(_case("A", "s", "active", "", route=["evidence", "compliance"])) == {
         "agents": ["evidence", "compliance"], "clock": False}
-    assert route_label(_case("B", "s", "active", "", route=[], event="renewal_due")) == {
-        "agents": [], "clock": True}
+    # A stale routing block (non-empty route, left over from an earlier
+    # onboarding event) must not leak agents when the LATEST claimed event
+    # is a clock event -- that routing block is not what the clock event did.
+    assert route_label(_case(
+        "B", "s", "active", "", route=["evidence", "compliance"], event="renewal_due"
+    )) == {"agents": [], "clock": True}
     assert route_label(_case("C", "s", "active", "")) == {"agents": [], "clock": False}
