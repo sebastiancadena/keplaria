@@ -245,6 +245,19 @@ prepended certificate prose, and dies at 108. It was turned down on that
 evidence and the measurement is published alongside the decision. One of its
 filters did work well, and that one remains a candidate.
 
+**A model can read a document perfectly and still be unusable.** An
+open-weights Gemma 4 was evaluated for the extraction step, which requires
+every value to arrive with the verbatim span of page text supporting it, in a
+fixed structure a deterministic validator checks before anything is believed.
+Served through Vertex AI it read **6 of 6** test documents correctly, including
+the one with no expiry date to find and the one carrying a planted instruction
+beside a decoy date, and it returned the required structure on **0 of 6**, in
+three different shapes across otherwise identical calls. The same weights run
+locally, where the runtime constrains generation to that structure, scored full
+marks on both columns. What differed was how the model was served, not how it
+read. It was not adopted, and the measurement is published alongside the
+decision.
+
 **Evidence rots quietly.** A committed evaluation score outlived the behaviour
 it graded by two days without anything looking wrong, and a routine cleanup once
 deleted the live records that were the only proof of a contract about deployed

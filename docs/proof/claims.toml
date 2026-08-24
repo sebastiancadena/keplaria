@@ -245,3 +245,38 @@ reason = """published and historical, and deliberately rounded. It describes \
 the effect of the generation pin measured on that day, not the current run \
 time, which has since moved. Do not reconcile it against today's number."""
 appears_in = ["docs/build-piece/article.dev.md"]
+
+[[claim]]
+id = "gemma_content_correct"
+claim = "Documents an open-weights Gemma read correctly, served by Vertex AI"
+evidence = "spikes/gemma_extraction/evidence.json"
+path = "cells.gemma-4-26b-a4b-it-maas::as_shipped.useful_after_normalisation"
+render = "{} of 6"
+appears_in = ["README.md", "docs/submission/devpost.md"]
+qualifier = "paired with gemma_format_conformant and never quotable without it: this number is the content the model read, after key renaming, and says nothing about whether it returned the required structure"
+
+[[claim]]
+id = "gemma_format_conformant"
+claim = "The same documents on which that model returned the required output format"
+evidence = "spikes/gemma_extraction/evidence.json"
+path = "cells.gemma-4-26b-a4b-it-maas::as_shipped.schema_conformant"
+render = "{} of 6"
+appears_in = ["README.md", "docs/submission/devpost.md"]
+qualifier = "paired with gemma_content_correct and never quotable without it: alone it reads as a model that could not extract, which the measurement disproves"
+
+[[claim]]
+id = "gemma_local_format_conformant"
+claim = "The same Gemma weights run locally, where the runtime constrains generation to the required structure"
+evidence = "spikes/gemma_extraction/evidence.json"
+path = "cells.gemma4:31b::as_shipped.schema_conformant"
+render = "{} of 6"
+appears_in = ["README.md"]
+qualifier = "author workstation, not Google Cloud; carries no deployment claim"
+
+[[claim]]
+id = "gemma_served_median_seconds"
+claim = "Median time for one served-Gemma extraction, against the deployed step's own median"
+evidence = "spikes/gemma_extraction/evidence.json"
+path = "cells.gemma-4-26b-a4b-it-maas::as_shipped.seconds_median"
+render = "{:.1f} s"
+appears_in = ["README.md"]

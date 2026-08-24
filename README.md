@@ -131,6 +131,47 @@ measured and turned down.
 | **Agent Gateway** | Not used | Ingress is an authenticated Pub/Sub push adapter on Cloud Run that refuses anonymous callers, and the human decision surface sits behind IAP. Nothing in the design needed a gateway in front of that. |
 | **Agent Observability** | Native | Cloud Trace and Cloud Logging. Traces are load-bearing rather than decorative: a 10.6 s rise in run time was diagnosed node-by-node against them and traced to model reasoning length, not to code. |
 
+### An open-weights model, measured and not adopted
+
+A second Google model was evaluated for the extraction step and turned down on
+the evidence, the same way Model Armor was above. The result is worth stating
+precisely, because its two halves point opposite ways: **Gemma 4 read every
+test document correctly, and would not return the format the extraction step
+requires.**
+
+Extraction here is not free text. The agent must return each value together
+with the verbatim span of page text it came from, in a fixed structure a
+deterministic validator checks before anything is believed. Served through
+Vertex AI, Gemma 4 got the content right on all six test documents: company
+names, identifiers, expiry dates and their supporting spans, including the
+document that carries no expiry at all, where the correct answer is to return
+none, and the one carrying a planted instruction beside a decoy far-future
+date, where it took the real date. It returned the required structure on none
+of them, in three different shapes across otherwise identical calls: the right
+values under the wrong key names, the list of fields rewritten as an object,
+and a response with no field list at all.
+
+| Measured over six documents | Read the values correctly | Returned the required format | Median |
+|---|---|---|---|
+| `gemini-3.6-flash`, the model in use | 6 of 6 | 6 of 6 | 2.3 s |
+| Gemma 4 26B, served by Vertex AI | 6 of 6 | 0 of 6 | 8.8 s |
+| The same Gemma weights, run locally | 6 of 6 | 6 of 6 | 91.4 s |
+
+The third row is the finding. Identical weights score full marks on both
+columns when the local runtime constrains generation to the required
+structure, and lose the format column entirely when served without that
+constraint. What differs is how the model is served, not how it reads.
+
+Not adopted, for two reasons. Every agent in this system returns a fixed
+structure, so a model whose output shape varies between identical calls would
+need a repair layer in production code existing only to correct it. And at
+roughly nine seconds against the current step's two, it spends a budget the
+whole run has to finish inside. The local column is a workstation result and
+carries no deployment claim: at ninety seconds a document it could not serve
+this system either. Full measurement, including every raw response and each
+repair the comparison applied before grading:
+[`spikes/gemma_extraction/evidence.json`](spikes/gemma_extraction/evidence.json).
+
 ## Architecture
 
 ![Keplaria system architecture](docs/architecture/architecture.svg)

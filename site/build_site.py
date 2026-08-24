@@ -65,6 +65,11 @@ GROUPS = (
      "claim anywhere else yet.",
      ("gross_cost_month_to_date", "credit_remaining",
       "yente_uptime_hours_per_day")),
+    ("A second Google model, measured against this project&rsquo;s own "
+     "documents. Reading them correctly was not enough to adopt it, so both "
+     "halves of that result are published together.",
+     ("gemma_content_correct", "gemma_format_conformant",
+      "gemma_local_format_conformant", "gemma_served_median_seconds")),
     ("Statements a human read and confirmed by hand, because no automatic "
      "check can settle them.",
      ("hold_before_decision", "eval_suite_at_the_time_of_the_pin",
