@@ -683,6 +683,38 @@ started, and every route worked except `/fleet`, which returned 503 because a
 data directory was missing from the image — see "Runtime data directories"
 below. Nothing before step 4 would have shown it.
 
+### The frozen state, and what a redeploy does to it
+
+`spikes/freeze/evidence.json` names the one commit the submission cites and
+ties every deployed container to it **by content**: nothing in the deploy
+path records a SHA (Cloud Build is handed a tarball of the working tree), so
+`spikes/freeze/capture.py` pulls each Cloud Run image through the registry
+API and diffs the `COPY`d files against `git ls-tree` at that commit. The
+engine image lives in a tenant-project registry that refuses pulls, so the
+engine is checked by static import closure from `app.agent` and `git log`
+since its `updateTime`. See `spikes/freeze/README.md`.
+
+Consequences for anyone deploying:
+
+- `scripts/doctor.sh` FAILS when the verdict is not `PASS`, and when HEAD has
+  moved past the captured commit in a deployable path (`app`, `console`,
+  `ingress`, `catalog`, `fixtures`, `policy`, `constraints.txt`,
+  `pyproject.toml`, `uv.lock`). Copy-only commits WARN.
+- After any deployable change: redeploy what carries it, re-run the ten-run
+  streak if the engine or ingress moved, then re-capture:
+
+  ```bash
+  uv run --env-file .env --env-file .env.secrets \
+      python spikes/freeze/capture.py --expect "$(git rev-parse --short HEAD)"
+  ```
+
+  Emulator on 8451; about five minutes; it drives one live lifecycle run,
+  the domain evals and the test suite, and rewrites the evidence.
+- Never write a "frozen commit" into STATUS or the submission by hand. Read
+  it off the evidence file. The first hand-declared one was six commits stale
+  before anyone checked, and the deployed ingress had never been rebuilt
+  after the container pin.
+
 ### Runtime data directories must be copied explicitly
 
 Three directories live **outside** `app/` and are read at runtime:
