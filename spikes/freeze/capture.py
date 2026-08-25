@@ -367,9 +367,20 @@ def main() -> int:
     billing = billing_section()
     log(f"billing: {billing.get("n_rows")} rows, {billing.get('first_usage')} → {billing.get('last_usage')}")
     skipped = {"ok": None, "problems": ["not run (--skip)"]}
-    trace = skipped if args.skip_trace else trace_section(token)
-    tests = skipped if args.skip_tests else test_section()
-    metric = skipped if args.skip_evals else metric_section(engine.get("update_time"))
+
+    def guarded(name, fn):
+        # A section that crashes must record the crash, not throw away the
+        # sections already run (the first full run lost a live lifecycle
+        # drive to a parse error in the section after it).
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001
+            log(f"{name}: crashed — {type(exc).__name__}: {exc}")
+            return {"ok": False, "problems": [f"section crashed: {type(exc).__name__}: {exc}"]}
+
+    trace = skipped if args.skip_trace else guarded("trace", lambda: trace_section(token))
+    tests = skipped if args.skip_tests else guarded("test", test_section)
+    metric = skipped if args.skip_evals else guarded("metric", lambda: metric_section(engine.get("update_time")))
 
     sections = {"commit": commit, "deployment": {"cloud_run": services, "engine": engine},
                 "catalog": catalog, "trace": trace, "test": tests, "metric": metric, "billing": billing}

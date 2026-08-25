@@ -13,7 +13,8 @@ import re
 from pathlib import Path
 
 _COPY = re.compile(r"^\s*COPY\s+(?!--from)(\S+)\s+(\S+)\s*$", re.MULTILINE)
-_SUMMARY = re.compile(r"^=+ (.+?) in [\d.]+s.*=+$", re.MULTILINE)
+# With -q the final line has no === bars: "627 passed, 15 deselected in 20.43s".
+_SUMMARY = re.compile(r"^(?:=+ )?(\d+ \w+(?:, \d+ \w+)*) in [\d.]+s", re.MULTILINE)
 
 
 def copied_paths(dockerfile: str) -> list[tuple[str, str]]:
@@ -138,7 +139,7 @@ def import_closure(root: Path, entry: str) -> set[str]:
 
 
 def parse_pytest_summary(output: str) -> dict[str, int]:
-    """Counts from pytest's final `=== N passed, M deselected in Ts ===` line."""
+    """Counts from pytest's final `N passed, M deselected in Ts` line (bars or not)."""
     counts = {"passed": 0, "failed": 0, "deselected": 0, "errors": 0}
     match = _SUMMARY.findall(output)
     if not match:

@@ -118,6 +118,7 @@ def test_layer_overlay_last_layer_wins_and_whiteouts_delete():
     [
         ("=== 412 passed, 31 deselected in 14.02s ===", {"passed": 412, "failed": 0, "deselected": 31, "errors": 0}),
         ("== 3 failed, 400 passed, 2 errors in 9s ==", {"passed": 400, "failed": 3, "deselected": 0, "errors": 2}),
+        ("627 passed, 15 deselected, 6 warnings in 20.43s", {"passed": 627, "failed": 0, "deselected": 15, "errors": 0}),
     ],
 )
 def test_pytest_summary_is_parsed(summary, expected):
