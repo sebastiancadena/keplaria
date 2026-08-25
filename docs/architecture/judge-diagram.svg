@@ -32,16 +32,20 @@ text{white-space:pre}
 <text x="764" y="398" font-family="Space Grotesk" font-size="48" font-weight="600" fill="#F8FAFC" text-anchor="start">Policy Gate</text>
 <text x="764" y="448" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">approve · park · refuse</text>
 <rect x="764" y="480" width="200" height="48" rx="8" fill="rgba(17,24,39,0.92)" stroke="rgba(100,116,139,0.55)" stroke-width="1"/><text x="864.0" y="513.8" font-family="JetBrains Mono" font-size="28" font-weight="500" fill="#F8FAFC" text-anchor="middle">fleet.v1</text>
-<rect x="1160" y="340" width="270" height="200" rx="12" fill="rgba(248,250,252,0.030)" stroke="rgba(100,116,139,0.32)" stroke-width="1.5"/>
+<rect x="1160" y="340" width="270" height="280" rx="12" fill="rgba(248,250,252,0.030)" stroke="rgba(100,116,139,0.32)" stroke-width="1.5"/>
 <text x="1184" y="402" font-family="Space Grotesk" font-size="40" font-weight="600" fill="#F8FAFC" text-anchor="start">Specialists</text>
 <rect x="1184" y="424" width="222" height="48" rx="8" fill="rgba(17,24,39,0.92)" stroke="rgba(100,116,139,0.55)" stroke-width="1"/><text x="1295.0" y="457.8" font-family="Inter" font-size="28" font-weight="500" fill="#F8FAFC" text-anchor="middle">evidence</text>
 <rect x="1184" y="480" width="222" height="48" rx="8" fill="rgba(17,24,39,0.92)" stroke="rgba(100,116,139,0.55)" stroke-width="1"/><text x="1295.0" y="513.8" font-family="Inter" font-size="28" font-weight="500" fill="#F8FAFC" text-anchor="middle">compliance</text>
+<text x="1184" y="566" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">no ERP credential</text>
+<text x="1184" y="600" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">no write tools</text>
 <rect x="1060" y="740" width="380" height="180" rx="12" fill="rgba(248,250,252,0.030)" stroke="rgba(100,116,139,0.32)" stroke-width="1.5"/>
 <text x="1090" y="812" font-family="Space Grotesk" font-size="40" font-weight="600" fill="#F8FAFC" text-anchor="start">Ground Control</text>
-<text x="1090" y="860" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">human approval</text>
-<rect x="1490" y="340" width="220" height="200" rx="14" fill="rgba(248,250,252,0.030)" stroke="rgba(100,116,139,0.55)" stroke-width="2"/>
+<text x="1090" y="860" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">human approval · Cloud IAP</text>
+<rect x="1490" y="340" width="240" height="250" rx="14" fill="rgba(248,250,252,0.030)" stroke="rgba(100,116,139,0.55)" stroke-width="2"/>
 <text x="1515" y="412" font-family="Space Grotesk" font-size="40" font-weight="600" fill="#F8FAFC" text-anchor="start">Outbox</text>
 <rect x="1515" y="444" width="170" height="48" rx="8" fill="rgba(17,24,39,0.92)" stroke="rgba(100,116,139,0.55)" stroke-width="1"/><text x="1600.0" y="477.8" font-family="JetBrains Mono" font-size="28" font-weight="500" fill="#F8FAFC" text-anchor="middle">executor</text>
+<text x="1515" y="530" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">scoped ERP role</text>
+<text x="1515" y="564" font-family="Inter" font-size="28" font-weight="400" fill="#64748B" text-anchor="start">sole write path</text>
 <rect x="1790" y="360" width="105" height="160" rx="12" fill="#111827" stroke="rgba(100,116,139,0.55)" stroke-width="2"/>
 <text x="1842" y="454" font-family="Space Grotesk" font-size="40" font-weight="600" fill="#F8FAFC" text-anchor="middle">ERP</text>
 <polyline points="300,440 352,440" fill="none" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-amber)"/>
@@ -50,7 +54,7 @@ text{white-space:pre}
 <polyline points="1430,440 1482,440" fill="none" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-amber)"/>
 <polyline points="1000,560 1000,800 1052,800" fill="none" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="12 10" marker-end="url(#arrow-amber)"/>
 <text x="1022" y="690" font-family="Inter" font-size="28" font-weight="500" fill="#FBBF24" text-anchor="start">parked</text>
-<polyline points="1440,830 1600,830 1600,548" fill="none" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-amber)"/>
-<text x="1615" y="700" font-family="Inter" font-size="28" font-weight="500" fill="#FBBF24" text-anchor="start">released</text>
-<polyline points="1710,440 1782,440" fill="none" stroke="#F59E0B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-exit)"/>
+<polyline points="1440,830 1600,830 1600,598" fill="none" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-amber)"/>
+<text x="1615" y="720" font-family="Inter" font-size="28" font-weight="500" fill="#FBBF24" text-anchor="start">released</text>
+<polyline points="1730,440 1782,440" fill="none" stroke="#F59E0B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-exit)"/>
 </svg>

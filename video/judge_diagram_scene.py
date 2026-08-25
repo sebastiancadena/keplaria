@@ -62,10 +62,11 @@ def node(title, subtitle=None, lines=(), chips=(), door=False, solid=False):
                         weight="SEMIBOLD"))
     if subtitle:
         stack.add(Text(subtitle, font=INTER, font_size=BODY, color=MUTED))
-    for line in lines:
-        stack.add(Text(line, font=INTER, font_size=BODY, color=MUTED))
     for c in chips:
         stack.add(c)
+    # Captions sit under the chips, as they do in the SVG the doctor checks.
+    for line in lines:
+        stack.add(Text(line, font=INTER, font_size=BODY, color=MUTED))
     stack.arrange(DOWN, buff=GAP, aligned_edge=stack[0].get_left() * 0)
 
     box = RoundedRectangle(
@@ -92,10 +93,12 @@ class JudgeDiagram(Scene):
         coord = node("Coordinator", subtitle="proposes, never acts")
         gate = node("Policy Gate", subtitle="approve · park · refuse",
                     chips=(chip("fleet.v1"),), door=True)
-        spec = node("Specialists", chips=(chip("evidence"), chip("compliance")))
-        outbox = node("Outbox", chips=(chip("executor"),), door=True)
+        spec = node("Specialists", chips=(chip("evidence"), chip("compliance")),
+                    lines=("no ERP credential", "no write tools"))
+        outbox = node("Outbox", chips=(chip("executor"),), door=True,
+                      lines=("scoped ERP role", "sole write path"))
         erp = node("ERP", solid=True)
-        gc = node("Ground Control", subtitle="human approval")
+        gc = node("Ground Control", subtitle="human approval · Cloud IAP")
 
         row = VGroup(triggers, coord, gate, spec, outbox, erp)
         row.arrange(RIGHT, buff=0.62)

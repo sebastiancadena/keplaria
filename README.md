@@ -117,8 +117,50 @@ outlive the behaviour behind it.
 | Criterion | What it asks | Proof in this repo |
 |---|---|---|
 | **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? Was it built for an "Unlikely Hero" outside of standard corporate roles? | The lifecycle closes: onboarded → active → renewal requested → held → released, over two suppliers and 380 simulated business days (about a year and a half), in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. The overlooked party is the supplier side of the relationship (often a small business with no compliance department), and the system deliberately asks nothing of them: no portal, no login, no account, no training. The renewal request is a real outbound email; in this prototype the returned certificate enters as a published event, and ingesting the email reply itself is design intent, stated as such wherever the claim appears. |
-| **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure (an extracted value with no supporting source span), injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite (24/24 graded domain cases passing). A schema-valid but source-unsupported worker (specialist agent) value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
+| **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? (The security boundary is summarised in [Security model, in six claims](#security-model-in-six-claims).) How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure (an extracted value with no supporting source span), injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite (24/24 graded domain cases passing). A schema-valid but source-unsupported worker (specialist agent) value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
 | **Demo & Production Readiness** (30%) | Does the video define the friction and architecture, show an unedited live execution, and are setup, diagram, deployment and proof reproducible? | The console URL above is live. The run in `spikes/judge_run/` is a real deployment, re-run on the engine currently serving. `bash scripts/doctor.sh` checks deployment and configuration preconditions read-only and prints its own pass/fail summary; the architecture diagram is generated from committed sources, not drawn; setup is [below](#setup-from-a-fresh-clone). |
+
+## Security model, in six claims
+
+Each claim below is proven somewhere else in this repository; this list exists
+so a reader who watched the video can find the proof without reading five
+sections. Nothing here is a second copy: follow the link.
+
+1. **No agent holds a credential or a write tool.** The evidence and
+   compliance agents carry no operational tools, and a clock event never
+   reaches an LLM agent (`forbidden_agent_tool_edges` in
+   [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json)).
+2. **One executor, one scoped ERP identity, read back off the live site.** The
+   deployed services run as `keplaria-executor`, a purpose-made ERP user with
+   one role: it cannot delete, cannot widen its own permissions, and cannot
+   reach a financial document. Measured every run, not described
+   ([`spikes/frappe_scoped_executor/evidence.json`](spikes/frappe_scoped_executor/evidence.json);
+   the two identities are explained under [ERPNext](#erpnext-frappe-cloud)).
+3. **A tainted document never reaches an agent.** A deterministic scan runs
+   before any agent reads the pages; a tainted page is withheld from
+   agent-resolvable state and `DOCUMENT_INJECTION` forces the gate to blocked.
+   The scan is a heuristic over the planted fixture, not a general defence,
+   and the README says so under [Event flow](#event-flow) ("Document
+   injection gate").
+4. **The reviewer's identity is verified, not asserted.** The review console
+   sits behind Cloud IAP and `console/iap.py` verifies the signed assertion
+   against Google's certificates and the configured audience; a forwarded
+   header is never trusted ([Identity is verified, not
+   asserted](#identity-is-verified-not-asserted)).
+5. **Secrets come from Secret Manager, per service identity, and the engine
+   has no internet path.** The mission graph reaches the screening service
+   over Private Service Connect only; anything that must call the public
+   internet runs on Cloud Run ([Platform subsystem
+   coverage](#platform-subsystem-coverage), "Agent Identity").
+6. **Failure becomes durable state, never a silent exception.** A failed ERP
+   command stays in the outbox with its attempt count; the unattended sweep
+   re-drives it once the destination is repaired, and the retried write is
+   singular (`one_erp_write_after_retry`, proven against a live command). A
+   value with no supporting source span is rejected, retried within bounds,
+   and parked for a human with zero ERP writes (`provenance_failure`).
+
+Model Armor was measured against this corpus and not adopted; the numbers are
+in the coverage table below.
 
 ## Platform subsystem coverage
 

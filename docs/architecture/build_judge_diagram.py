@@ -170,18 +170,25 @@ S.append(text(764, 398, "Policy Gate", 48, SG, 600, STAR))
 S.append(text(764, 448, "approve · park · refuse", 28, INTER, 400, MUTED))
 S.append(chip(764, 480, 200, 48, "fleet.v1", MONO))
 
-S.append(rrect(1160, 340, 270, 200))
+# The security boundary is drawn where the narration speaks it (beat 3):
+# the specialists carry no credential, the executor is the one scoped
+# identity and the sole write path, and Ground Control sits behind IAP.
+S.append(rrect(1160, 340, 270, 280))
 S.append(text(1184, 402, "Specialists", 40, SG, 600, STAR))
 S.append(chip(1184, 424, 222, 48, "evidence"))
 S.append(chip(1184, 480, 222, 48, "compliance"))
+S.append(text(1184, 566, "no ERP credential", 28, INTER, 400, MUTED))
+S.append(text(1184, 600, "no write tools", 28, INTER, 400, MUTED))
 
 S.append(rrect(1060, 740, 380, 180))
 S.append(text(1090, 812, "Ground Control", 40, SG, 600, STAR))
-S.append(text(1090, 860, "human approval", 28, INTER, 400, MUTED))
+S.append(text(1090, 860, "human approval · Cloud IAP", 28, INTER, 400, MUTED))
 
-S.append(rrect(1490, 340, 220, 200, 14, PANEL_FILL, DOOR_STROKE, 2))
+S.append(rrect(1490, 340, 240, 250, 14, PANEL_FILL, DOOR_STROKE, 2))
 S.append(text(1515, 412, "Outbox", 40, SG, 600, STAR))
 S.append(chip(1515, 444, 170, 48, "executor", MONO))
+S.append(text(1515, 530, "scoped ERP role", 28, INTER, 400, MUTED))
+S.append(text(1515, 564, "sole write path", 28, INTER, 400, MUTED))
 
 S.append(rrect(1790, 360, 105, 160, 12, INK, CHIP_STROKE, 2))
 S.append(text(1842, 454, "ERP", 40, SG, 600, STAR, "middle"))
@@ -194,9 +201,9 @@ S.append(edge([(1102, 440), (1152, 440)]))
 S.append(edge([(1430, 440), (1482, 440)]))
 S.append(edge([(1000, 560), (1000, 800), (1052, 800)], dash="12 10"))
 S.append(text(1022, 690, "parked", 28, INTER, 500, AMBER_BRIGHT))
-S.append(edge([(1440, 830), (1600, 830), (1600, 548)]))
-S.append(text(1615, 700, "released", 28, INTER, 500, AMBER_BRIGHT))
-S.append(edge([(1710, 440), (1782, 440)], sw=6, marker="exit"))
+S.append(edge([(1440, 830), (1600, 830), (1600, 598)]))
+S.append(text(1615, 720, "released", 28, INTER, 500, AMBER_BRIGHT))
+S.append(edge([(1730, 440), (1782, 440)], sw=6, marker="exit"))
 
 S.append("</svg>")
 OUT.write_text("\n".join(S))
