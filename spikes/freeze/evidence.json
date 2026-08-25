@@ -1,0 +1,184 @@
+{
+  "captured_at": "2026-08-25T01:04:06.853126+00:00",
+  "what_this_is": "The frozen-artifact set the submission cites: deployment, catalog, trace, test, metric and billing artifacts, each discovered live and tied to the one commit in `commit`.",
+  "verdict": "PASS",
+  "problems": {},
+  "commit": {
+    "sha": "f972ce6a6b6c6680d50ee76ff4a5a3f2b9250a77",
+    "short": "f972ce6",
+    "subject": "fix(spike): parse pytest's bar-less -q summary and record a crashed capture section",
+    "committed_at": "2026-08-24T20:04:06-05:00",
+    "expected": "f972ce6",
+    "clean": true,
+    "ok": true,
+    "problems": []
+  },
+  "deployment": {
+    "cloud_run": {
+      "keplaria-console": {
+        "revision": "keplaria-console-00022-bhn",
+        "deployed_at": "2026-08-24T23:27:26.811125Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:f55e35e040d0bcde8047aa5430759597f1ec173286fa4752e267271898d9a940",
+        "url": "https://keplaria-console-bklu5jcdea-uc.a.run.app",
+        "dockerfile": "console/Dockerfile",
+        "files_compared": 80,
+        "mismatched": [],
+        "absent_from_image": [],
+        "extra_in_image": [],
+        "ok": true
+      },
+      "keplaria-review": {
+        "revision": "keplaria-review-00022-44l",
+        "deployed_at": "2026-08-24T23:28:05.897856Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:f55e35e040d0bcde8047aa5430759597f1ec173286fa4752e267271898d9a940",
+        "url": "https://keplaria-review-bklu5jcdea-uc.a.run.app",
+        "dockerfile": "console/Dockerfile",
+        "files_compared": 80,
+        "mismatched": [],
+        "absent_from_image": [],
+        "extra_in_image": [],
+        "ok": true
+      },
+      "keplaria-ingress": {
+        "revision": "keplaria-ingress-00013-kwz",
+        "deployed_at": "2026-08-24T23:59:37.594302Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/ingress@sha256:e2bdbe61300361a30970d7f96eff6026ef7becf44f6681e232f8f8b4a00c9217",
+        "url": "https://keplaria-ingress-bklu5jcdea-uc.a.run.app",
+        "dockerfile": "ingress/Dockerfile",
+        "files_compared": 45,
+        "mismatched": [],
+        "absent_from_image": [],
+        "extra_in_image": [],
+        "ok": true
+      }
+    },
+    "engine": {
+      "resource": "projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416",
+      "update_time": "2026-08-25T00:03:52.179574Z",
+      "min_instances": 1,
+      "max_instances": 10,
+      "image_pullable": false,
+      "how_verified": "The engine image is pushed to a tenant-project registry that refuses pulls, so its content cannot be compared. Instead: every commit after update_time that touched a file the graph imports (static closure from app.agent) or a data directory it reads is listed as drift.",
+      "graph_closure_files": 14,
+      "watched_paths": [
+        "app/__init__.py",
+        "app/agent.py",
+        "app/catalog.py",
+        "app/documents.py",
+        "app/grounding.py",
+        "app/injection.py",
+        "app/lifecycle.py",
+        "app/nodes.py",
+        "app/policy.py",
+        "app/risk.py",
+        "app/schemas.py",
+        "app/state/__init__.py",
+        "app/state/commands.py",
+        "app/state/firestore.py",
+        "policy",
+        "catalog",
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "commits_touching_graph_since_deploy": [],
+      "ok": true
+    }
+  },
+  "catalog": {
+    "entries": 2,
+    "entry": {
+      "name": "projects/keplaria/locations/us-central1/agents/agentregistry-00000000-0000-0000-5cba-57a8c927c466",
+      "displayName": "keplaria",
+      "agentId": "urn:agent:projects-584548214478:projects:584548214478:locations:us-central1:aiplatform:reasoningEngines:2127503872455868416",
+      "updateTime": "2026-08-25T00:01:13.040031Z",
+      "createTime": "2026-08-13T17:40:32.309620Z"
+    },
+    "ok": true,
+    "problems": []
+  },
+  "trace": {
+    "driver": "spikes/lifecycle/harness.py",
+    "window": {
+      "start": "2026-08-25T01:04:51.043154Z",
+      "end": "2026-08-25T01:05:46.185390Z"
+    },
+    "lifecycle_result": "PASS",
+    "case_id": "DEMO-27c56608",
+    "traces": [
+      {
+        "trace_id": "15aebdde16b77e9600ad8f499b05215b",
+        "root": "invoke_workflow keplaria_workflow",
+        "start": "2026-08-25T01:05:28.581400072Z"
+      },
+      {
+        "trace_id": "283f9faa63c46346ca9f816155f81bc9",
+        "root": "/pubsub/push",
+        "start": "2026-08-25T01:04:58.930691Z"
+      },
+      {
+        "trace_id": "2e84baeac056570526aecd831321ca82",
+        "root": "invoke_workflow keplaria_workflow",
+        "start": "2026-08-25T01:05:21.140190718Z"
+      },
+      {
+        "trace_id": "37f66d59f0f88a6d6e3e4ced6a93644b",
+        "root": "invoke_workflow keplaria_workflow",
+        "start": "2026-08-25T01:05:13.416937171Z"
+      }
+    ],
+    "ok": true,
+    "problems": []
+  },
+  "test": {
+    "command": "uv run pytest -q  (addopts: -m 'not live')",
+    "passed": 628,
+    "failed": 0,
+    "deselected": 15,
+    "errors": 0,
+    "live_marked_not_run": 15,
+    "firestore": "emulator",
+    "ok": true,
+    "problems": []
+  },
+  "metric": {
+    "domain_evals": {
+      "command": "bash tests/eval/run_domain_evals.sh",
+      "graded_at": "2026-08-25T01:09:05.733353Z",
+      "cases": 24,
+      "errors": 0,
+      "mean_score": 1.0,
+      "floor": 0.9
+    },
+    "run_streak": {
+      "evidence": "spikes/run_streak/evidence.json",
+      "captured_at": "2026-08-25T00:10:36.693552+00:00",
+      "verdict": {
+        "consecutive": 10,
+        "cold_confirmed": 2,
+        "green": true,
+        "why": "criterion met",
+        "required_runs": 10,
+        "required_cold": 2,
+        "budget_seconds": 130
+      },
+      "engine_update_time": "2026-08-25T00:03:52.179574Z",
+      "same_engine_as_frozen": true
+    },
+    "ok": true,
+    "problems": []
+  },
+  "billing": {
+    "table": "keplaria.billing_export.gcp_billing_export_resource_v1_006252_CAF71A_EC72B9",
+    "forward_only_since": "2026-08-19 07:00:00+00",
+    "cost_usd": 12.92,
+    "credits_usd": -12.92,
+    "first_usage": "2026-08-19 07:00:00+00",
+    "last_export": "2026-08-24 23:45:44.548171+00",
+    "last_usage": "2026-08-24 18:00:00+00",
+    "n_rows": 6428,
+    "gross_cost_usd": 12.92,
+    "net_cost_usd": 0.0,
+    "ok": true,
+    "problems": []
+  }
+}
