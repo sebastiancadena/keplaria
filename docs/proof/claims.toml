@@ -130,7 +130,8 @@ claim = "Duplicate ERP writes after a retry"
 evidence = "spikes/judge_run/evidence.json"
 path = "scoreboard.duplicate_writes_after_retry"
 render = "{} duplicate writes after a retry"
-appears_in = ["docs/submission/devpost.md", "docs/submission/video-script.md"]
+appears_in = ["docs/submission/devpost.md"]
+qualifier = "the judge run itself retried nothing (commands_retried_then_succeeded: 0); the retried ERP write that proves singularity is the sweep probe in spikes/core_contracts/evidence.json, so this number is not spoken or shown in the video (2026-08-25)"
 
 [[claim]]
 id = "contract_suite_passed"

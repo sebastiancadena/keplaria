@@ -74,8 +74,10 @@ Tick each line against the actual capture, not against intent.
 - [ ] The baseline qualifier — **author-timed, not practitioner-reviewed** —
       is legible on screen wherever the comparison appears, not only spoken.
 - [ ] No claim on screen that the audit of the code did not support. The
-      three struck ones: pixel redaction, scanned/multimodal document
-      handling, and an inbound email path.
+      five struck ones: pixel redaction, scanned/multimodal document
+      handling, an inbound email path, an ERP 503 retry probe, and "the
+      agent refuses" the injection (the deterministic scan blocks it before
+      any agent sees it).
 
 ### Audio
 

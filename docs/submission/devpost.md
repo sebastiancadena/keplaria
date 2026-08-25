@@ -113,7 +113,9 @@ the repository:
   deciding it.
 - **5 enforced hold days**: claimed only because both the hold and its release
   executed in the ERP.
-- **0 duplicate writes after a retry.**
+- **0 duplicate writes after a retry.** The retry that proves it is a real
+  failed `clear_hold` command re-driven to completion by the unattended sweep
+  (core contracts); the recorded run itself needed no retry.
 - **380 simulated business days**, about a year and a half of a supplier's
   life, inside one recording; the compression is disclosed on screen.
 

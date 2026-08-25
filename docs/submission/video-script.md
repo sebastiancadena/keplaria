@@ -1,7 +1,9 @@
 # Submission video — narration script and shot list
 
 Target 3:40–3:45; hard cap 4:00. One continuous unedited live segment,
-0:15–2:25. Narration ~533 words at ~139 wpm.
+0:15–2:25. Narration ~460 words; dense UI beats at or under ~135 wpm, nothing
+above ~155. Every beat is rendered through `video/narrate.sh` at its slot; a
+clamp warning means cut the copy, never speed the voice.
 
 Lines marked **SYNC** must land on the named on-screen event.
 
@@ -10,141 +12,162 @@ Telemetry. Everything else is called what it is.
 
 ## Status of this draft
 
-Three claims were corrected against the code before this file was written. See
-"Corrections applied" at the end — do not restore the original wording.
+Rewritten 2026-08-25 (day 14) after an external script review and the
+organizer pre-submission check-in. Six claims have now been corrected against
+the code; see "Corrections applied" at the end — do not restore the original
+wording. The judge's stated priorities for this track (security, recovery
+steps, going beyond the happy path, "clever, not long-running") are addressed
+in beats 3 and 4 with evidence that already exists; nothing new is built.
 
 Every bracketed token must be refilled from the frozen run before recording.
-Re-measured 2026-08-22 against the current deployment; re-run again after the
-day-15 freeze and refill from that run.
+Numbers below were measured against the frozen deployment (`f972ce6`) and are
+bound in `docs/proof/claims.toml`; run `scripts/claim_ledger.py --check` after
+any edit.
 
 ## 1. Narration
 
-### Beat 1 — The twist (0:00–0:15) — 31 words
+### Beat 1 — The twist (0:00–0:15) — 24 words
 
-> Every supplier-onboarding tool retires the day the ERP record is created.
-> Keplaria stays — for months. Two live suppliers, one unedited take: fifty-five
-> seconds of machine work against the eleven minutes I timed by hand.
+> Supplier onboarding usually ends when the ERP record is created. Keplaria
+> stays for what happens months later. Two synthetic suppliers, one real ERP,
+> one unedited take.
 
-The qualifier is inside the claim — "I timed by hand" — spoken with confidence,
-not apology. The overlay carries the full version.
+The baseline comparison moves to the overlay with its qualifier attached. It
+is the weakest-provenance number in the video (author-timed) and should not be
+the first thing a judge hears; the twist should.
 
-### Beat 2a — Route one: the packet (0:15–0:35) — 42 words
+### Beat 2a — Route one: the packet (0:15–0:35) — 40 words
 
 > This is the deployed system, one continuous take. **SYNC (packet event
-> appears)** A supplier packet arrives. The coordinator proposes a route —
-> evidence plus compliance — but it doesn't decide. A deterministic policy layer
-> validates the proposal against a versioned fleet catalog before anything runs.
-> **SYNC (verdict chip)** Approved: two specialists.
+> appears)** A supplier packet arrives. The coordinator proposes a route,
+> evidence plus compliance, but it doesn't decide. A deterministic policy gate
+> checks the proposal against a versioned fleet catalog. **SYNC (verdict chip)**
+> Approved: two specialists.
 
-### Beat 2b — The stop (0:35–0:55) — 43 words
+### Beat 2b — The stop (0:35–0:55) — 40 words
 
-> The compliance agent flags a sanctions near-match — and the system stops.
-> **SYNC (park timer)** Fourteen seconds in, the case — a Payload, in our
-> terms — parks in Ground Control, the human-approval dashboard, with its two
-> ERP writes sitting unexecuted. It doesn't ask permission. It pauses, and
-> waits.
+> The compliance agent flags a sanctions near-match, and the system stops.
+> **SYNC (park timer)** Fourteen seconds in, the case, a Payload in our terms,
+> parks in Ground Control, the human-approval dashboard, its two ERP writes
+> held, unexecuted. It doesn't ask. It waits.
 
-### Beat 2c — The human (0:55–1:15) — 36 words
+### Beat 2c — The human (0:55–1:15) — 23 words
 
-> One human, one decision. Read it, one click to approve — **SYNC (ERP rows
-> appear)** and the supplier record and its evidence attachment appear in the
-> ERP the same moment. Nothing was written before that click.
+> One human, one decision. **SYNC (ERP row appears)** When I approve, the held
+> supplier write is released into ERPNext. Nothing was written before that
+> click.
 
-### Beat 2d — Supplier two, and the honesty line (1:15–1:45) — 55 words
+The stand-in attachment is not narrated. The proof is the supplier row and
+the click that preceded it.
 
-> Supplier two is a separate case — the approval you just saw doesn't carry
-> over, and doesn't need to. The same policy gate reads this one clean: no
-> near-match, no reason to stop, so nobody does. **SYNC (extraction panel)**
-> Fields lift straight out of the document into the ERP, none of them rekeyed.
-> Now watch a simulated year and a half compress into the next eighty seconds.
+### Beat 2d — Supplier two, and the honesty line (1:15–1:45) — 60 words
 
-Dead-air pocket 2 lives inside this beat's 21.4-second onboarding wait.
+> Supplier two is a separate case; the approval doesn't carry over. This one
+> reads clean: no near-match, so nobody stops it. **SYNC (extraction panel)**
+> Its fields come from a synthetic page-text fixture, no OCR, into the ERP
+> without rekeying. The supplier's side of this, by design, is answering an
+> email: no portal, no account. Now, a simulated year and a half in eighty
+> seconds.
 
-### Beat 2e — Route two: the clock (1:45–2:05) — 57 words
+This beat holds the 21.4-second onboarding wait, which is why it carries the
+data-boundary sentence and the overlooked-user line. Spoken once, plainly, no
+persona.
 
-> Two clock events — and clock events engage no agents at all; deterministic
-> policy handles them. **SYNC (first clock chip)** First renewal check: not yet
-> due, so nothing happens — correctly. **SYNC (email sent)** Second: due, and a
-> real renewal email goes out to the supplier. It goes unanswered — the evidence
-> is now overdue — **SYNC (hold applied)** and a purchasing hold lands in the
-> ERP. This supplier genuinely cannot be bought from.
+### Beat 2e — Route two: the clock (1:45–2:05) — 42 words
 
-### Beat 2f — Route three: the certificate (2:05–2:25) — 64 words
+> Two clock events; no agents, policy alone. **SYNC (first clock chip)** First
+> check: not yet due, nothing happens, correctly. **SYNC (email sent)** Second:
+> due, and a real renewal email goes out. Unanswered. Evidence overdue, **SYNC
+> (hold applied)** and a purchasing hold lands in the ERP. This supplier cannot
+> be bought from.
 
-> **SYNC (certificate event)** Then the certificate comes back. New event, new
-> route: evidence only, no compliance; policy agrees. **SYNC (grounding view)**
-> Every field traces to a verbatim span in the document. **SYNC (hold lifts)**
-> The hold releases. Renewal, hold, release — automatic corrections we call
-> station-keeping. And the supplier's side of this — by design — is answering
-> an email: no portal, no login, no account.
+### Beat 2f — Route three: the certificate (2:05–2:25) — 41 words
+
+> **SYNC (certificate event)** The renewed certificate enters as a published
+> event; policy routes it to evidence only. **SYNC (grounding view)** Every
+> field traces to a verbatim span. **SYNC (hold lifts)** The hold releases.
+> Renewal, hold, release: station-keeping.
 >
 > **SYNC (run freezes on end state)** Three hundred eighty simulated business
 > days. Five under real hold. Zero human touches.
 
-### Beat 3 — Architecture (2:25–2:55) — 85 words
+### Beat 3 — Architecture and the security boundary (2:25–2:57) — 76 words
 
-> Six boxes: events in; the coordinator proposes; the policy gate decides,
-> against a versioned fleet catalog; specialists reason; an outbox executes — and
-> Ground Control can pause the flow before the ERP. Three departments —
-> procurement, compliance, finance — each with a permitted-agent and a
-> permitted-command list; finance's events engage no agents, and an out-of-list
-> request is refused and recorded. That table is the fleet: the crew and its
-> rulebook. Every case you just watched was one payload carried through it.
-> All of it deployed on Google Cloud.
+> Six boxes: events in, the coordinator proposes, a deterministic gate decides
+> against a versioned fleet catalog, and only the outbox reaches the ERP;
+> Ground Control can pause it first. That boundary is the security model:
+> agents hold no ERP credential; the one executor runs as a scoped ERP role
+> that cannot delete; Firestore, not the model, remembers the case for months.
+> Three departments, each with permitted agents and commands: that table is
+> the fleet. Deployed on Google Cloud: the registered graph, and one trace.
 
-The stack list moved to the overlay; spoken, it cost the ten words the
-fleet definition needs, and the overlay already carries every product name.
+Every sentence here is backed by a committed proof: the credential boundary by
+`spikes/frappe_scoped_executor/evidence.json` (role read back off the live
+site: no delete, no role widening, no financial documents) and the
+`forbidden_agent_tool_edges` core contract; the durable-state line by the
+Firestore-owned case version and outbox. "Memory" is said once and means
+durable case state; nothing implies the agents learn.
 
-### Beat 4 — Failure and safety (2:55–3:30) — 88 words
+### Beat 4 — Failure, recovery, and safety (2:57–3:32) — 76 words
 
-> The part most demos skip: failure. **SYNC (503 injected)** We force a 503 from
-> the ERP mid-write. Bounded retry — and afterwards, exactly one supplier record
-> exists. Zero duplicates. **SYNC (injected doc)** We plant a prompt injection in
-> a document; the agent refuses, and the refusal is logged. **SYNC (red field)**
-> Then an agent returns a worker count that's schema-valid but appears nowhere in
-> the source. Every value must resolve to a verbatim span; this one doesn't —
-> caught, retried within bounds, parked for a human, zero ERP writes. It's all in
-> Telemetry — our OpenTelemetry traces. Not perfect. Contained.
+> The part most demos skip: failure. **SYNC (command ledger)** A failed ERP
+> command stays durable; when the destination is repaired, the unattended sweep
+> re-drives that same command to done: one record, no duplicate. **SYNC
+> (injected doc)** This planted instruction is caught by a deterministic scan
+> and blocked before any agent sees it: zero ERP writes. **SYNC (red field)**
+> And a schema-valid worker count with no source span is rejected, retried
+> once, and parked for a human: zero ERP writes. Every refusal lands in
+> Telemetry, our OpenTelemetry traces. Not perfect. Contained.
 
-### Beat 5 — Close (3:30–3:45) — 38 words
+Three panels, not four: the replay-safety contract is real but a fourth panel
+in 35 seconds cannot be read. It stays on `/proof`.
 
-> Kepler didn't discover that planets move — he showed their motion obeys law.
-> Same here: launch a case once, and it stays up for months, corrected by policy,
-> not by you. Put your work in orbit. Keplaria dot com.
+### Beat 5 — Close (3:32–3:45) — 36 words
 
-**The scoreboard moves to the overlay, deliberately.** Fifteen seconds cannot
-hold six figures and land the name, and the overlay already carries every one of
-them with the author-timed qualifier attached. The spoken qualifier survives in
-the cold open — "the eleven minutes I timed by hand" — so the comparison is never
-voiced without it.
+> Kepler didn't discover that planets move; he showed their motion obeys law.
+> Launch a case once, and it stays up for months, corrected by policy, not by
+> you. Put your work in orbit. Keplaria dot com.
+
+**The scoreboard on the overlay carries three ideas, not six.** Fifteen seconds
+cannot hold six figures and land the name. The full figures, qualifiers
+included, live on `keplaria.com/proof`, which is in frame.
 
 ## 2. Shot list
 
-Persistent during 0:15–2:25: a "LIVE — one take" badge, and a run clock counting
-up against a visible "budget: 130s" mark.
+Persistent during 0:15–2:25: a "LIVE — one take" badge, a run clock counting
+up against a visible "budget: 130s" mark, and the console's `.run.app` address
+bar in the **hash form** (`keplaria-console-bklu5jcdea-uc.a.run.app`), legible,
+so the Google Cloud deployment is on screen for the whole live window rather
+than asserted later.
 
 Split-screen layout for the live segment:
 
 - Left ~55%: Ground Control, labelled once on first appearance —
   "Ground Control — human-approval dashboard".
-- Right top: the ERPNext supplier list, live.
+- Right top: the ERPNext supplier list, live, cropped to the data region
+  (masthead out of frame unless the trademark call in `video-audit.md` is
+  recorded the other way).
 - Right bottom: the route strip — incoming event chip, the coordinator's
-  proposed roster, the policy verdict. This strip is what makes the three routes
-  legible: it visibly shows 2 agents / 0 agents / 1 agent across the segment.
-  **Depends on the console change below.**
+  proposed roster, the policy verdict. This strip is what makes the three
+  routes legible: it visibly shows 2 agents / 0 agents / 1 agent across the
+  segment. Shipped in the console (`f9a3233`); no dependency remains.
 
 | Beat | On screen | Overlay text |
 |---|---|---|
 | 1 | Black card: "Onboarding ends when the ERP record is created." — "ends" strikes through, replaced by "begins". Title card: Keplaria. | "55.3 s of machine time vs 663.5 s by hand — a 20 steps walkthrough, 19 of which the run removes; author-timed, not practitioner-reviewed" |
 | 2a | Packet event chip; route strip: proposed "evidence + compliance", verdict "APPROVED 2/2" | "Deployed on Google Cloud · unedited from here" |
 | 2b | Compliance result "sanctions near-match"; case moves into Ground Control's parked column showing `create_supplier — HELD`, `attach_evidence — HELD` | "Parked in 13.8 s · ERP writes so far: 0" |
-| 2c | Cursor reads the case, clicks Approve; ERP pane: supplier row and attachment appear | "47.7 s human approval · 0.1 s execution" |
-| 2d | New case card labelled as a separate Payload; route strip runs again; extraction panel fills; ERP row appears; simulated-clock widget starts | "Separate case — the approval does not carry over" |
+| 2c | Cursor reads the case, clicks Approve; ERP pane: supplier row appears | "47.7 s human approval · 0.1 s execution" |
+| 2d | New case card labelled as a separate Payload; route strip runs again; extraction panel fills; ERP row appears; simulated-clock widget starts | "Separate case — the approval does not carry over", then, over the extraction panel: "Synthetic page-text fixture · no OCR · the returned certificate enters as a published event", then "Design intent: the supplier answers an email. No portal, no login, no account." |
 | 2e | Sim-clock jumps; chips: `renewal_due → no action`, `renewal_due → renewal email sent` (show the outbound Communication in the ERP), `evidence_overdue → purchasing hold`; ERP row flips to Hold | "Clock events: agents engaged — none (policy only)" |
-| 2f | `certificate_received` event chip carrying the renewed document; route strip "evidence only → APPROVED 1/1"; grounding view highlights the verbatim spans; ERP hold lifts; freeze on end state | "380 simulated business days · 5 enforced hold days — hold AND release both executed in ERP · 0 human touches", then "Design intent: the supplier answers an email. No portal, no login, no account." |
-| 3 | Full-screen six-box diagram, arrows animating in flow order; then the `/fleet` scope matrix (three departments, permitted-agent / permitted-command columns, exercise counts); cross-fade to supplier one's Routing panel on the console as 'carried through it' lands; deployment strip | "ADK + Gemini · Agent Runtime · Cloud Run · Firestore · Pub/Sub" and "10/10 deployed rehearsals under the 130 s budget" |
-| 4 | Three fast panels: (1) trace of 503 → retry → ERP count = 1; (2) document with highlighted injection and the refusal in the trace; (3) extraction output with the worker-count field flagged "no source span" → retry → parked card in Ground Control. Trace viewer labelled "Telemetry — OpenTelemetry traces" | "0 duplicate writes after a retry" · "Refusal recorded" · "0 ERP writes" |
-| 5 | Scoreboard card, `keplaria.com` in frame (front door + `/proof` verification ledger), repo link | "6/6 steps autonomous · 20 steps by hand, 19 of which the run removes · 22 fields, 0 rekeyed · 1 policy-required intervention · 55.3 s of machine time vs 663.5 s (author-timed, not practitioner-reviewed)" |
+| 2f | `certificate_received` event chip carrying the renewed document; route strip "evidence only → APPROVED 1/1"; grounding view highlights the verbatim spans; ERP hold lifts; freeze on end state | "380 simulated business days · 5 enforced hold days — hold AND release both executed in ERP · 0 human touches" |
+| 3 | (1) Full-screen six-box diagram, arrows animating in flow order. (2) **Google Cloud proof, sanitized:** the deployed graph in Agent Registry / Agent Runtime, then the Cloud Run services list, then one Cloud Trace belonging to supplier one's case — each capture passes the browser-chrome checklist in `video-audit.md` (no project number, no account, hash-form URLs only). (3) The `/fleet` scope matrix (three departments, permitted-agent / permitted-command columns, exercise counts); cross-fade to supplier one's Routing panel as "that table is the fleet" lands. | "Agents: no ERP credential · Executor: one scoped ERP role, read back off the live site — cannot delete, cannot widen its role" then "ADK + Gemini · Agent Runtime · Agent Registry · Cloud Run · Firestore · Pub/Sub · Cloud Trace · IAP" and "10/10 deployed rehearsals under the 130 s budget, 2 cold starts" |
+| 4 | Three panels: (1) the command ledger for the sweep probe: `clear_hold` `failed` → re-driven by the unattended sweep → `done`, beside the ERP supplier count for that name = 1 (source: `spikes/core_contracts/evidence.json`, check `retried_erp_write_is_singular`); (2) the injected fixture with the planted instruction highlighted, the case's `injection` block (`tainted: true`, pattern id, page) and the policy outcome `DOCUMENT_INJECTION → blocked`, then the trace; (3) extraction output with the worker-count field flagged "no source span" → retry → parked card in Ground Control. Trace viewer labelled "Telemetry — OpenTelemetry traces" | "Failed command re-driven by the sweep · one ERP record" · "Deterministic scan · blocked before any agent · 0 ERP writes" · "Grounding: no span, no write · 0 ERP writes" |
+| 5 | Scoreboard card, `keplaria.com` in frame (front door + `/proof` verification ledger), repo link | "380 simulated business days · 1 policy-required intervention · real ERP hold and release" with a second line, smaller: "22 fields, 0 rekeyed · full ledger and qualifiers at keplaria.com/proof" |
+
+Every panel in beats 3 and 4 is real output: a trace, a ledger row, a test
+result, or a console page. The six-box diagram is the one designed
+illustration, and it is labelled as a diagram.
 
 ## 3. Six-box diagram
 
@@ -159,10 +182,10 @@ carrying meaning sits below 28px — this is not a shrunk `architecture.svg`.
 `~/dev/git/byteql-video` (`uv run --group animation scripts/render.py`).
 It assembles in the narration's order: walls and zones first, then each box
 as its clause is spoken, with the single ERP crossing drawn LAST — after the
-pause point, matching the line "and Ground Control can pause the flow before
-the ERP". **This clip is outside the continuous-unedited window (0:15–2:25),
-which is the only reason it may exist.** If it is cut, the static SVG stands
-in with no other change — that is also its rollback.
+pause point, matching the line "Ground Control can pause it first". **This
+clip is outside the continuous-unedited window (0:15–2:25), which is the only
+reason it may exist.** If it is cut, the static SVG stands in with no other
+change — that is also its rollback.
 
 **The device:** two walls, each pierced exactly once. The Policy Gate is
 embedded in the first; a single heavy arrow crosses the second. "Only the
@@ -184,7 +207,10 @@ Carrying sentence: "Agents propose, a deterministic gate decides, and nothing
 reaches the ERP except through the outbox — with Ground Control able to pause any
 case on the way."
 
-## 4. Dead-air pockets
+## 4. Dead-air pocket
+
+One pocket, and it is a **substitute**, never additive copy: if beat 2a or 2b
+renders short of its slot, this fills the gap; otherwise it is not spoken.
 
 **Pocket 1** — anywhere in 0:20–0:55, while the agents are working:
 
@@ -192,20 +218,18 @@ case on the way."
 > action queues as a command in a Firestore outbox, and an executor performs it
 > only after policy has signed it off.
 
-**Pocket 2** — during the 21.4-second onboarding of supplier two:
-
-> Ten consecutive rehearsals of this run on the deployed system, all under the
-> hundred-thirty-second budget, before we pressed record. What you're watching is
-> the ordinary behaviour, not the lucky take.
+The former pocket 2 (ten rehearsals) is an overlay in beat 3 now; its 21-second
+home in beat 2d is taken by the data-boundary and email lines.
 
 ## 5. Lines rejected as overclaims
 
 1. "Watch one approval unlock a year of autonomous governance." False — the
    approval binds to one version of one case. Replaced with "Supplier two is a
-   separate case — the approval you just saw doesn't carry over, and doesn't need
-   to." The honest version is the better line: one gate, shown discriminating.
+   separate case; the approval doesn't carry over." The honest version is the
+   better line: one gate, shown discriminating.
 2. "87% faster than manual onboarding, validated against industry practice."
-   Replaced with the raw seconds and the qualifier. No percentage is spoken.
+   Replaced with the raw seconds and the qualifier, on the overlay only. No
+   percentage is spoken.
 3. Any supplier-admin persona, quote, or testimonial. No such user was
    interviewed. Replaced with the mechanism plus an on-screen "Design intent"
    label.
@@ -219,8 +243,27 @@ case on the way."
 7. "Fully autonomous — no humans needed", and its mirror "it never fails."
    Replaced with "One intervention — required by policy, not failure", and a
    35-second segment about how it fails.
+8. "We force a 503 from the ERP mid-write; bounded retry; zero duplicates."
+   No such probe exists. `spikes/retry_503` retries a document-dependency fetch
+   and writes a redacted derivative, not an ERP record; the judge run reports
+   `commands_retried_then_succeeded: 0`. Replaced with the retried ERP write
+   that actually happened: the sweep probe's `clear_hold` failed once and was
+   re-driven to `done` by the deployed sweep, leaving one record
+   (`spikes/core_contracts/evidence.json`, `one_erp_write_after_retry`).
+9. "The agent refuses the prompt injection." The agent never sees it. A
+   deterministic scan taints the page before any agent reads it, the pages are
+   withheld from agent-resolvable state, and `DOCUMENT_INJECTION` forces the
+   gate to blocked (`app/nodes.py`, `app/injection.py`). The scan is a
+   heuristic over the planted fixture, not a general defence, so the spoken
+   scope is "this planted instruction", never "prompt injection is blocked".
+10. "Two live suppliers." The ERP is real; the suppliers are synthetic fixtures.
+    "Two synthetic suppliers, one real ERP."
+11. "Self-improving agents" / "the agents learn from memory." Not built, and
+    deliberately so: agent history lives in Sessions and is never a compliance
+    fact. The judge asked about memory; the honest answer is that Firestore
+    remembers the case and the model does not decide what is true.
 
-## Corrections applied to the first draft
+## Corrections applied
 
 1. **No inbound email exists.** The draft had the certificate arrive as "a plain
    email reply", with an inbox on screen. `certificate_received` is a published
@@ -236,17 +279,14 @@ case on the way."
    showing "pixel redaction" on screen. `RedactedDerivative` is a type name;
    `app/documents.py` states the real preprocessor comes later. Documents are
    page-text fixtures. Nothing on camera may imply OCR, scan handling, or
-   multimodal extraction.
-
-## Console change this script depends on
-
-The route strip needs the coordinator's proposal shown next to the policy
-verdict. `console/projection.py` already carries `proposed`, `route`, `dropped`
-and `refused`, but not `added`; `console/templates/case.html` renders only
-`route`, `dropped` and `refused`. Two small additions make routing completion
-visible.
-
-This is a console-only deploy. The ten-run streak binds the engine and
-`keplaria-ingress` only — `spikes/run_streak/evidence.json` lists the review
-service under `not_exercised`, and the console is not on the timed path — so it
-does not restart the streak.
+   multimodal extraction. **2026-08-25:** the beat 2d wording "fields lift
+   straight out of the document" still implied a document pipeline; now the
+   narration and an overlay say "synthetic page-text fixture, no OCR".
+4. **The ERP 503 scene (2026-08-25).** See rejected line 8. The planning
+   notes carried the same story and were corrected the same day.
+5. **Injection attribution (2026-08-25).** See rejected line 9.
+6. **Google Cloud is shown, not asserted (2026-08-25).** The rules ask the video
+   to demonstrate the backend runs on Google Cloud. The hash-form `.run.app`
+   address stays in frame for the live window, and beat 3 shows the registered
+   graph, the Cloud Run services and one Cloud Trace, each capture audited
+   against `video-audit.md` before the take.
