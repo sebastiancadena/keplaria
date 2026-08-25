@@ -150,9 +150,9 @@ Split-screen layout for the live segment:
 
 - Left ~55%: Ground Control, labelled once on first appearance —
   "Ground Control — human-approval dashboard".
-- Right top: the ERPNext supplier list, live, cropped to the data region
-  (masthead out of frame unless the trademark call in `video-audit.md` is
-  recorded the other way).
+- Right top: the ERPNext supplier list, live, cropped to the data region,
+  masthead out of frame (the trademark call, recorded in `video-audit.md`
+  on 2026-08-25).
 - Right bottom: the route strip — incoming event chip, the coordinator's
   proposed roster, the policy verdict. This strip is what makes the three
   routes legible: it visibly shows 2 agents / 0 agents / 1 agent across the

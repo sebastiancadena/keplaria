@@ -51,14 +51,17 @@ Tick each line against the actual capture, not against intent.
 
 ### ERPNext
 
-- [ ] **Decide and record the trademark call.** The ERPNext UI carries Frappe
-      and ERPNext marks. The stack is disclosed in `THIRD_PARTY.md` and the
-      product is legitimately used, so showing it is ordinary
-      technology-stack depiction rather than third-party advertising — but
-      rule 12 lists trademarks explicitly, so the call belongs in writing
-      before the take, not in an argument after judging. Alternative if the
-      call goes the other way: show the supplier record cropped to the data
-      region, with no masthead.
+- [x] **Trademark call, recorded 2026-08-25 (day 14): crop to the data
+      region, no masthead.** The ERPNext UI carries Frappe and ERPNext marks.
+      Showing them would be ordinary technology-stack depiction (the stack is
+      disclosed in `THIRD_PARTY.md` and the product is legitimately used), but
+      rule 12 lists trademarks explicitly and the crop costs nothing the video
+      needs: the proof is the supplier row, the hold flag and the released
+      hold, all of which live in the data region. So the ERP pane is framed on
+      the list/record body only; ERPNext is named in narration and in the
+      README, never shown as a logo. The call is written here so it is not
+      argued after judging; reversing it means editing this line and the shot
+      list in `video-script.md` together.
 - [ ] Supplier list is clean. As of 2026-08-22 it still holds
       `DLQ Sweep Probe SAS` and three older test suppliers; a judge reading
       the list sees debris. Purge or crop.
