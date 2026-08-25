@@ -1,8 +1,8 @@
 # Submission video — narration script and shot list
 
 Target 3:40–3:45; hard cap 4:00. One continuous unedited live segment,
-0:15–2:25. Narration 467 spoken words (the optional pocket is a substitute, not additive). Every
-beat is rendered through `video/narrate.sh` at its slot; a clamp warning in
+0:15–2:25. Narration 467 spoken words (the optional pocket is a substitute,
+not additive). Every beat is rendered through `video/narrate.sh` at its slot; a clamp warning in
 the FAST direction means cut the copy, never speed the voice. A warning in the
 SLOW direction (the voice under-fills the slot) is silence over live UI, which
 is fine.
