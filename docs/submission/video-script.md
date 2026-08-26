@@ -42,18 +42,18 @@ The baseline comparison moves to the overlay with its qualifier attached. It
 is the weakest-provenance number in the video (author-timed) and should not be
 the first thing a judge hears; the twist should.
 
-### Beat 2a — Route one: the packet (0:15–0:35) — 39 words
+### Beat 2a — Route one: the packet (0:15–0:35) — 37 words
 
 > This is the deployed system, one continuous take. **SYNC (packet event
 > appears)** A supplier packet arrives. The coordinator proposes a route,
-> evidence plus compliance, but it doesn't decide. A deterministic policy gate
-> checks the proposal against a versioned fleet catalog. **SYNC (verdict chip)**
+> evidence plus compliance; it doesn't decide. A deterministic policy gate
+> checks it against a versioned fleet catalog. **SYNC (verdict chip)**
 > Approved: two specialists.
 
 ### Beat 2b — The stop (0:35–0:55) — 39 words
 
 > The compliance agent flags a sanctions near-match, and the system stops.
-> **SYNC (park timer)** Fourteen seconds in, the case, a Payload in our terms,
+> **SYNC (park timer)** Twelve seconds in, the case, a Payload in our terms,
 > parks in Ground Control, the human-approval dashboard, its two ERP writes
 > held, unexecuted. It doesn't ask. It waits.
 
@@ -66,28 +66,26 @@ the first thing a judge hears; the twist should.
 The stand-in attachment is not narrated. The proof is the supplier row and
 the click that preceded it.
 
-### Beat 2d — Supplier two, and the honesty line (1:15–1:45) — 61 words
+### Beat 2d — Supplier two (1:15–1:45) — 30 words
 
-> Supplier two is a separate case; the approval doesn't carry over. This one
-> reads clean: no near-match, so nobody stops it. **SYNC (extraction panel)**
-> Its fields come from a synthetic page-text fixture, no OCR, into the ERP
-> without rekeying. The supplier's side of this, by design, is answering an
-> email: no portal, no account. Now, a simulated year and a half in eighty
-> seconds.
+> Supplier two is a separate case; the approval doesn't carry over. It reads
+> clean, so nobody stops it. **SYNC (extraction panel)** Its fields come from a
+> synthetic page-text fixture, no OCR, no rekeying.
 
-This beat holds the 21.4-second onboarding wait, which is why it carries the
-data-boundary sentence and the overlooked-user line. Spoken once, plainly, no
-persona.
+Cut to fit the recorded take (2026-08-25): supplier two onboards in 12.6 s
+and its whole lifecycle plays in 34 s, so this beat holds only the
+data-boundary sentence. The overlooked-user line moved to the end of 2f, over
+the held end frame; "a year and a half in eighty seconds" was dropped (the
+number was never true of the run).
 
-### Beat 2e — Route two: the clock (1:45–2:05) — 41 words
+### Beat 2e — Route two: the clock (1:45–2:05) — 35 words
 
 > Two clock events; no agents, policy alone. **SYNC (first clock chip)** First
 > check: not yet due, nothing happens, correctly. **SYNC (email sent)** Second:
 > due, and a real renewal email goes out. Unanswered. Evidence overdue, **SYNC
-> (hold applied)** and a purchasing hold lands in the ERP. This supplier cannot
-> be bought from.
+> (hold applied)** and a purchasing hold lands in the ERP.
 
-### Beat 2f — Route three: the certificate (2:05–2:25) — 41 words
+### Beat 2f — Route three: the certificate (2:05–2:25) — 55 words
 
 > **SYNC (certificate event)** The renewed certificate enters as a published
 > event; policy routes it to evidence only. **SYNC (grounding view)** Every
@@ -95,7 +93,8 @@ persona.
 > Renewal, hold, release: station-keeping.
 >
 > **SYNC (run freezes on end state)** Three hundred eighty simulated business
-> days. Five under real hold. Zero human touches.
+> days. Five under real hold. Zero human touches. The supplier's side of all
+> this was answering one email: no portal, no account.
 
 ### Beat 3 — Architecture and the security boundary (2:25–2:57) — 82 words
 
