@@ -24,6 +24,7 @@ whole group is scaled to the frame at the end. Nothing is a magic number that
 has to be re-tuned when a word changes.
 """
 
+from pathlib import Path
 from manim import (
     VGroup, Scene, RoundedRectangle, Text, Line, Arrow,
     Create, FadeIn, Write, config, DOWN, RIGHT,
@@ -39,6 +40,18 @@ MUTED = "#64748B"
 SG = "Space Grotesk"
 INTER = "Inter"
 MONO = "JetBrains Mono"
+# Only Inter is installed system-wide. Register the vendored brand faces or Pango
+# silently substitutes a fallback whose kerning opens gaps ("Coord inator",
+# "exe cutor") -- caught by a cold watch of the assembled video on 2026-08-26.
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(Path.home() / "dev/git/keplaria-assets"))
+    from brand import tokens as _tokens
+    import manimpango as _mp
+    for _f, _ in _tokens.FONT_FILES.values():
+        _mp.register_font(str(_tokens.FONT_DIR / _f))
+except ImportError:
+    pass
 
 TITLE, BODY, CHIP, ZONE = 26, 17, 16, 19
 PAD_X, PAD_Y, GAP = 0.34, 0.28, 0.20

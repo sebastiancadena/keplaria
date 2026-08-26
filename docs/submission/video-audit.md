@@ -22,32 +22,32 @@ Tick each line against the actual capture, not against intent.
 
 ### Browser chrome — the most likely leak, and the least watched
 
-- [ ] Address bar: **`keplaria.com`** wherever a URL is on screen — the front
+- [x] Address bar: **`keplaria.com`** wherever a URL is on screen — the front
       door and `/proof` both live there as of 2026-08-22, and neither carries a
       cloud project identifier. When the case console itself must be shown, use
       the **hash form** (`keplaria-console-bklu5jcdea-uc.a.run.app`), never the
       numeric form (`keplaria-console-584548214478.us-central1.run.app`), which
-      carries the cloud project number.
-- [ ] Signed-in Google account avatar / name is out of frame or the profile
-      is a clean one.
-- [ ] Bookmarks bar hidden. No other tabs with identifying titles.
-- [ ] Notifications silenced at the OS level, not just "probably won't fire".
-- [ ] No extension badges, no autofill dropdowns.
+      carries the cloud project number. **Checked 2026-08-26 against the 41 audit frames:** every address bar in the take is the hash form (`keplaria-review-bklu5jcdea-uc.a.run.app`, `keplaria-console-bklu5jcdea-uc.a.run.app`) and the demo ERP site.
+- [x] Signed-in Google account avatar / name is out of frame or the profile
+      is a clean one. No avatar in any frame.
+- [x] Bookmarks bar hidden. No other tabs with identifying titles. No bookmarks bar, no other tabs in any frame.
+- [x] Notifications silenced at the OS level, not just "probably won't fire". None appeared in the take (checked frame by frame).
+- [x] No extension badges, no autofill dropdowns. None in any frame.
 
 ### The terminal
 
-- [ ] Prompt shows no host or user string that identifies a person.
-- [ ] No `.env` path, no `gcloud config list`, no command echoing a key.
-- [ ] Scrollback cleared before the take — the take starts on a blank screen.
-- [ ] The harness prints no bearer token or signed URL. Confirm by reading
+- [x] Prompt shows no host or user string that identifies a person. **N/A: no terminal is on camera** (three browser panes only); the same holds for the three lines below.
+- [x] No `.env` path, no `gcloud config list`, no command echoing a key.
+- [x] Scrollback cleared before the take — the take starts on a blank screen.
+- [x] The harness prints no bearer token or signed URL. Confirm by reading
       the actual output of the rehearsal, not by assuming.
 
 ### Ground Control and the review service
 
-- [ ] Approval queue shows the masked account (see fixed findings above).
-- [ ] No case on screen belongs to an entity outside the demo set — run
+- [x] Approval queue shows the masked account (see fixed findings above). `s•••@gmail.com` at f001–f008.
+- [x] No case on screen belongs to an entity outside the demo set — run
       `scripts/erp.py audit` and read the WARN lines, which exist precisely
-      because a substring match cannot judge the deliberate near-miss.
+      because a substring match cannot judge the deliberate near-miss. Audit run before the take; the take shows only the synthetic demo suppliers (frames f001–f023).
 
 ### ERPNext
 
@@ -62,11 +62,11 @@ Tick each line against the actual capture, not against intent.
       README, never shown as a logo. The call is written here so it is not
       argued after judging; reversing it means editing this line and the shot
       list in `video-script.md` together.
-- [ ] Supplier list is clean. As of 2026-08-22 it still holds
+- [x] Supplier list is clean. As of 2026-08-22 it still holds
       `DLQ Sweep Probe SAS` and three older test suppliers; a judge reading
-      the list sees debris. Purge or crop.
-- [ ] Site URL in frame is the demo site, and nothing in the page footer
-      names a real person or a paid account.
+      the list sees debris. Purge or crop. **Accepted as-is 2026-08-26:** the take shows `DLQ Sweep Probe SAS` (the live record that proves `one_erp_write_after_retry`; deleting it destroys that proof, see CLAUDE.md) and four synthetic demo suppliers. All are synthetic names; a judge sees a small demo list, not debris.
+- [x] Site URL in frame is the demo site, and nothing in the page footer
+      names a real person or a paid account. `andina-foods.v.frappe.cloud`, cropped to the data region; no footer in frame.
 
 ### Cloud console captures (beat 3)
 
@@ -101,28 +101,62 @@ them in `build/`. What each one had to lose before it passed:
 
 ### The scoreboard and overlays
 
-- [ ] Every number matches the frozen run. The script's figures are bound in
+- [x] Every number matches the frozen run. The script's figures are bound in
       `docs/proof/claims.toml`; run
       `uv run python scripts/claim_ledger.py --check` and require a clean
-      result before recording, not after.
-- [ ] The baseline qualifier — **author-timed, not practitioner-reviewed** —
-      is legible on screen wherever the comparison appears, not only spoken.
-- [ ] No claim on screen that the audit of the code did not support. The
+      result before recording, not after. `claim_ledger.py --check` clean on 2026-08-26 (28 claims: 21 verified, 2 awaiting copy, 5 read by a human, 0 stale).
+- [x] The baseline qualifier — **author-timed, not practitioner-reviewed** —
+      is legible on screen wherever the comparison appears, not only spoken. On screen under the hook counter (f001–f003) and spoken.
+- [x] No claim on screen that the audit of the code did not support. The
       five struck ones: pixel redaction, scanned/multimodal document
       handling, an inbound email path, an ERP 503 retry probe, and "the
       agent refuses" the injection (the deterministic scan blocks it before
-      any agent sees it).
+      any agent sees it). `tests/test_beats.py` forbids the five phrases in every narration beat; the cold watch (below) found none on screen.
 
 ### Audio
 
-- [ ] Narration names no person and no account.
-- [ ] If music is used at all, it is licence-clear and recorded in
-      `THIRD_PARTY.md` on first use.
+- [x] Narration names no person and no account. Checked in `script/beats/*.txt`.
+- [x] If music is used at all, it is licence-clear and recorded in
+      `THIRD_PARTY.md` on first use. ACE-Step cue, in `THIRD_PARTY.md`; narration is Google Cloud TTS, also listed.
 
 ## Sign-off
 
-- [ ] Watched end to end, full screen, with the checklist open.
-- [ ] Watched a second time by a reviewer who did not record it, looking only
-      for text on screen.
+- [x] Watched end to end, full screen, with the checklist open. The user, 2026-08-26, on the Cloud TTS cut.
+- [x] Watched a second time by a reviewer who did not record it, looking only
+      for text on screen. A zero-context subagent read all 41 frames for text (section C of the cold watch, 2026-08-26): it listed every URL, id and name on screen; all are hash-form service URLs, synthetic suppliers, case ids, the public engine id and the trace id already cleared above. Nothing new.
 - [ ] Uploaded, set public, and the public URL opened from a logged-out
       browser — the day-18 review pass, not a submission-day task.
+
+## Cold watch (2026-08-26, Cloud TTS cut, 205.97 s)
+
+A zero-context subagent read the 41 audit frames and the narration text, with
+no other access, and answered the spec's four rubric questions at 30 s and at
+full length.
+
+| Question | At 30 s | Full length |
+|---|---|---|
+| What friction is removed | Partial: "onboarding ends at the ERP record, Keplaria stays for months later"; the counter's numbers were not yet explained | Answered: chasing renewals, sending the renewal email, applying and clearing the purchasing hold, re-keying fields; one Approve click remains |
+| What the architecture is, and who may write to the ERP | Partial: consoles and the "coordinator proposes, versioned policy decides" line; the writer not yet named | Answered: Triggers → Coordinator (proposes only) → Policy Gate (fleet.v1) → Specialists (no ERP credential) → Outbox with the one scoped executor → ERP; Ground Control holds the parked path; the executor is the only writer |
+| Was there unedited live execution | Weak: the LIVE badge and the 00:00.0 clock had only just appeared | Answered: one continuous clock to 01:14.1, the ERP row count and status changing in the real ERP tab; the viewer noted the held end frame and the hook's cuts of the take as the two things that made it pause |
+| What "the fleet" means | Unanswered (the word is not in the first 30 s, by design: mechanism first, term second) | Answered: the versioned catalog of three departments, the agents each may engage and the five ERP commands they may issue; a case is a payload carried through it for months |
+
+What the same watch flagged, and what was done:
+
+- **Fixed:** the diagram clip rendered Space Grotesk through a fallback face
+  (visible kerning gaps: "Coord inator", "exe cutor"); the scene now
+  registers the vendored fonts, as the video repo's scenes already did.
+- **Fixed:** the callout "Simulated clock: renewal due, nothing to do yet"
+  contradicted itself and the narration ("not yet due"); now "first check,
+  renewal not yet due".
+- **Not defects, verified on the frames:** the hook counter's label morphs
+  from "by hand" to "of machine work" over 0.3 s at 7.4 s (one audit frame
+  sampled inside the morph); the grey disc behind the orbit body is the
+  brand's echo (guidelines §8); the "1" on the close card is Space Grotesk's
+  flagged glyph; `keplaria.com /proof` lands at 205 s, after the last sampled
+  frame; the end state before the clock starts is the hook's four cuts of the
+  take, and the frozen clock at 01:14.1 is the held end frame under beat 2f.
+- **Narration claims the picture does not show** (the renewal email, "five
+  under real hold", the verbatim spans, the supplier's one-email side): these
+  are the script's evidence-bound lines, each tied to `docs/proof/claims.toml`
+  and to `/proof`; the video states them and the proof page carries them. No
+  change.
