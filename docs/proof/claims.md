@@ -8,8 +8,8 @@ evidence disagree — the evidence is right.
 
 | Claim | Value | Evidence | Stated in | Qualifier | Status |
 |---|---|---|---|---|---|
-| Machine time for one deployed run of the whole lifecycle | 85.8 s of machine time | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | machine time only; the human approval is timed separately and excluded | verified |
-| The single human approval the same run required | 3.3 s human approval | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | — | verified |
+| Machine time for one deployed run of the whole lifecycle | 45.1 s of machine time | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | machine time only; the human approval is timed separately and excluded | verified |
+| The single human approval the same run required | 22.4 s human approval | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | — | verified |
 | The budget one deployed run must finish inside | 130s | [`spikes/judge_run/evidence.json`](../../spikes/judge_run/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | — | verified |
 | The same work done by hand, timed | 663.5 s | [`spikes/manual_baseline/evidence.json`](../../spikes/manual_baseline/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | author-timed, not practitioner-reviewed | verified |
 | Steps in the hand-done walkthrough | 20 steps | [`spikes/manual_baseline/evidence.json`](../../spikes/manual_baseline/evidence.json) | `README.md`, `docs/submission/devpost.md`, `docs/submission/video-script.md` | author-timed, not practitioner-reviewed | verified |

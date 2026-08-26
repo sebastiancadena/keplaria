@@ -102,8 +102,8 @@ suppliers (one parks for a human, one runs unattended from onboarding to hold
 release), with every figure below read from the run's own evidence file in
 the repository:
 
-- **85.8 s of machine time** against a **130s** budget, plus a single
-  **3.3 s human approval**, timed separately because it is a person's time.
+- **45.1 s of machine time** against a **130s** budget, plus a single
+  **22.4 s human approval**, timed separately because it is a person's time.
 - By hand, the same work took **663.5 s** over **20 steps**,
   **19 of which the run removes**; the twentieth is the approval policy
   requires. Author-timed, not practitioner-reviewed; labelled that way
