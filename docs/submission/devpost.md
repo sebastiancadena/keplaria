@@ -18,12 +18,14 @@ The demonstration video URL was the one deliberate blank until the upload on
 
 ---
 
-## Tagline
+## Tagline (elevator pitch, 200-character field; the gallery shows ~15)
 
-> Every onboarding tool retires the day the ERP record is created. Keplaria
-> stays: it wakes months later to chase the expiring certificate, holds
-> purchasing when the evidence lapses, and releases the hold when the renewal
-> checks out. The model proposes; deterministic policy decides.
+> Keplaria stays. It onboards a supplier into a real ERP, then wakes months
+> later to chase the renewal, hold purchasing when evidence lapses, and
+> release the hold. The model proposes; policy decides.
+
+197 characters as one line; the first fifteen, "Keplaria stays.", are a
+complete sentence on their own, which is what the gallery truncation shows.
 
 ## Category
 
