@@ -3,22 +3,23 @@
 #
 #   video/narrate.sh <script.txt> <out.wav> [target_seconds] [semitones]
 #
-# No voice cloning: the stock Chatterbox speaker is used deliberately (user's
-# call, 2026-08-22). Two corrections sit on top of it.
+# ENGINE. Google Cloud Text-to-Speech, voice en-US-Chirp3-HD-Charon, no style
+# prompt (user's call after a listening test on 2026-08-26, day 15). It
+# replaced the stock Chatterbox speaker, which read as a sneering narrator at
+# every setting tried across three viewings; a Gemini-TTS voice was heard in
+# the same test and rejected on pace (it read ~1.6x slower than the timeline
+# allows). Rides on ADC in the `keplaria` project; the API is enabled there.
+# No voice cloning, no reference clip: the voice is a stock Google one, and
+# THIRD_PARTY.md says so.
 #
-#   PITCH. Off by default since 2026-08-26: the -2 semitone shift, stacked on
-#   the low exaggeration/cfg, read as a sneering, unnatural narrator on the
-#   first full viewing (user's call after a four-way listening test). The
-#   shift remains available as the fourth argument; if used, it goes through
-#   rubberband with formant=preserved, because asetrate + atempo drags the
-#   formants down and yields a muffled voice rather than a lower one.
+#   PITCH. Off by default; the fourth argument shifts by semitones through
+#   rubberband with formant=preserved (asetrate + atempo drags the formants
+#   down and yields a muffled voice rather than a lower one).
 #
-#   PACE, AND WHY IT IS A TARGET RATHER THAN A CONSTANT. Chatterbox is
-#   stochastic: the SAME text renders a different length on every run -- 11.1s
-#   and 11.8s were measured back to back here. So a fixed tempo cannot hit a
-#   time slot, and the script's word budget cannot be trusted to produce a
-#   duration. Pass the beat's slot in seconds and the tempo is computed from
-#   what actually came out.
+#   PACE, AND WHY IT IS A TARGET RATHER THAN A CONSTANT. The engine's length
+#   for a given text is not something the script's word budget can predict, so
+#   a fixed tempo cannot hit a time slot. Pass the beat's slot in seconds and
+#   the tempo is computed from what actually came out.
 #
 # The stretch is clamped to 0.80-1.15. Outside that band rubberband starts to
 # sound like rubberband, and a beat that needs more than a 20% stretch needs
@@ -29,19 +30,32 @@ set -euo pipefail
 SCRIPT=${1:?usage: narrate.sh <script.txt> <out.wav> [target_seconds] [semitones]}
 OUT=${2:?usage: narrate.sh <script.txt> <out.wav> [target_seconds] [semitones]}
 TARGET=${3:-0}
-# Absolute paths: the TTS call below cd's into the tool repo, so a relative
-# script or output path silently pointed nowhere (found 2026-08-24).
 SCRIPT=$(realpath "$SCRIPT"); OUT=$(realpath -m "$OUT")
 SEMITONES=${4:-0}
 
-VIDEO_REPO=${KEPLARIA_VIDEO_REPO:-$HOME/dev/git/byteql-video}
+VOICE=${KEPLARIA_TTS_VOICE:-en-US-Chirp3-HD-Charon}
+PROJECT=${GOOGLE_CLOUD_PROJECT:-keplaria}
 RAW=$(mktemp --suffix=.wav)
 trap 'rm -f "$RAW"' EXIT
 
-# Calm delivery: the 0.5/0.5 defaults read as an advert. Lower exaggeration
-# and cfg give a narrator instead of a pitchman.
-( cd "$VIDEO_REPO" && uv run scripts/narrate.py "$SCRIPT" -o "$RAW" \
-    --exaggeration 0.35 --cfg 0.35 >/dev/null 2>&1 )
+python3 - "$SCRIPT" "$RAW" "$VOICE" "$PROJECT" <<'PY'
+import base64, json, subprocess, sys, urllib.request
+script, raw, voice, project = sys.argv[1:5]
+tok = subprocess.check_output(["gcloud", "auth", "print-access-token"], text=True).strip()
+body = {"input": {"text": open(script).read().strip()},
+        "voice": {"languageCode": "en-US", "name": voice},
+        "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 24000}}
+req = urllib.request.Request(
+    "https://texttospeech.googleapis.com/v1beta1/text:synthesize",
+    data=json.dumps(body).encode(),
+    headers={"Authorization": f"Bearer {tok}", "x-goog-user-project": project,
+             "Content-Type": "application/json"})
+try:
+    reply = json.load(urllib.request.urlopen(req))
+except urllib.error.HTTPError as e:
+    sys.exit(f"FAIL: text-to-speech {e.code}: {e.read().decode()[:400]}")
+open(raw, "wb").write(base64.b64decode(reply["audioContent"]))
+PY
 
 read -r RATIO TEMPO < <(python3 - "$RAW" "$TARGET" "$SEMITONES" <<'PY'
 import sys, wave

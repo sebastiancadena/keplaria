@@ -57,7 +57,7 @@ subset files and their OFL notices live in `docs/architecture/assets/`.
 |---|---|---|---|
 | Google Cloud product icons | Google LLC, official icon set ([cloud.google.com/icons](https://cloud.google.com/icons)) | Google's icon terms — provided for use in architecture diagrams | Nine product icons inlined into `docs/architecture/architecture.svg` (sources in `docs/architecture/assets/`) |
 | Keplaria lockup | Own brand asset, built in the sibling `keplaria-assets` repository | Project's own | Embedded verbatim in the diagram header |
-| Chatterbox TTS 0.1.7 | Resemble AI | MIT | Narration of the submission video (stock voice, no cloning), run locally; not shipped in any service |
+| Google Cloud Text-to-Speech (voice `en-US-Chirp3-HD-Charon`) | Google LLC | Google Cloud terms of service | Narration of the submission video (a stock Google voice, no cloning, no reference clip), rendered by `video/narrate.sh` at build time; not shipped in any service. Replaced Chatterbox TTS on 2026-08-26 |
 | ACE-Step 3.5B | ACE Studio / StepFun | Apache-2.0 | The submission video's music cue, generated locally; not shipped in any service |
 | Manim Community 0.18.1 | Manim Community | MIT | Renders the video's animated diagram and overlay scenes; not shipped in any service |
 
