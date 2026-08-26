@@ -41,3 +41,6 @@ artifacts/
 # committed.
 spikes/hitl_release/.parked.json
 spikes/hitl_reject/.parked.json
+
+# wrangler CLI cache names the Cloudflare account
+site/.wrangler/

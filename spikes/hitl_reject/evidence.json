@@ -36,7 +36,7 @@
       "committed_at": "2026-08-17 18:44:14.389000+00:00",
       "case_version": 1,
       "approval_id": "REJ-A-225CED:v1",
-      "actor": "sebastiancadena@gmail.com"
+      "actor": "owner@redacted.invalid"
     },
     "commands": {
       "create_supplier": {
@@ -106,7 +106,7 @@
       "committed_at": "2026-08-17 18:44:22.401000+00:00",
       "case_version": 3,
       "approval_id": "REJ-B-564088:v3",
-      "actor": "sebastiancadena@gmail.com"
+      "actor": "owner@redacted.invalid"
     },
     "commands": {
       "apply_hold": {
@@ -182,10 +182,10 @@
     },
     "erp_supplier_after": {
       "name": "Andes Verde Import Export SAS",
-      "owner": "sebastiancadena@gmail.com",
+      "owner": "owner@redacted.invalid",
       "creation": "2026-08-17 07:54:37.760936",
       "modified": "2026-08-17 13:33:13.903294",
-      "modified_by": "sebastiancadena@gmail.com",
+      "modified_by": "owner@redacted.invalid",
       "docstatus": 0,
       "idx": 0,
       "naming_series": "SUP-.YYYY.-",

@@ -39,11 +39,11 @@
     "decision": "approved",
     "approval_id": "HITL-71936DC5:v1",
     "committed_at": "2026-08-17 12:54:37.139000+00:00",
-    "actor": "sebastiancadena@gmail.com"
+    "actor": "owner@redacted.invalid"
   },
   "approvals_subcollection": [
     {
-      "actor": "sebastiancadena@gmail.com",
+      "actor": "owner@redacted.invalid",
       "case_version": 1,
       "approval_id": "HITL-71936DC5:v1",
       "committed_at": "2026-08-17 12:54:37.139000+00:00",

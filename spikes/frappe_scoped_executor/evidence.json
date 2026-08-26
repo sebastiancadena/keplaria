@@ -37,7 +37,7 @@
         {
           "kind": "api",
           "ok": true,
-          "detail": "executor identity is not the site owner (sebastiancadena@gmail.com)",
+          "detail": "executor identity is not the site owner (redacted)",
           "evidence": "frappe.auth.get_logged_user"
         },
         {

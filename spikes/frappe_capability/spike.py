@@ -23,7 +23,7 @@ import httpx
 
 SITE = os.environ["FRAPPE_SITE"].rstrip("/")
 AUTH = f"token {os.environ['FRAPPE_API_KEY']}:{os.environ['FRAPPE_API_SECRET']}"
-NOTIFY_EMAIL = os.environ.get("SPIKE_NOTIFY_EMAIL", "sebastiancadena@gmail.com")
+NOTIFY_EMAIL = os.environ["SPIKE_NOTIFY_EMAIL"]
 SUPPLIER_NAME = "SPIKE Deterministic Supplier"
 BOT_EMAIL = "spike-bot@keplaria.example"
 

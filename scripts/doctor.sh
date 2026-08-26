@@ -107,6 +107,15 @@ else
   meh "private vocabulary in an already-pushed commit message:$leak_commits — rewriting public history this close to submission costs more than the clause does; left deliberately, do not force-push to tidy it"
 fi
 
+# The owner's personal address reached six evidence files as the IAM actor
+# before anyone noticed (found by the 2026-08-25 history grep, redacted the
+# same day). No legitimate gmail address belongs in this tree, so the check
+# needs no literal -- which also keeps the address out of this file.
+gmail_files=$(git grep -lEi -I '[a-z0-9._%+-]+@gmail\.com' -- ':!strategy' ':!scripts/doctor.sh' 2>/dev/null)
+[ -z "$gmail_files" ] \
+  && ok "no personal (gmail) address in the tracked tree" \
+  || bad "personal address in tracked files: $(echo "$gmail_files" | tr '\n' ' ')"
+
 echo "== project =="
 [ -d .venv ] && uv lock --check >/dev/null 2>&1 \
   && ok "uv.lock consistent with pyproject" || meh ".venv/lock drift (run: uv sync)"

@@ -46,7 +46,7 @@
       "ok": true,
       "human_seconds": 47.7,
       "decision": "approved",
-      "actor": "sebastiancadena@gmail.com",
+      "actor": "owner@redacted.invalid",
       "executed": [
         "attach_evidence",
         "create_supplier"

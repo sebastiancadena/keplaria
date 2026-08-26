@@ -548,7 +548,7 @@ def test_the_reviewer_banner_masks_the_account_it_names():
     """
     from console.review import mask_account
 
-    assert mask_account("sebastiancadena@gmail.com") == "s•••@gmail.com"
+    assert mask_account("someone@example.com") == "s•••@example.com"
     assert mask_account("a@b.co") == "a•••@b.co"
 
 
