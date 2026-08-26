@@ -467,6 +467,20 @@ def cmd_purge(args) -> int:
         targets_suppliers + targets_cases + targets_comms + targets_files
         + targets_contacts
     )
+    if cited and getattr(args, "recreated_by_next_run", False):
+        # The one sanctioned exception: a DEMO record the very next deployed
+        # run recreates (the live take's approval re-runs create_supplier and
+        # attach_evidence for it), deleted so that approval is a real write
+        # on camera rather than two `created: False` no-ops (2026-08-25).
+        # The citations are printed, not skipped, so the operator sees what
+        # they are betting on; --yes is still required below.
+        print("Cited by evidence, deleting anyway (--recreated-by-next-run):")
+        for target, files in sorted(cited.items()):
+            print(f"  {target}")
+            for file in files:
+                print(f"      cited by {file}")
+        print()
+        cited = {}
     if cited:
         print(f"Refusing {len(cited)} target(s) — committed evidence asserts something about them:")
         for target, files in sorted(cited.items()):
@@ -502,12 +516,14 @@ def cmd_purge(args) -> int:
         return 0
 
     # Correspondence and attachments first: a row still linked to a Supplier
-    # can make the ERP refuse that Supplier's delete outright.
+    # can make the ERP refuse that Supplier's delete outright. The Contact is
+    # the other way round: the ERP refuses to delete one while its Supplier
+    # still exists (417, seen 2026-08-25), so it goes after the Supplier.
     erp_targets = (
         [("Communication", name) for name in targets_comms]
         + [("File", name) for name in targets_files]
-        + [("Contact", name) for name in targets_contacts]
         + [("Supplier", name) for name in targets_suppliers]
+        + [("Contact", name) for name in targets_contacts]
     )
 
     deleted, failed = 0, []
@@ -559,6 +575,11 @@ def main() -> int:
     purge.add_argument("--file", action="append", help="one file by id (repeatable); folders refused")
     purge.add_argument("--contact", action="append", help="one contact by id (repeatable)")
     purge.add_argument("--yes", action="store_true", help="actually delete; without it this is a dry run")
+    purge.add_argument(
+        "--recreated-by-next-run", action="store_true",
+        help="override the evidence-citation refusal for a demo record the next "
+             "deployed run recreates (the live-take reset); citations are printed",
+    )
 
     args = parser.parse_args()
     return {

@@ -202,6 +202,31 @@ def test_purge_refuses_a_target_a_spike_evidence_file_cites(tmp_path, monkeypatc
     assert erp.cmd_purge(args) == 2
 
 
+def test_purge_override_for_a_record_the_next_run_recreates_prints_the_citations(
+    tmp_path, monkeypatch, capsys
+):
+    """The live take needs the demo supplier absent so its approval is a real
+    create, and the take itself recreates it minutes later. The override is
+    explicit, prints what it is overriding, and still stops at the dry run
+    without --yes; a Namespace without the flag behaves as before."""
+    (tmp_path / "judge_run").mkdir()
+    (tmp_path / "judge_run" / "evidence.json").write_text(
+        '{"suppliers": {"hitl": "Andes Verde Import Export SAS"}}'
+    )
+    monkeypatch.setattr(erp, "SPIKES", tmp_path)
+    args = Namespace(
+        test_suppliers=False, supplier=["Andes Verde Import Export SAS"],
+        case=None, communication=None, contact=None, file=None, yes=False,
+        database="(default)", recreated_by_next_run=True,
+    )
+
+    assert erp.cmd_purge(args) == 0
+    out = capsys.readouterr().out
+    assert "deleting anyway" in out
+    assert "judge_run/evidence.json" in out
+    assert "Dry run" in out
+
+
 def test_purge_still_proceeds_for_a_target_no_evidence_mentions(tmp_path, monkeypatch, capsys):
     """The guard must not become a refusal of everything: residue is exactly
     what purge exists to remove, and a rule that blocks it would be worked
