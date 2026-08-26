@@ -102,8 +102,8 @@ suppliers (one parks for a human, one runs unattended from onboarding to hold
 release), with every figure below read from the run's own evidence file in
 the repository:
 
-- **55.3 s of machine time** against a **130s** budget, plus a single
-  **47.7 s human approval**, timed separately because it is a person's time.
+- **85.8 s of machine time** against a **130s** budget, plus a single
+  **3.3 s human approval**, timed separately because it is a person's time.
 - By hand, the same work took **663.5 s** over **20 steps**,
   **19 of which the run removes**; the twentieth is the approval policy
   requires. Author-timed, not practitioner-reviewed; labelled that way
@@ -211,9 +211,8 @@ cites.
 **Every number in this submission has a checker.** The graded domain suite
 runs **24/24** at a **100%** mean score on a deterministic pass metric: whether
 the enforcement outcome was the required one, not whether a model liked the
-prose. **549 passed** of 550 contract and unit tests, re-executed by the run
-that reports them; the one failure, later traced to a shared test database
-rather than to the product, is disclosed.
+prose. **629 passed** of 629 contract and unit tests, re-executed by the run
+that reports them.
 **Nine contracts**, from replay safety to one ERP write after a retry, are
 re-verified at capture time. Ten consecutive deployed runs, two of them cold starts,
 finished inside the budget before anything was recorded. And a claim ledger

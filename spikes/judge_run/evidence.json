@@ -1,28 +1,28 @@
 {
-  "captured_at": "2026-08-22T23:56:10.148009+00:00",
+  "captured_at": "2026-08-26T02:15:28.820030+00:00",
   "result": "PASS",
   "what_this_is": "One full deployed rehearsal of the live judge run: a case parked for a near-match and released by a human approval, then the four-beat lifecycle sequence. Machine time only -- the human approval is timed but excluded from the budget total.",
   "case_ids": {
-    "hitl": "JR-A-E98AC9",
-    "lifecycle": "JR-B-4B4F8E"
+    "hitl": "JR-A-BB8719",
+    "lifecycle": "JR-B-149B9F"
   },
   "suppliers": {
     "hitl": "Andes Verde Import Export SAS",
     "lifecycle": "Distribuidora Llanos Azules SAS"
   },
   "machine_seconds": {
-    "hitl_track": 13.9,
-    "lifecycle_track": 41.4,
-    "total": 55.3
+    "hitl_track": 48.9,
+    "lifecycle_track": 37.0,
+    "total": 85.8
   },
-  "human_seconds": 47.7,
+  "human_seconds": 3.3,
   "budget_seconds": 130,
   "within_budget": true,
   "steps": [
     {
       "track": "A",
       "beat": "event -> parked for review",
-      "seconds": 13.8,
+      "seconds": 48.7,
       "ok": true,
       "phase": "awaiting_approval",
       "band": "review",
@@ -42,9 +42,9 @@
     {
       "track": "A",
       "beat": "human approval -> ERP write",
-      "seconds": 0.1,
+      "seconds": 0.2,
       "ok": true,
-      "human_seconds": 47.7,
+      "human_seconds": 3.3,
       "decision": "approved",
       "actor": "owner@redacted.invalid",
       "executed": [
@@ -55,7 +55,7 @@
     {
       "track": "B",
       "beat": "1. new_supplier_packet",
-      "seconds": 21.4,
+      "seconds": 12.7,
       "ok": true,
       "expected": {
         "state": "active",
@@ -72,7 +72,7 @@
     {
       "track": "B",
       "beat": "2. renewal_due",
-      "seconds": 4.2,
+      "seconds": 4.0,
       "ok": true,
       "expected": {
         "state": "active",
@@ -89,7 +89,7 @@
     {
       "track": "B",
       "beat": "3. renewal_due",
-      "seconds": 3.7,
+      "seconds": 3.8,
       "ok": true,
       "expected": {
         "state": "renewal_requested"
@@ -105,7 +105,7 @@
     {
       "track": "B",
       "beat": "4. evidence_overdue",
-      "seconds": 3.7,
+      "seconds": 6.1,
       "ok": true,
       "expected": {
         "state": "held"
@@ -121,7 +121,7 @@
     {
       "track": "B",
       "beat": "5. certificate_received",
-      "seconds": 8.3,
+      "seconds": 10.4,
       "ok": true,
       "expected": {
         "state": "active",
@@ -141,41 +141,41 @@
       "seconds": 0.0,
       "ok": true,
       "commands": {
-        "JR-B-4B4F8E:apply_hold:c1": {
+        "JR-B-149B9F:apply_hold:c1": {
           "status": "done",
           "cycle": 1,
           "action": "apply_hold",
           "external_id": "Distribuidora Llanos Azules SAS"
         },
-        "JR-B-4B4F8E:attach_evidence:c1": {
+        "JR-B-149B9F:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "action": "attach_evidence",
           "external_id": "9161a08a96"
         },
-        "JR-B-4B4F8E:attach_evidence:c2": {
+        "JR-B-149B9F:attach_evidence:c2": {
           "status": "done",
           "cycle": 2,
           "action": "attach_evidence",
           "external_id": "fc302b6f7d"
         },
-        "JR-B-4B4F8E:clear_hold:c2": {
+        "JR-B-149B9F:clear_hold:c2": {
           "status": "done",
           "cycle": 2,
           "action": "clear_hold",
           "external_id": "Distribuidora Llanos Azules SAS"
         },
-        "JR-B-4B4F8E:create_supplier:c1": {
+        "JR-B-149B9F:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "action": "create_supplier",
           "external_id": "Distribuidora Llanos Azules SAS"
         },
-        "JR-B-4B4F8E:request_renewal:c1": {
+        "JR-B-149B9F:request_renewal:c1": {
           "status": "done",
           "cycle": 1,
           "action": "request_renewal",
-          "external_id": "ealcpboboi"
+          "external_id": "avbq6nqokp"
         }
       }
     }
@@ -191,14 +191,14 @@
     "fields_without_rekeying": 22,
     "simulated_business_days": 380,
     "enforced_hold_days": 5,
-    "automation_seconds": 55.3,
-    "human_seconds": 47.7,
+    "automation_seconds": 85.8,
+    "human_seconds": 3.3,
     "contract_suite": {
-      "passed": 549,
-      "failed": 1,
+      "passed": 629,
+      "failed": 0,
       "deselected": 15,
-      "denominator": 550,
-      "summary_line": "1 failed, 549 passed, 15 deselected, 6 warnings in 551.76s (0:09:11)",
+      "denominator": 629,
+      "summary_line": "629 passed, 15 deselected, 6 warnings in 9.27s",
       "note": "re-executed by this harness, not quoted from a previous run"
     }
   }

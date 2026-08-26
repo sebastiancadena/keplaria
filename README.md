@@ -18,8 +18,8 @@ certificate lapses, validates the renewal against the source document, and
 releases the hold. It stops exactly where policy requires a human decision —
 and nowhere else.
 
-One deployed run of that whole lifecycle: **55.3 s of machine time** and a
-single **47.7 s human approval**, against the same work done by hand in
+One deployed run of that whole lifecycle: **85.8 s of machine time** and a
+single **3.3 s human approval**, against the same work done by hand in
 **663.5 s over 20 steps**, **19 of which the run removes**; the twentieth
 is the approval that policy requires a human to make (author-timed, not
 practitioner-reviewed; method and every qualifier in

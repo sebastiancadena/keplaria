@@ -314,7 +314,10 @@ def hitl_track(db, steps: list, approve=None) -> tuple[str, float, float]:
         "track": "A", "beat": "human approval -> ERP write", "seconds": round(release_s, 1),
         "ok": released_ok, "human_seconds": round(human_s, 1),
         "decision": (case.get("approval") or {}).get("decision"),
-        "actor": (case.get("approval") or {}).get("actor"),
+        # The raw actor stays in the case record (an audit trail must name the
+        # decider); this committed file must not carry a personal address, so
+        # it records the same placeholder the tracked tree was redacted to.
+        "actor": "owner@redacted.invalid" if (case.get("approval") or {}).get("actor") else None,
         "executed": executed,
     })
     log(f"  approved after {human_s:.0f}s of human time; executed {executed}")

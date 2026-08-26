@@ -174,7 +174,7 @@ purchasing hold when a certificate lapses, checks the renewal against the
 source document, and releases the hold. An LLM (large language model)
 coordinator <em>proposes</em> which specialist agents should run; a
 deterministic policy layer <em>decides</em>, against a versioned catalog.</p>
-<div class="figures"><div class="fig"><b>55.3s</b><span>of machine work, one deployed run</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed (author-timed, not practitioner-reviewed)</span></div><div class="fig"><b>1</b><span>decision a human had to make</span></div></div>
+<div class="figures"><div class="fig"><b>85.8s</b><span>of machine work, one deployed run</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed (author-timed, not practitioner-reviewed)</span></div><div class="fig"><b>1</b><span>decision a human had to make</span></div></div>
 <p class="sub">It stops exactly where policy requires a human decision
 &mdash; and nowhere else. Nothing reaches the ERP except through an outbox (a
 queue of pending ERP writes, released only on approval).</p>
