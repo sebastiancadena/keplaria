@@ -161,7 +161,7 @@ Split-screen layout for the live segment:
 |---|---|---|
 | 1 | Black card: "Onboarding ends when the ERP record is created." — "ends" strikes through, replaced by "begins". Title card: Keplaria. | "45.1 s of machine time vs 663.5 s by hand — a 20 steps walkthrough, 19 of which the run removes; author-timed, not practitioner-reviewed" |
 | 2a | Packet event chip; route strip: proposed "evidence + compliance", verdict "APPROVED 2/2" | "Deployed on Google Cloud · unedited from here" |
-| 2b | Compliance result "sanctions near-match"; case moves into Ground Control's parked column showing `create_supplier — HELD`, `attach_evidence — HELD` | "Parked in 13.8 s · ERP writes so far: 0" |
+| 2b | Compliance result "sanctions near-match"; case moves into Ground Control's parked column showing `create_supplier — HELD`, `attach_evidence — HELD` | "Parked in 11.9 s · ERP writes so far: 0" |
 | 2c | Cursor reads the case, clicks Approve; ERP pane: supplier row appears | "22.4 s human approval · 0.1 s execution" |
 | 2d | New case card labelled as a separate Payload; route strip runs again; extraction panel fills; ERP row appears; simulated-clock widget starts | "Separate case — the approval does not carry over", then, over the extraction panel: "Synthetic page-text fixture · no OCR · the returned certificate enters as a published event", then "Design intent: the supplier answers an email. No portal, no login, no account." |
 | 2e | Sim-clock jumps; chips: `renewal_due → no action`, `renewal_due → renewal email sent` (show the outbound Communication in the ERP), `evidence_overdue → purchasing hold`; ERP row flips to Hold | "Clock events: agents engaged — none (policy only)" |

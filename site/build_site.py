@@ -49,7 +49,7 @@ REPO = "https://github.com/sebastiancadena/keplaria"
 # nobody assigned to a group.
 GROUPS = (
     ("The run's own clock, compared against the same work timed by hand.",
-     ("run_machine_seconds", "run_human_seconds", "run_budget_seconds",
+     ("run_machine_seconds", "run_human_seconds", "run_parked_seconds", "run_budget_seconds",
       "manual_baseline_seconds", "manual_baseline_steps",
       "manual_steps_eliminated", "simulated_business_days")),
     ("Checks this run re-executes every time it reports them, not numbers "

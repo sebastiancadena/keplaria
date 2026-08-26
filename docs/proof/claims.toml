@@ -28,6 +28,15 @@ render = "{:.1f} s human approval"
 appears_in = ["README.md", "docs/submission/devpost.md", "docs/submission/video-script.md"]
 
 [[claim]]
+id = "run_parked_seconds"
+claim = "Seconds from the supplier packet to the case parking for a human"
+evidence = "spikes/judge_run/evidence.json"
+path = "steps.0.seconds"
+render = "Parked in {:.1f} s"
+appears_in = ["docs/submission/video-script.md"]
+qualifier = "the recorded take's own run; the narration rounds it to whole seconds"
+
+[[claim]]
 id = "run_budget_seconds"
 claim = "The budget one deployed run must finish inside"
 evidence = "spikes/judge_run/evidence.json"
