@@ -127,7 +127,7 @@ them in `build/`. What each one had to lose before it passed:
 - [ ] Uploaded, set public, and the public URL opened from a logged-out
       browser — the day-18 review pass, not a submission-day task.
 
-## Cold watch (2026-08-26, Cloud TTS cut, 205.97 s)
+## Cold watch (2026-08-26, Cloud TTS cut; 205.97 s when watched, 202.77 s after beat 2f was fitted)
 
 A zero-context subagent read the 41 audit frames and the narration text, with
 no other access, and answered the spec's four rubric questions at 30 s and at
