@@ -13,7 +13,7 @@ assembly; this file is the public pointer to the exact artifact.
 | Frozen commit shown | `f972ce6` (`spikes/freeze/evidence.json`; deployed containers are tied to it by content) |
 | Video repo commit | `ae7c213` |
 | Narration | Google Cloud Text-to-Speech, `en-US-Chirp3-HD-Charon`, rendered by `video/narrate.sh` (see `THIRD_PARTY.md`) |
-| YouTube URL | _(blank until uploaded; the one deliberate blank in the submission copy)_ |
+| YouTube URL | <https://youtu.be/54GiU75AjH4> (public, uploaded 2026-08-26) |
 
 ## How it was checked
 

@@ -49,9 +49,8 @@ Python, running on the
    organizer accounts are pre-authorized ([details below](#access-for-judges-and-testers)).
    Cases the policy stopped wait here with their ERP writes held; an
    approval is what releases them.
-3. **Watch the demonstration video** (not linked yet: it publishes with
-   the Devpost submission and will be linked here then). What it shows: one
-   continuous unedited take. A stop for a human, an approval releasing
+3. **Watch the demonstration video**: <https://youtu.be/54GiU75AjH4> (3:23).
+   What it shows: one continuous unedited take. A stop for a human, an approval releasing
    the ERP writes the same moment, then a simulated year and a half of
    renewals, a hold, and a release.
 

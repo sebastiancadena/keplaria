@@ -13,8 +13,8 @@ require four things of the description, and each has a home here: features
 and functionality (What it does), technologies used and other data sources
 (How we built it), findings and learnings (Challenges, What we learned).
 
-One thing is deliberately absent and must not be invented before it exists:
-the demonstration video URL.
+The demonstration video URL was the one deliberate blank until the upload on
+2026-08-26; it is filled in now.
 
 ---
 
@@ -38,7 +38,7 @@ the demonstration video URL.
 | Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP; the two organizer accounts are pre-authorized) |
 | Code repository | <https://github.com/sebastiancadena/keplaria> |
 | Frozen commit | `f972ce6` — <https://github.com/sebastiancadena/keplaria/commit/f972ce6>; every deployed container was verified against this commit file for file, and the tests, evaluations and timed runs cited here were re-run against it |
-| Demonstration video | TODO — add before submitting |
+| Demonstration video | <https://youtu.be/54GiU75AjH4> (3:23; the build record `docs/submission/video-build.md` names the exact file by sha256) |
 | Architecture diagram | uploaded as a submission image; it is generated from committed sources in the repository, so it cannot drift from the deployed system |
 
 ---

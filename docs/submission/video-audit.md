@@ -124,7 +124,7 @@ them in `build/`. What each one had to lose before it passed:
 - [x] Watched end to end, full screen, with the checklist open. The user, 2026-08-26, on the Cloud TTS cut.
 - [x] Watched a second time by a reviewer who did not record it, looking only
       for text on screen. A zero-context subagent read all 41 frames for text (section C of the cold watch, 2026-08-26): it listed every URL, id and name on screen; all are hash-form service URLs, synthetic suppliers, case ids, the public engine id and the trace id already cleared above. Nothing new.
-- [ ] Uploaded, set public, and the public URL opened from a logged-out
+- [x] Uploaded, set public, and the public URL opened from a logged-out
       browser — the day-18 review pass, not a submission-day task.
 
 ## Cold watch (2026-08-26, Cloud TTS cut; 205.97 s when watched, 202.77 s after beat 2f was fitted)
