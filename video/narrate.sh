@@ -6,10 +6,12 @@
 # No voice cloning: the stock Chatterbox speaker is used deliberately (user's
 # call, 2026-08-22). Two corrections sit on top of it.
 #
-#   PITCH. The stock speaker is bright to the point of sounding synthetic over
-#   a dark, slow-cut video. The shift uses rubberband with formant=preserved.
-#   The cheap trick (asetrate + atempo) drags the formants down with the pitch
-#   and yields a muffled voice rather than a lower one.
+#   PITCH. Off by default since 2026-08-26: the -2 semitone shift, stacked on
+#   the low exaggeration/cfg, read as a sneering, unnatural narrator on the
+#   first full viewing (user's call after a four-way listening test). The
+#   shift remains available as the fourth argument; if used, it goes through
+#   rubberband with formant=preserved, because asetrate + atempo drags the
+#   formants down and yields a muffled voice rather than a lower one.
 #
 #   PACE, AND WHY IT IS A TARGET RATHER THAN A CONSTANT. Chatterbox is
 #   stochastic: the SAME text renders a different length on every run -- 11.1s
@@ -30,7 +32,7 @@ TARGET=${3:-0}
 # Absolute paths: the TTS call below cd's into the tool repo, so a relative
 # script or output path silently pointed nowhere (found 2026-08-24).
 SCRIPT=$(realpath "$SCRIPT"); OUT=$(realpath -m "$OUT")
-SEMITONES=${4:--2}
+SEMITONES=${4:-0}
 
 VIDEO_REPO=${KEPLARIA_VIDEO_REPO:-$HOME/dev/git/byteql-video}
 RAW=$(mktemp --suffix=.wav)
