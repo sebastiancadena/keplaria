@@ -68,6 +68,37 @@ Tick each line against the actual capture, not against intent.
 - [ ] Site URL in frame is the demo site, and nothing in the page footer
       names a real person or a paid account.
 
+### Cloud console captures (beat 3)
+
+The rules ask the video to demonstrate that the backend runs on Google
+Cloud, so beat 3 shows three console pages as stills. Captured 2026-08-25
+(day 14) from the personal-profile Chrome at a 1920×1080 viewport, grabbed
+from the X display (not the extension's scaled JPEG), filed in
+`keplaria-video/media/gcp/` with the capture and masking scripts beside
+them in `build/`. What each one had to lose before it passed:
+
+- [x] **01 Agent Runtime deployment list.** The account avatar (a face)
+      sits in the console's top bar on every page: masked with a patch of
+      the same bar rows. **Never hover the avatar before a capture** — the
+      tooltip prints the account name and email. The "Get started" promo
+      card was dismissed. Resource name and identity columns show only
+      the engine id (public in the README) and a truncated
+      `...gserviceaccount.com`.
+- [x] **02 Cloud Run services list.** The default "Deployed by" column
+      prints the account email on every row: hidden through the column
+      chooser. The service URL column is not displayed (it would carry the
+      numeric project form). `billing-killswitch` stays in the list: it is
+      a real service and hiding it would be a lie of omission.
+- [x] **03 Cloud Trace, supplier one.** Trace `a0bf7262c679c2d9350698d7032da78c`,
+      the `JR-A-E98AC9` onboarding invocation (coordinator → evidence →
+      screening → compliance → `park_case`). Framed on the waterfall only:
+      the span attribute panel prints `gcp.project_id` as the project
+      NUMBER, so it is never opened on camera. The header shows the console
+      timezone (`America/Indianapolis`); judged not identifying and left.
+- [x] The extension used to drive the browser paints its own cursor into
+      the page; it is parked on flat background and painted out. Check
+      each frame for a stray arrow before use.
+
 ### The scoreboard and overlays
 
 - [ ] Every number matches the frozen run. The script's figures are bound in
