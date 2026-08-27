@@ -102,25 +102,14 @@ literally (do not paraphrase it away in edits). The
 
 ## Social post (drafted, not posted)
 
-Needs `#AllThingsAgenticHackathon` and the article's public URL.
+Needs `#AllThingsAgenticHackathon` and the article's public URL. The first
+draft (an uncontextualized finding plus an aphorism stack) was rejected by
+the author on 2026-08-27 as reading like rambling with no orientation; this
+replacement was chosen from three context-first candidates the same day.
+264 characters as X counts them (a t.co link is 23):
 
-> A commercial prompt-injection filter, at its most sensitive setting,
-> returned NO_MATCH_FOUND on the injected document a small sentence-level
-> heuristic catches with 5 findings.
->
-> Not language. Not segmentation. Context dilution — the payload is detected
-> under 89 characters of surrounding prose and gone at 108.
->
-> That's one of three findings from my hackathon build where the surface
-> signal said yes and a small probe said no:
->
-> — a documented "thinking budget" that is actually an off switch when
-> structured output is on: 0 reasoning tokens, both model generations
-> — a model that went 12/12 on small calls, then 429'd twice on the real
-> workload. Capacity, not quota.
->
-> Enabled is not detecting. Configured is not bounded. Responding is not
-> serving.
->
-> Write-up: <https://dev.to/sebastiancadena7/the-smoke-test-said-yes-1068>
+> Does your safety filter see what you think it sees? Mine passed every
+> quick check, then missed the injected document my demo plants once ~100
+> chars of prose surrounded the payload. Measured for my hackathon entry:
+> <https://dev.to/sebastiancadena7/the-smoke-test-said-yes-1068>
 > #AllThingsAgenticHackathon
