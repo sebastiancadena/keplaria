@@ -369,8 +369,14 @@ OpenTelemetry</p>
 
 
 def _proof_row(claim) -> str:
-    result = resolve(claim, ROOT) if claim.verify == "evidence" else None
+    # A hold recorded in the ledger must reach this page: rendering the value
+    # anyway would publish the very number the reason says not to.
+    held = (claim.verify == "evidence" and bool(claim.reason)
+            and not claim.appears_in)
+    result = (resolve(claim, ROOT)
+              if claim.verify == "evidence" and not held else None)
     value = (f'<span class="val">{html.escape(result)}</span>' if result
+             else '<span class="q">held (reason in the ledger)</span>' if held
              else '<span class="q">read the evidence file</span>')
     qualifier = (f'<div class="q">{html.escape(claim.qualifier)}</div>'
                  if claim.qualifier else "")
