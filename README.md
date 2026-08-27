@@ -18,6 +18,12 @@ certificate lapses, validates the renewal against the source document, and
 releases the hold. It stops exactly where policy requires a human decision —
 and nowhere else.
 
+The name is deliberate: Kepler showed that orbital motion obeys law, and
+law-governed motion is the claim this system makes about its agents. The model
+proposes; a versioned policy decides. The full argument is on
+[keplaria.com](https://keplaria.com), under "Named for the law, not the
+planets".
+
 One deployed run of that whole lifecycle: **45.1 s of machine time** and a
 single **22.4 s human approval**, against the same work done by hand in
 **663.5 s over 20 steps**, **19 of which the run removes**; the twentieth
