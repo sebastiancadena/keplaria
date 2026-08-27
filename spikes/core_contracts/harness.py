@@ -374,6 +374,30 @@ LIVE_CHECKS = {
 }
 
 
+def _environment_gaps() -> list[str]:
+    """Prerequisites whose absence makes a FAIL say nothing about behaviour.
+
+    A fresh clone without credentials, or a run missing `.env.secrets`, fails
+    every live check for environmental reasons. Such a run must not overwrite
+    the committed evidence — that exact overwrite happened on 2026-08-23
+    (missing `.env.secrets` false-FAILed `one_erp_write_after_retry` and
+    rewrote evidence.json with the false FAIL).
+    """
+    gaps = []
+    try:
+        import google.auth
+
+        google.auth.default()
+    except Exception as exc:
+        gaps.append(f"no Google credentials (ADC): {type(exc).__name__}")
+    if not os.environ.get("FRAPPE_API_KEY"):
+        gaps.append(
+            "FRAPPE_API_KEY is not set — run with "
+            "--env-file .env --env-file .env.secrets"
+        )
+    return gaps
+
+
 def _run_tests(node_ids: list[str]) -> tuple[bool, str]:
     """Re-run the cited tests. Their passing now is the point, not their names."""
     proc = subprocess.run(
@@ -387,6 +411,15 @@ def _run_tests(node_ids: list[str]) -> tuple[bool, str]:
 
 
 def main() -> int:
+    env_gaps = _environment_gaps()
+    for gap in env_gaps:
+        print(f"WARNING: {gap}")
+    if env_gaps:
+        print(
+            "WARNING: environment incomplete — live checks will report "
+            "unproven, and a failed run will NOT overwrite evidence.json\n"
+        )
+
     results = []
     for entry in CRITERIA:
         checks = []
@@ -457,9 +490,19 @@ def main() -> int:
         ],
         "criteria": results,
     }
-    (HERE / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
 
     print()
+    if unproven and env_gaps:
+        print(f"RESULT: FAIL — {len(unproven)} unproven: {', '.join(unproven)}")
+        print(
+            "Environment incomplete ("
+            + "; ".join(env_gaps)
+            + "), so this failure says nothing about behaviour: "
+            "evidence.json was left untouched."
+        )
+        return 1
+    (HERE / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+
     if unproven:
         print(f"RESULT: FAIL — {len(unproven)} unproven: {', '.join(unproven)}")
         return 1

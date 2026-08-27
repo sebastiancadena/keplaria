@@ -2,10 +2,11 @@
 # Environment doctor: verifies the local toolchain this project depends on.
 # Safe to run anytime; read-only. Exits non-zero if any REQUIRED check fails.
 set -uo pipefail
-pass=0; fail=0; warn=0
+pass=0; fail=0; warn=0; skipped=0
 ok()   { printf ' PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf ' FAIL  %s\n' "$1"; fail=$((fail+1)); }
 meh()  { printf ' WARN  %s\n' "$1"; warn=$((warn+1)); }
+skip() { printf ' SKIP  %s\n' "$1"; skipped=$((skipped+1)); }
 
 echo "== tool presence =="
 for t in uv uvx gcloud node npx git; do
@@ -16,10 +17,26 @@ command -v wrangler   >/dev/null && ok "wrangler $(wrangler --version 2>/dev/nul
 command -v gh         >/dev/null && ok "gh $(gh --version 2>/dev/null | head -1)"       || meh "gh missing"
 
 echo "== auth =="
-[ "$(gcloud config get-value project 2>/dev/null)" = "keplaria" ] \
-  && ok "gcloud project = keplaria" || bad "gcloud project != keplaria"
-gcloud auth application-default print-access-token >/dev/null 2>&1 \
-  && ok "ADC token mints" || bad "ADC broken (do NOT fix by re-running gcloud init blindly)"
+# Cloud checks only mean something when an identity can actually see the
+# project. A credential-less clone (a judge's machine) would otherwise read
+# every cloud FAIL as an outage that is really just absent auth — the
+# 2026-08-27 zero-context README walk hit 28 such false FAILs, including
+# "the agent graph is down" while the hosted console was serving. Access is
+# probed directly (projects describe) rather than inferred from config, so a
+# misconfigured author machine still fails loudly instead of skipping.
+if gcloud projects describe keplaria --format='value(projectId)' >/dev/null 2>&1; then
+  cloud_ok=1
+else
+  cloud_ok=0
+fi
+if [ "$cloud_ok" = 1 ]; then
+  [ "$(gcloud config get-value project 2>/dev/null)" = "keplaria" ] \
+    && ok "gcloud project = keplaria" || bad "gcloud project != keplaria"
+  gcloud auth application-default print-access-token >/dev/null 2>&1 \
+    && ok "ADC token mints" || bad "ADC broken (do NOT fix by re-running gcloud init blindly)"
+else
+  skip "no identity with access to project keplaria — cloud-infrastructure checks below report SKIP, not FAIL; they can only go green for the author"
+fi
 # `wrangler whoami` is a network call, so a blip reads as "not authenticated" —
 # which points at exactly the wrong remedy, since re-running the OAuth login
 # would disturb working credentials. Retry once and separate the two cases.
@@ -251,6 +268,9 @@ else
 fi
 
 echo "== cloud infra (read-only) =="
+if [ "$cloud_ok" = 0 ]; then
+  skip "cloud infra checks (billing kill switch, VPC, yente VM posture) — no cloud identity"
+else
 state=$(gcloud functions describe billing-killswitch --region=us-central1 --gen2 \
   --format='value(state,serviceConfig.environmentVariables.DRY_RUN)' --project=keplaria 2>/dev/null)
 echo "$state" | grep -q 'ACTIVE' && ok "billing kill switch deployed" || bad "billing kill switch not ACTIVE"
@@ -339,6 +359,7 @@ if printf '%s' "$addr" | grep -q '10\.10\.0\.2'; then
 else
   bad "10.10.0.2 is NOT reserved — an ephemeral address can be handed to another VM while yente is down, and the graph reaches yente by that literal address"
 fi
+fi
 [ -f spikes/vm_recovery/evidence.json ] \
   && ok "VM recovery drill evidence present (spikes/vm_recovery/evidence.json)" \
   || bad "no VM recovery drill evidence — screening has no managed fallback, so the snapshot restore must be a tested path, not an assumed one; bash spikes/vm_recovery/drill.sh"
@@ -400,6 +421,9 @@ grep -qE '^\s*COPY\s+\./policy\s+\./policy\s*$' Dockerfile \
 grep -qE '^\s*COPY\s+\./fixtures\s+\./fixtures\s*$' Dockerfile \
   && ok "Dockerfile copies fixtures/ into the image" \
   || bad "Dockerfile does not COPY ./fixtures ./fixtures — load_document() raises DocumentUnavailable on every deployed case with a document_ref"
+if [ "$cloud_ok" = 0 ]; then
+  skip "PSC/IAM deploy preconditions — no cloud identity"
+else
 gcloud compute network-attachments describe keplaria-psc2 --region=us-central1 \
   --project=keplaria >/dev/null 2>&1 \
   && ok "network attachment keplaria-psc2" || bad "keplaria-psc2 missing (PSC-I → yente will fail)"
@@ -421,6 +445,7 @@ echo "$re_roles" | grep -q 'compute.networkUser' \
   && ok "aiplatform-re SA has compute.networkUser" || bad "aiplatform-re SA lacks compute.networkUser"
 gcloud services list --enabled --project=keplaria 2>/dev/null | grep -q 'cloudresourcemanager' \
   && ok "cloudresourcemanager API enabled" || bad "cloudresourcemanager disabled (Cloud Logging + OTel resource detector need it)"
+fi
 # Base image and requires-python must agree or the lock installs into the wrong venv.
 img=$(grep -oP '^FROM python:\K[0-9]+\.[0-9]+' Dockerfile 2>/dev/null | head -1)
 req=$(grep -oP 'requires-python\s*=\s*">=\K[0-9]+\.[0-9]+' pyproject.toml 2>/dev/null | head -1)
@@ -431,6 +456,9 @@ req=$(grep -oP 'requires-python\s*=\s*">=\K[0-9]+\.[0-9]+' pyproject.toml 2>/dev
 # One engine named keplaria. services.py finds-or-creates by display name, so a
 # second engine means a stray duplicate and a non-deterministic session backend.
 # There is no `gcloud ai reasoning-engines` surface — this is REST-only.
+if [ "$cloud_ok" = 0 ]; then
+  skip "one-engine invariant (reasoning-engine list) — no cloud identity"
+else
 names=$(curl -s -m 30 -H "Authorization: Bearer $(gcloud auth print-access-token 2>/dev/null)" \
   "https://us-central1-aiplatform.googleapis.com/v1/projects/584548214478/locations/us-central1/reasoningEngines" \
   2>/dev/null | python3 -c 'import json,sys
@@ -448,8 +476,16 @@ elif [ "$count" -eq 0 ]; then
 else
   bad "expected 1 engine named keplaria, found $count: $(printf '%s' "$names" | tr '\n' ' ')— strays surface in Agent Registry"
 fi
+fi
 
 echo "== thin vertical =="
+gcloud components list --filter='id=cloud-firestore-emulator' --format='value(state)' 2>/dev/null \
+  | grep -q 'Installed' \
+  && ok "firestore emulator component installed" \
+  || meh "firestore emulator component not installed (gcloud components install cloud-firestore-emulator)"
+if [ "$cloud_ok" = 0 ]; then
+  skip "thin-vertical infra (Firestore, Pub/Sub, ingress posture) — no cloud identity"
+else
 gcloud firestore databases list --format='value(name)' --project=keplaria 2>/dev/null \
   | grep -q '(default)$' \
   && ok "firestore (default) database" || bad "firestore (default) database missing"
@@ -476,10 +512,6 @@ if [ -n "$ingress_url" ]; then
 else
   bad "keplaria-ingress service not deployed"
 fi
-gcloud components list --filter='id=cloud-firestore-emulator' --format='value(state)' 2>/dev/null \
-  | grep -q 'Installed' \
-  && ok "firestore emulator component installed" \
-  || meh "firestore emulator component not installed (gcloud components install cloud-firestore-emulator)"
 # The Agent Runtime engine allows only 1 concurrent query; a serialised
 # ingress is what stops a single 429 from becoming a redelivery storm (see
 # infra/events/setup.sh for the incident this guards against).
@@ -496,8 +528,12 @@ retry_backoff=$(gcloud pubsub subscriptions describe keplaria-events-push --proj
 [ -n "$retry_backoff" ] \
   && ok "keplaria-events-push has a retry policy (minimumBackoff=$retry_backoff)" \
   || bad "keplaria-events-push has no retry policy — a 429/503 redelivers near-instantly and can exhaust the engine quota"
+fi
 
 echo "== console + review services =="
+if [ "$cloud_ok" = 0 ]; then
+  skip "console + review service checks (their URLs come from gcloud; the public console URL is in the README and answers logged-out) — no cloud identity"
+else
 console_url=$(gcloud run services describe keplaria-console --region=us-central1 \
   --format='value(status.url)' --project=keplaria 2>/dev/null)
 if [ -n "$console_url" ]; then
@@ -587,6 +623,7 @@ if [ -n "$review_url" ]; then
 else
   meh "keplaria-review not deployed yet"
 fi
+fi
 
 echo "== MCP: adk-docs probe (known failure mode: mcp>=2 breaks mcpdoc with a misleading -32000) =="
 probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"doctor","version":"0"}}}'
@@ -597,6 +634,9 @@ if command -v uvx >/dev/null; then
 fi
 
 echo "== dead-letter and sweep =="
+if [ "$cloud_ok" = 0 ]; then
+  skip "dead-letter and sweep checks — no cloud identity"
+else
 DLQ_TOPIC_PATH=$(gcloud pubsub topics describe keplaria-events-dead \
   --project=keplaria --format='value(name)' 2>/dev/null || true)
 [ -n "$DLQ_TOPIC_PATH" ] \
@@ -672,6 +712,7 @@ done
 [ -z "$missing_index" ] \
   && ok "outbox/status COLLECTION_GROUP index READY in (default) and keplaria-test (the sweep's query needs it)" \
   || bad "no READY outbox/status COLLECTION_GROUP index in: ${missing_index}— the sweep query and /review/failures FailedPrecondition there; the emulator hides this because it auto-indexes"
+fi
 
 
 echo "== cost observability (a budget that watches nothing reports 0.00 forever) =="
@@ -686,6 +727,9 @@ echo "== cost observability (a budget that watches nothing reports 0.00 forever)
 #      one that excludes credits and therefore the only source of the real burn
 #      rate. If it is deleted or flipped to include credits, gross visibility
 #      disappears silently.
+if [ "$cloud_ok" = 0 ]; then
+  skip "cost observability checks (budgets, billing export, detach alert) — no cloud identity"
+else
 billing_account="$(gcloud billing projects describe keplaria \
   --format='value(billingAccountName)' 2>/dev/null | sed 's|billingAccounts/||')"
 if [ -z "$billing_account" ]; then
@@ -782,8 +826,9 @@ case "$alert_state" in
   MISSING)   bad "no alert policy watches for BILLING DETACHED — the kill switch would take the project down silently (infra/monitoring/alert-billing-detached.json)" ;;
   DISABLED)  bad "the billing-detach alert policy is DISABLED — a detach would go unannounced" ;;
   NOCHANNEL) bad "the billing-detach alert policy has no notification channel — it would fire into nothing" ;;
-  ERR)       warn "could not list alert policies to check the billing-detach alert" ;;
+  ERR)       meh "could not list alert policies to check the billing-detach alert" ;;
 esac
+fi
 
 
 echo "== deploy-time secret hygiene =="
@@ -803,7 +848,7 @@ if [ -f .env ]; then
     && ok ".env carries no secret-shaped keys (agents-cli would deploy them as plaintext)" \
     || bad ".env contains secret-shaped key(s): ${leaked} — the next agents-cli deploy injects these as plaintext env on the engine and echoes them to stdout; move them to .env.secrets"
 else
-  warn ".env not found — skipping the deploy-time secret check"
+  meh ".env not found — skipping the deploy-time secret check"
 fi
 
 # .gcloudignore REPLACES .gitignore at deploy time, so a file being gitignored
@@ -821,7 +866,15 @@ fi
 # The engine has no public internet egress and its graph never imports the
 # executor, so it cannot reach the ERP at all. Any Frappe credential on it is
 # both unused and readable — belt and braces against a redeploy putting them back.
-engine_env="$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+#
+# The response must actually BE the engine spec before "no secret-shaped vars"
+# may pass: an unauthenticated call gets a JSON error body, which parses fine,
+# has no spec, and used to read as a green — a check that passed because it
+# could not look (caught by the 2026-08-27 credential-less README walk).
+if [ "$cloud_ok" = 0 ]; then
+  skip "deployed-engine plaintext-secret check — no cloud identity"
+else
+engine_env="$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token 2>/dev/null)" \
   "https://us-central1-aiplatform.googleapis.com/v1/projects/keplaria/locations/us-central1/reasoningEngines/2127503872455868416" 2>/dev/null \
   | python3 -c '
 import json, sys
@@ -829,16 +882,19 @@ try:
     d = json.load(sys.stdin)
 except Exception:
     print("ERR"); raise SystemExit
+if "error" in d or "name" not in d:
+    print("ERR"); raise SystemExit
 env = d.get("spec", {}).get("deploymentSpec", {}).get("env", []) or []
 bad = [e["name"] for e in env
        if any(t in e["name"] for t in ("SECRET", "API_KEY", "TOKEN", "PASSWORD"))]
-print(",".join(bad))
+print("OK=" + ",".join(bad))
 ' 2>/dev/null)"
 case "$engine_env" in
-  ERR) warn "could not read the engine deployment spec to check for plaintext secrets" ;;
-  "")  ok "deployed engine carries no secret-shaped plaintext env vars" ;;
-  *)   bad "deployed engine carries plaintext secret env var(s): ${engine_env} — readable by anyone with viewer access on the engine; the graph does not use them (no public egress, executor runs on Cloud Run)" ;;
+  OK=)   ok "deployed engine carries no secret-shaped plaintext env vars" ;;
+  OK=*)  bad "deployed engine carries plaintext secret env var(s): ${engine_env#OK=} — readable by anyone with viewer access on the engine; the graph does not use them (no public egress, executor runs on Cloud Run)" ;;
+  *)     meh "could not read the engine deployment spec, so the plaintext-secret check did NOT run (this is not a pass)" ;;
 esac
+fi
 
 # The ERP credential the deployed services hold must be the SCOPED executor,
 # not the site owner. Until 2026-08-23 it was the owner's key — a full System
@@ -846,7 +902,9 @@ esac
 # cold read caught as an overclaim. Checked by asking Frappe who the deployed
 # credential authenticates as, because that is the only answer that cannot be
 # satisfied by a comment.
-if [ -f .env ]; then
+if [ "$cloud_ok" = 0 ]; then
+  skip "deployed ERP credential + revision-freshness checks — no cloud identity"
+elif [ -f .env ]; then
   # shellcheck disable=SC1091
   site="$(grep -E '^FRAPPE_SITE=' .env | cut -d= -f2- | tr -d '"'"'"'"' | sed 's:/*$::')"
   key="$(gcloud secrets versions access latest --secret frappe-api-key --project keplaria 2>/dev/null)"
@@ -871,6 +929,7 @@ fi
 # forgetting this step leaves the services on the old credential while every
 # local check passes — the failure the rotation runbook in docs/operations.md
 # exists to prevent, now checked rather than described.
+if [ "$cloud_ok" = 1 ]; then
 newest_secret=0
 for sname in frappe-api-key frappe-api-secret; do
   t="$(gcloud secrets versions describe latest --secret "$sname" --project keplaria \
@@ -895,6 +954,7 @@ else
     && ok "keplaria-ingress and keplaria-review revisions are newer than the ERP secret versions they resolve" \
     || bad "revision(s) predate the current ERP secret: ${stale}— a revision holds the version it resolved at deploy time, so these still serve the OLD credential; run: gcloud run services update <svc> --region us-central1 --update-secrets FRAPPE_API_KEY=frappe-api-key:latest,FRAPPE_API_SECRET=frappe-api-secret:latest"
 fi
+fi
 
 echo "== public claims =="
 # A number in the README that no longer matches the run that produced it is a
@@ -912,5 +972,10 @@ else
 fi
 
 echo
-printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
+if [ "$skipped" -gt 0 ]; then
+  printf '%d passed, %d failed, %d warnings, %d skipped (no cloud identity — cloud checks are author-only)\n' \
+    "$pass" "$fail" "$warn" "$skipped"
+else
+  printf '%d passed, %d failed, %d warnings\n' "$pass" "$fail" "$warn"
+fi
 [ "$fail" -eq 0 ]

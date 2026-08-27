@@ -47,12 +47,14 @@ Python, running on the
    Open a case: the strip at the top shows where it sits in the lifecycle
    (onboarded → active → renewal requested → held → released), and the
    status line says what has actually been written to the ERP; for a
-   parked case, nothing yet.
+   parked case (one stopped to wait for a human decision), nothing yet.
 2. **Open [Ground Control](https://keplaria-review-bklu5jcdea-uc.a.run.app/review)**,
    the human decision surface. Sign-in is Google, through Cloud IAP
-   (Identity-Aware Proxy: Google's sign-in gate in front of the service);
-   the two
-   organizer accounts are pre-authorized ([details below](#access-for-judges-and-testers)).
+   (Identity-Aware Proxy: Google's sign-in gate in front of the service).
+   This step works only for the two pre-authorized organizer accounts; any
+   other account gets IAP's refusal, which is the access model working, and
+   the video shows the surface in use
+   ([details below](#access-for-judges-and-testers)).
    Cases the policy stopped wait here with their ERP writes held; an
    approval is what releases them.
 3. **Watch the demonstration video**: <https://youtu.be/54GiU75AjH4> (3:23).
@@ -62,8 +64,9 @@ Python, running on the
 
 What those three show together: the model proposes, deterministic policy
 decides, a human stays in exactly the loop policy requires, and nothing
-reaches the ERP except through a policy-gated command from the outbox,
-safe to retry: a retried command leaves exactly one ERP record. The one
+reaches the ERP except through a policy-gated command from the outbox (the
+durable queue of ERP commands a case has been cleared to send), safe to
+retry: a retried command leaves exactly one ERP record. The one
 at-least-once channel is outbound mail, which can repeat a message but
 never a record.
 
@@ -71,10 +74,16 @@ never a record.
 
 ## Access for judges and testers
 
-Nothing in this repository needs a credential to evaluate. The evidence files
-are committed, `bash scripts/doctor.sh` is read-only and prints its own
-pass/fail summary, and the case console below opens in a logged-out browser.
-Two hosted surfaces exist, and only one of them asks who you are.
+Nothing in this repository needs a credential to evaluate: the evidence files
+are committed, `uv run python scripts/claim_ledger.py --check` re-verifies
+every machine-checkable public number offline, and the case console below
+opens in a logged-out browser. `bash scripts/doctor.sh` is read-only and
+prints its own pass/fail summary; its local checks (generated artifacts,
+lockfile, secret hygiene, the claim ledger) run without any credential, and
+it reports its cloud-infrastructure checks as SKIP when no Google Cloud
+identity with access to the `keplaria` project is available; those checks
+can only go green for the author. Two hosted surfaces exist, and only one of
+them asks who you are.
 
 | Surface | Sign-in | What it is |
 |---|---|---|
@@ -159,6 +168,7 @@ sections. Nothing here is a second copy: follow the link.
    coverage](#platform-subsystem-coverage), "Agent Identity").
 6. **Failure becomes durable state, never a silent exception.** A failed ERP
    command stays in the outbox with its attempt count; the unattended sweep
+   (a scheduled background job that finds stuck commands)
    re-drives it once the destination is repaired, and the retried write is
    singular (`one_erp_write_after_retry`, proven against a live command). A
    value with no supporting source span is rejected, retried within bounds,
@@ -234,6 +244,9 @@ repair the comparison applied before grading:
 The diagram is generated, not drawn: `uv run python docs/architecture/build.py`
 rebuilds `docs/architecture/architecture.svg` from the committed sources under
 `docs/architecture/assets/` (a PNG export for form uploads sits alongside it).
+(Every `uv run` command in this file assumes
+[Setup from a fresh clone](#setup-from-a-fresh-clone) has been done first;
+`uv sync` there creates the environment.)
 Update the build script whenever a component is added or moved: the diagram
 is part of the submission and must match the deployed system.
 
@@ -273,7 +286,8 @@ The agent graph and its adapters run on two different runtimes:
 - **Agent Runtime** hosts the ADK graph as reasoning engine `keplaria`
   (`projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416`).
   It reaches yente (an open-source sanctions-screening service, running on
-  a private VM) over the `keplaria-psc2` PSC-I network attachment and keeps
+  a private VM) over the `keplaria-psc2` PSC-I (Private Service Connect
+  Interface) network attachment and keeps
   agent execution state in Agent Platform
   Sessions.
 - **Cloud Run** hosts `keplaria-ingress`, the authenticated Pub/Sub push
@@ -480,8 +494,15 @@ reference for re-running any one specific proof.*
   than a hand-maintained list:** a test that is deleted, renamed, or red
   demotes its criterion instead of continuing to look green. Exits non-zero if
   any contract is unproven, and writes
-  `spikes/core_contracts/evidence.json`. Needs `--env-file .env` for the live
-  checks.
+  `spikes/core_contracts/evidence.json`. Run it as
+  `uv run --env-file .env --env-file .env.secrets python
+  spikes/core_contracts/harness.py`, with the Firestore emulator listening
+  (see [Setup](#setup-from-a-fresh-clone)); the live checks need author
+  credentials, and a stranger's clone has no `.env.secrets` to pass (copy
+  `.env.secrets.example` if the file must exist). Without credentials it
+  still re-runs the local tests, but it reports the live checks as unproven
+  and deliberately leaves the committed `evidence.json` untouched, so an
+  environment-caused failure cannot overwrite a real result.
 
   Both live checks **discover** what they verify rather than naming it. The
   retry check asks the deployed ledger whether any command carries
@@ -524,7 +545,8 @@ reference for re-running any one specific proof.*
   finding and driving a stuck case, and an event actually landing in
   `dead_events`. Writes `spikes/dlq/evidence.json`.
 - `spikes/lifecycle/harness.py` — drives the full five-step station-keeping
-  lifecycle (onboarding, early renewal check, renewal request, overdue hold,
+  lifecycle (the scheduled wake-ups that keep a long-lived case on course:
+  onboarding, early renewal check, renewal request, overdue hold,
   renewed evidence and hold release) against the deployed engine and ingress,
   and writes `spikes/lifecycle/evidence.json`. This is the current
   post-deploy verification script; see
@@ -584,10 +606,25 @@ own Python; no system interpreter, pyenv, or Homebrew Python is involved.
 
 ```bash
 uv sync                                       # creates .venv from uv.lock
-gcloud auth application-default login         # once per machine
-cp .env.example .env                          # then edit if needed
-uv run adk web                                # ADK dev UI
+cp .env.example .env                          # placeholders are fine as-is
+uv run adk web                                # ADK dev UI; needs no credentials
 ```
+
+`adk web`, the diagram and site generators, and the claim-ledger check all run
+with no credentials and no edits to `.env`: the placeholders in it (engine
+resource, ERP site, IAP audience) only matter for the deployed-state
+harnesses, which need access to the author's project anyway. Two further
+steps if you want to run the test suite or cloud-touching commands:
+
+```bash
+gcloud auth application-default login         # once per machine, cloud only
+gcloud beta emulators firestore start --host-port=localhost:8451
+```
+
+The Firestore emulator is what the test suite and the local half of
+`spikes/core_contracts/harness.py` run against; with it listening, the full
+suite takes about 14 seconds. Without it, tests that need Firestore fail
+loudly rather than passing quietly.
 
 Operational runbooks (deploys, provisioning, failure handling, tooling)
 live in [docs/operations.md](docs/operations.md).
@@ -596,7 +633,7 @@ live in [docs/operations.md](docs/operations.md).
 
 | | |
 |---|---|
-| Python | **3.13.13**, uv-managed (pinned in `.python-version`) |
+| Python | **3.13**, uv-managed (`.python-version` pins the minor; uv resolves the interpreter) |
 | Package manager | **uv** |
 | Venv | `.venv/` — self-contained, links to no system interpreter |
 | ADK | `google-adk` 2.5.0 |
@@ -624,20 +661,28 @@ assets for the site live in the sibling repo `~/dev/git/keplaria-assets`.
 resource detector and the Cloud Logging client both call it, and it was disabled
 until 2026-08-13.
 
-Authentication is via Application Default Credentials. Verify with:
+Authentication is via Application Default Credentials. On the author's
+machine, verify with:
 
 ```bash
 gcloud config list                                  # expect project = keplaria
 gcloud auth application-default print-access-token  # expect a token
 ```
 
+A fresh clone under your own Google account shows your own project here, and
+no outside identity has IAM on `keplaria`; every cloud-side verification in
+this file is author-only, which is why `doctor.sh` reports those checks as
+SKIP rather than FAIL when it cannot see the project.
+
 `aiplatform.googleapis.com` is now surfaced as the **Agent Platform API**: the
 Vertex AI API under its current name, not a separate product.
 
 ## Configuration
 
-Credentials and platform selection go in a `.env` at the project root. `.env` is
-gitignored; never commit keys.
+Platform selection and non-secret configuration go in a `.env` at the project
+root; secrets go in `.env.secrets`. Both are gitignored, and only `.env` is
+ever read by a deploy (`.env.example` explains why at its top). Never commit
+keys.
 
 ```dotenv
 GOOGLE_GENAI_USE_ENTERPRISE=true
