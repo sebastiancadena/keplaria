@@ -284,6 +284,9 @@ Everything is in `us-central1`.
 
 ### Event flow
 
+This is the path drawn in the [architecture diagram](#architecture) above,
+written out as a sequential trace naming the components involved:
+
 ```text
 topic keplaria-events
   -> OIDC-authenticated push subscription keplaria-events-push
