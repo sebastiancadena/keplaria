@@ -5,10 +5,10 @@ project, per the hackathon's disclosure requirements. All repository commits
 fall inside the submission period; the entries below are the components that
 did not originate here.
 
-**Repository license:** this repository is not currently published under an
-open-source license (all rights reserved by the author). The third-party
-components below remain under their own licenses, including the Apache-2.0
-notices retained on files derived from the Google scaffold.
+**Repository license:** MIT, see [LICENSE](LICENSE) (relicensed from
+all-rights-reserved on 2026-08-27, when the repository went public). The
+third-party components below remain under their own licenses, including the
+Apache-2.0 notices retained on files derived from the Google scaffold.
 
 ## Code
 
