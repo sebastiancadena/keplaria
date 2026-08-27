@@ -37,8 +37,8 @@
     {
       "id": "case_accumulation_under_one_supplier",
       "severity": "concern",
-      "status": "OPEN (user decision: deleting cases risks unproving spike evidence that cites live records; purge refuses records named by spike JSON)",
-      "detail": "The console's first group shows 21 cases under one supplier, ~20 near-identical JR-A-* rows awaiting approval (accumulated rehearsal runs), plus DLQ-SWEEP and DEMO-* probe rows, under a front page whose core sentence is 'one durable case per supplier'."
+      "status": "RESOLVED IN PART 2026-08-27 (user-triggered purge)",
+      "detail": "The console's first group showed 21 cases under one supplier, ~20 near-identical JR-A-* rows awaiting approval (accumulated rehearsal runs), plus DLQ-SWEEP and DEMO-* probe rows, under a front page whose core sentence is 'one durable case per supplier'. Every live case id was mapped against every committed evidence file, the tracked tree, untracked files, the strategy repo, and the video repo's take logs: 27 cases are evidence-cited and must stay, 1 (JR-A-E98AC9) appears on camera in the video's Cloud Trace still, and the remaining 16 were cited nowhere. The user deleted those 16 via erp.py purge (dry-run inspected first); the store went 44 to 28, deleted pages 404, protected pages render, and the core-contracts harness re-proved 9/9 plus a clean erp.py audit afterwards. The rows that remain under one supplier are proof residue by design (the ten-run streak alone pins ten per supplier); accepted."
     },
     {
       "id": "env_secrets_example_mislabeled",
