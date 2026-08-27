@@ -20,12 +20,14 @@ The demonstration video URL was the one deliberate blank until the upload on
 
 ## Tagline (elevator pitch, 200-character field; the gallery shows ~15)
 
-> Keplaria stays. It onboards a supplier into a real ERP, then wakes months
-> later to chase the renewal, hold purchasing when evidence lapses, and
-> release the hold. The model proposes; policy decides.
+> Keplaria stays. Put your work in orbit: a supplier's case, onboarded into a
+> real ERP, wakes months later to chase the renewal, hold purchasing, release
+> the hold. The model proposes; policy decides.
 
 197 characters as one line; the first fifteen, "Keplaria stays.", are a
 complete sentence on their own, which is what the gallery truncation shows.
+The brand tagline ("put your work in orbit") follows immediately, with the
+mechanism in the same breath, per the no-term-before-clarity rule.
 
 ## Category
 
