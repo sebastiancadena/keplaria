@@ -31,7 +31,7 @@
     {
       "id": "console_rejected_case_reads_approved",
       "severity": "concern",
-      "status": "OPEN (user decision: fix chain includes console redeploy, freeze re-capture, and editing the frozen-commit line in the submitted Devpost form)",
+      "status": "RESOLVED 2026-08-27 (fix deployed; freeze re-captured at eff56c0; the form carries no SHA, so no form edit was needed — devpost.md now points at the freeze evidence instead of quoting one)",
       "detail": "On a rejected case (JR-A-C04699, REJ-B-564088) the lifecycle banner reads 'APPROVED - Released by a human at Ground Control' while the same page shows 'Human decision: rejected' and 'Effective band: blocked'. Verified in code: console/projection.py _status() returns APPROVED for any approval_id (a rejection included), and console/templates/case.html prints 'Released by a human' whenever a decision applies, never branching on the decision itself; the same template line's else branch makes finished clear-band cases read 'Awaiting a Ground Control decision'. approval.decision is already projected, so the fix is a small branch in each place."
     },
     {
@@ -49,7 +49,7 @@
     {
       "id": "proof_evidence_paths_not_links",
       "severity": "minor",
-      "status": "OPEN (user decision: keplaria.com UI changes are ask-first)",
+      "status": "RESOLVED 2026-08-27 (user approved: all 28 evidence cells link to the file on GitHub, deployed and live-verified)",
       "detail": "Every evidence cell on /proof is plain monospace text; the files are publicly reachable in the repo but the reader must reconstruct the URL by hand."
     },
     {
@@ -61,14 +61,14 @@
     {
       "id": "no_license_file",
       "severity": "minor",
-      "status": "OPEN (user decision: licensing is a legal choice; all-rights-reserved is disclosed in THIRD_PARTY.md)",
+      "status": "RESOLVED 2026-08-27 (user decision: MIT; LICENSE at root, THIRD_PARTY.md relicensing note)",
       "detail": "GitHub shows no license; the disclosure lives inside THIRD_PARTY.md where a judge may not look first."
     },
     {
       "id": "small_console_polish",
       "severity": "minor",
-      "status": "OPEN (bundled with the console fix if taken)",
-      "detail": "REJ-B-564088 is tagged route 'clock' while its rationale describes a supplier packet and its Routing section omits the Event/Department row; 'DLQ' in a public case id is never defined; 'parked' appears in the site's 3-minute guide before its definition."
+      "status": "CLOSED 2026-08-27 (partially fixed, remainder accepted)",
+      "detail": "The caption and banner parts shipped with the console fix. What remains is accepted: REJ-B-564088's route label is a data quirk of that parked rehearsal case, not a rendering bug; 'DLQ' sits inside an immutable case id; and the site's 'parked' was checked and already carries an inline gloss at first use — the reviewer missed it."
     }
   ],
   "verdicts": {
