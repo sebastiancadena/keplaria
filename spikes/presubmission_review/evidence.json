@@ -1,0 +1,78 @@
+{
+  "spike": "presubmission_review",
+  "scope": "pre-submission review pass: two logged-out zero-context reviews + /proof read (the video third-party/PII audit component was completed 2026-08-26 against the export; see docs/submission/video-audit.md)",
+  "captured_at": "2026-08-27",
+  "method": "Two independent zero-context agents reviewed only public URLs from a logged-out perspective, with no credentials and no repository working copy. Reviewer 1 walked the judge product path (site, /proof, console, case pages, review-console refusal, video, social post). Reviewer 2 did cross-surface consistency (every shared number across README, Devpost copy, article, site, /proof, spike evidence), a full link check, a hygiene sweep, and article-vs-evidence spot checks. Every load-bearing finding was then re-verified directly by the controller before being recorded here.",
+  "result": "PASS_WITH_FINDINGS",
+  "surfaces_checked": [
+    "https://keplaria.com",
+    "https://keplaria.com/proof",
+    "https://keplaria-console-bklu5jcdea-uc.a.run.app (+ /fleet, three case pages)",
+    "https://keplaria-review-bklu5jcdea-uc.a.run.app/review (refusal behaviour)",
+    "https://youtu.be/54GiU75AjH4 (public, correct title)",
+    "https://x.com/sebastiancadena/status/2093031873236619590",
+    "https://github.com/sebastiancadena/keplaria (README, devpost.md, THIRD_PARTY.md, spike evidence via raw)",
+    "https://dev.to/sebastiancadena7/the-smoke-test-said-yes-1068"
+  ],
+  "clean": [
+    "All 23 checked links resolve logged-out; the review console 302s to accounts.google.com exactly as documented (x-goog-iap-generated-response header present)",
+    "Zero hard numeric contradictions across surfaces: 45.1 s, 22.4 s, 663.5 s, 19/20, 380 days, 130 s, 24/24, 629 tests, nine contracts, Gemma and Model Armor figures all agree cell for cell with their evidence files",
+    "No credentials, bearer tokens, signed URLs, personal emails, or undisclosed project identifiers on any public surface",
+    "The author-timed-not-practitioner-reviewed qualifier travels with the baseline on every surface",
+    "Article headline numbers verified against spikes/model_armor and spikes/gemini_37_eval evidence (full match; one labelled-manual historical figure, see findings)"
+  ],
+  "findings": [
+    {
+      "id": "social_post_not_public",
+      "severity": "severe",
+      "status": "RESOLVED 2026-08-27",
+      "detail": "At review time the X account limited post visibility: oembed refused and the syndication endpoint returned a TweetTombstone, so the bonus-content URL in the Devpost form was a dead end for judges. The user made the post public the same day; re-verified: syndication returns the Tweet (hashtag and article link intact) and oembed answers 200."
+    },
+    {
+      "id": "console_rejected_case_reads_approved",
+      "severity": "concern",
+      "status": "OPEN (user decision: fix chain includes console redeploy, freeze re-capture, and editing the frozen-commit line in the submitted Devpost form)",
+      "detail": "On a rejected case (JR-A-C04699, REJ-B-564088) the lifecycle banner reads 'APPROVED - Released by a human at Ground Control' while the same page shows 'Human decision: rejected' and 'Effective band: blocked'. Verified in code: console/projection.py _status() returns APPROVED for any approval_id (a rejection included), and console/templates/case.html prints 'Released by a human' whenever a decision applies, never branching on the decision itself; the same template line's else branch makes finished clear-band cases read 'Awaiting a Ground Control decision'. approval.decision is already projected, so the fix is a small branch in each place."
+    },
+    {
+      "id": "case_accumulation_under_one_supplier",
+      "severity": "concern",
+      "status": "OPEN (user decision: deleting cases risks unproving spike evidence that cites live records; purge refuses records named by spike JSON)",
+      "detail": "The console's first group shows 21 cases under one supplier, ~20 near-identical JR-A-* rows awaiting approval (accumulated rehearsal runs), plus DLQ-SWEEP and DEMO-* probe rows, under a front page whose core sentence is 'one durable case per supplier'."
+    },
+    {
+      "id": "env_secrets_example_mislabeled",
+      "severity": "minor",
+      "status": "FIXED 2026-08-27 (this commit)",
+      "detail": "The example file labelled FRAPPE_API_KEY as 'admin-scoped owner keys' (it is the scoped executor) and omitted the FRAPPE_ADMIN_* owner pair entirely, contradicting the README's two-identity security claim on a file strangers are told to copy."
+    },
+    {
+      "id": "proof_evidence_paths_not_links",
+      "severity": "minor",
+      "status": "OPEN (user decision: keplaria.com UI changes are ask-first)",
+      "detail": "Every evidence cell on /proof is plain monospace text; the files are publicly reachable in the repo but the reader must reconstruct the URL by hand."
+    },
+    {
+      "id": "article_85_figure_manual",
+      "severity": "minor",
+      "status": "ACCEPTED AS LABELLED",
+      "detail": "The article's 'dropped from 85 to 57 seconds' cites evidence that contains the 57 (56.9 s) but not the 85. The ledger row article_run_timing_at_publication is verify=manual with the reason recorded (published, historical, deliberately rounded; do not reconcile against today's number). A judge who follows the citation finds the label."
+    },
+    {
+      "id": "no_license_file",
+      "severity": "minor",
+      "status": "OPEN (user decision: licensing is a legal choice; all-rights-reserved is disclosed in THIRD_PARTY.md)",
+      "detail": "GitHub shows no license; the disclosure lives inside THIRD_PARTY.md where a judge may not look first."
+    },
+    {
+      "id": "small_console_polish",
+      "severity": "minor",
+      "status": "OPEN (bundled with the console fix if taken)",
+      "detail": "REJ-B-564088 is tagged route 'clock' while its rationale describes a supplier packet and its Routing section omits the Event/Department row; 'DLQ' in a public case id is never defined; 'parked' appears in the site's 3-minute guide before its definition."
+    }
+  ],
+  "verdicts": {
+    "reviewer_1": "The core product path survives the first ten minutes: every surface resolves logged-out, the refusal behaves as advertised, the cold read lands inside a minute, numbers agree everywhere. Worst issue was the invisible social post (since resolved); second, the rejected-case banner.",
+    "reviewer_2": "Zero hard numeric contradictions between surfaces, unusual for a hackathon submission; the claim-ledger architecture visibly works. Worst catch is the labelled-manual 85 figure; runners-up the missing LICENSE badge and the (now fixed) secrets-example mislabel."
+  }
+}
