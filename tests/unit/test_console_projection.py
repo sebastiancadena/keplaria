@@ -253,6 +253,29 @@ def test_a_superseded_approval_does_not_read_as_approved():
     assert view["status"]["state"] == "PARKED"
 
 
+def test_a_rejected_case_reads_as_refused_not_as_approved():
+    """effective_band hands back an approval_id for ANY applied decision, so
+    a rejection rendered as 'APPROVED — Released by a human' directly above
+    'Human decision: rejected' (found live by the logged-out review)."""
+    view = public_case(
+        _case(approval={"decision": "rejected", "case_version": 1,
+                        "approval_id": "A-1"}),
+        [{"action": "create_supplier", "status": "pending"}],
+    )
+    assert view["status"]["state"] == "REJECTED"
+    assert "Refused" in view["status"]["summary"]
+    assert "Released" not in view["status"]["summary"]
+
+
+def test_a_superseded_rejection_reads_as_parked_again():
+    view = public_case(
+        _case(case_version=4, approval={"decision": "rejected",
+                                        "case_version": 1, "approval_id": "A-1"}),
+        [{"action": "create_supplier", "status": "held"}],
+    )
+    assert view["status"]["state"] == "PARKED"
+
+
 # --- screening candidates ------------------------------------------------
 
 def test_the_projection_carries_the_candidate_name_yente_returned():

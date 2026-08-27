@@ -380,6 +380,7 @@ button[value="rejected"]:hover {
 }
 .status--parked { border-left-color: var(--amber); }
 .status--blocked { border-left-color: var(--blocked); }
+.status--rejected { border-left-color: var(--blocked); }
 .status--executed { border-left-color: var(--clear); }
 .status__state {
   font-family: "Space Grotesk", system-ui, sans-serif;
@@ -390,6 +391,7 @@ button[value="rejected"]:hover {
 }
 .status--parked .status__state { color: var(--amber-bright); }
 .status--blocked .status__state { color: var(--blocked); }
+.status--rejected .status__state { color: var(--blocked); }
 .status--executed .status__state { color: var(--clear); }
 .status__summary { margin: 0; max-width: 62ch; }
 

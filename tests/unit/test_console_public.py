@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.nodes import commit_commands, park_case
-from app.state.approvals import APPROVED, commit_approval
+from app.state.approvals import APPROVED, REJECTED, commit_approval
 from app.state.firestore import claim_event
 from console.public import api
 
@@ -204,6 +204,44 @@ def test_the_detail_page_shows_both_bands_when_they_differ(db, case_id, client):
     response = client.get(f"/cases/{case_id}")
     assert "Gate verdict: review" in response.text, "the gate's own verdict must stay visible"
     assert "Effective band: clear" in response.text, "the effective band must be visible"
+
+
+def test_a_rejected_case_page_says_refused_not_released(db, case_id, client):
+    """A real rejection through commit_approval, rendered by the real page."""
+    version = _park_a_real_case(db, case_id)
+    commit_approval(db, case_id, f"{case_id}:v{version}", version, REJECTED,
+                    "reviewer@example.com")
+    response = client.get(f"/cases/{case_id}")
+    assert response.status_code == 200
+    assert "Refused by a human" in response.text
+    assert "Released by a human" not in response.text
+    assert "APPROVED" not in response.text
+
+
+def test_a_clear_case_page_does_not_claim_to_await_a_decision(
+    db, case_id, client, monkeypatch
+):
+    """A clear-band case needs no human, so the effective-band caption must
+    not read 'Awaiting a Ground Control decision' (found live: an EXECUTED
+    clear case carried the caption). Injected at the view-model layer, the
+    same way the withheld-field test works, because no graph path in this
+    suite drains a clear case end to end."""
+    import console.public as public
+
+    real = public.public_case
+
+    def cleared(case, commands=(), events=()):
+        view = real(case, commands, events)
+        view["gate_band"] = "clear"
+        view["effective_band"] = "clear"
+        view["approval"] = None
+        return view
+
+    _park_a_real_case(db, case_id)
+    monkeypatch.setattr(public, "public_case", cleared)
+    response = client.get(f"/cases/{case_id}")
+    assert "Awaiting a Ground Control decision" not in response.text
+    assert "No decision was required" in response.text
 
 
 def test_a_subthreshold_candidate_is_shown(db, case_id, client):

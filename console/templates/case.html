@@ -35,8 +35,14 @@ has stopped for a human decision, its ERP writes held.</p>
     <dt><span class="band--{{ case.gate_band or 'review' }}">Gate verdict: {{ case.gate_band }}</span></dt>
     <dd>Set by policy. An approval is recorded beside it, never over it.</dd>
     <dt><span class="band--{{ case.effective_band or 'review' }}">Effective band: {{ case.effective_band }}</span></dt>
-    <dd>{% if case.approval and case.approval.applies %}Released by a human at Ground Control.
-        {% else %}Awaiting a Ground Control decision. A release would change this line only.
+    <dd>{% if case.approval and case.approval.applies %}
+          {%- if case.approval.decision == 'rejected' -%}
+          Refused by a human at Ground Control.
+          {%- else -%}
+          Released by a human at Ground Control.
+          {%- endif %}
+        {% elif case.gate_band == 'review' %}Awaiting a Ground Control decision. A release would change this line only.
+        {% else %}No decision was required: the policy verdict stands.
         {% endif %}</dd>
   </dl>
   {% if case.policy.factors_fired %}

@@ -106,6 +106,14 @@ def _status(case: dict, commands: list[dict], effective: str | None,
         return {"state": "BLOCKED", "erp_writes": written, "held": held,
                 "summary": "Blocked by policy. Nothing will be written to "
                            "the ERP."}
+    # approval_id is set for ANY applied decision -- effective_band returns it
+    # for a rejection too, so the branch below it must never be the one that
+    # answers for a refused case.
+    if approval_id and (case.get("approval") or {}).get("decision") == "rejected":
+        return {"state": "REJECTED", "erp_writes": written, "held": held,
+                "summary": "Refused by a human at Ground Control. The gate's "
+                           "verdict stays review; the held commands will not "
+                           "be written to the ERP."}
     if approval_id and written and not held:
         return {"state": "EXECUTED", "erp_writes": written, "held": held,
                 "summary": f"Complete. {_plural(written, 'command')} "
