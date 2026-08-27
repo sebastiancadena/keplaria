@@ -414,10 +414,18 @@ def _proof_row(claim) -> str:
              else '<span class="q">read the evidence file</span>')
     qualifier = (f'<div class="q">{html.escape(claim.qualifier)}</div>'
                  if claim.qualifier else "")
+    # The evidence path is a live link into the public repository: a page
+    # whose pitch is "every number, with its evidence" must not make the
+    # reader reconstruct the URL by hand (flagged by the logged-out review).
+    evidence = (
+        f'<a class="mono" href="{REPO}/blob/main/{html.escape(claim.evidence)}">'
+        f"{html.escape(claim.evidence)}</a>"
+        if claim.evidence else '<span class="mono">&mdash;</span>'
+    )
     return (
         f"<tr><td>{html.escape(claim.claim)}{qualifier}</td>"
         f"<td>{value}</td>"
-        f'<td class="mono">{html.escape(claim.evidence or "—")}</td></tr>'
+        f"<td>{evidence}</td></tr>"
     )
 
 
