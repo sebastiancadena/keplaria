@@ -3,6 +3,7 @@
 Run with: uv run --env-file .env pytest tests/integration/test_frappe_executor.py -v
 """
 
+import json
 import os
 import urllib.parse
 import uuid
@@ -14,6 +15,7 @@ from app.executor.frappe import (
     attach_evidence,
     clear_supplier_hold,
     create_supplier_if_absent,
+    frappe_admin_client,
     frappe_client,
     send_supplier_message,
     set_supplier_hold,
@@ -129,6 +131,16 @@ def test_a_hold_can_be_applied_and_cleared(client, supplier):
 
 
 def test_a_renewal_message_is_queued_for_delivery(client, supplier):
+    """The name says queued, so the test has to look in the queue.
+
+    Asserting only that an id came back is what let this pass for free
+    between 2026-08-14 and 2026-08-27: the executor was inserting a
+    Communication whose `send_email: 1` is not a docfield, so every renewal
+    filed correspondence and queued no mail at all, and this test could not
+    tell the difference. Email Queue is what proves a send was attempted,
+    and reading it needs the OWNER: the executor has no permission on that
+    doctype, which is the point.
+    """
     result = send_supplier_message(
         client,
         supplier,
@@ -138,6 +150,25 @@ def test_a_renewal_message_is_queued_for_delivery(client, supplier):
 
     assert result["external_id"], "the Communication name is the external ID"
     assert result["created"] is True
+
+    if not os.environ.get("FRAPPE_ADMIN_API_KEY"):
+        pytest.skip("owner credential absent; cannot read Email Queue")
+    with frappe_admin_client() as owner:
+        queued = owner.get(
+            "/api/resource/Email Queue",
+            params={
+                "filters": json.dumps(
+                    [["communication", "=", result["external_id"]]]
+                ),
+                "fields": json.dumps(["name", "status"]),
+            },
+        )
+    assert queued.status_code == 200, queued.text[:300]
+    rows = queued.json()["data"]
+    assert len(rows) == 1, (
+        f"expected exactly one Email Queue row for Communication "
+        f"{result['external_id']}, got {rows!r}"
+    )
 
 
 def test_a_renewal_message_without_email_id_is_rejected(client, supplier_without_email):

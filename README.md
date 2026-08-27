@@ -130,7 +130,7 @@ outlive the behaviour behind it.
 
 | Criterion | What it asks | Proof in this repo |
 |---|---|---|
-| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? Was it built for an "Unlikely Hero" outside of standard corporate roles? | The lifecycle closes: onboarded → active → renewal requested → held → released, over two suppliers and 380 simulated business days (about a year and a half), in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. The overlooked party is the supplier side of the relationship (often a small business with no compliance department), and the system deliberately asks nothing of them: no portal, no login, no account, no training. The renewal request is a real outbound email; in this prototype the returned certificate enters as a published event, and ingesting the email reply itself is design intent, stated as such wherever the claim appears. |
+| **Innovation & Operational Utility** (40%) | Does it remove real friction, decide autonomously, and complete high-value work rather than chat? Is the task complex enough to warrant multiple agents, and does it delegate intelligently? Was it built for an "Unlikely Hero" outside of standard corporate roles? | The lifecycle closes: onboarded → active → renewal requested → held → released, over two suppliers and 380 simulated business days (about a year and a half), in [`spikes/judge_run/`](spikes/judge_run/). A coordinator (the routing agent) selects the Evidence and/or Compliance agent from the event and the case's own state; two case variants take different routes. Friction is measured against the manual baseline above, not asserted. The overlooked party is the supplier side of the relationship (often a small business with no compliance department), and the system deliberately asks nothing of them: no portal, no login, no account, no training. The renewal request is a real outbound email, dispatched through the ERP's own mail queue; demo suppliers carry `example.com` addresses, which have no MX record, so no message is delivered to a real mailbox. In this prototype the returned certificate enters as a published event, and ingesting the email reply itself is design intent, stated as such wherever the claim appears. |
 | **Architectural Discipline & Tech Stack** (30%) | Are systems decoupled and maintainable, state durable, tools isolated, credentials scoped, failures handled? (The security boundary is summarised in [Security model, in six claims](#security-model-in-six-claims).) How does routing recover from a looping or hallucinating worker? | Nine contracts in [`spikes/core_contracts/evidence.json`](spikes/core_contracts/evidence.json): closed loop, duplicate and out-of-order events, provenance failure (an extracted value with no supporting source span), injection refusal, stale and double approval, forbidden agent→tool edges, one ERP write after a retry, cataloging visible, and the eval suite (24/24 graded domain cases passing). A schema-valid but source-unsupported worker (specialist agent) value is rejected, retried within bounds, and quarantined for a human instead of reaching the ERP. |
 | **Demo & Production Readiness** (30%) | Does the video define the friction and architecture, show an unedited live execution, and are setup, diagram, deployment and proof reproducible? | The console URL above is live. The run in `spikes/judge_run/` is a real deployment, re-run on the engine currently serving. `bash scripts/doctor.sh` checks deployment and configuration preconditions read-only and prints its own pass/fail summary; the architecture diagram is generated from committed sources, not drawn; setup is [below](#setup-from-a-fresh-clone). |
 
@@ -190,7 +190,7 @@ measured and turned down.
 |---|---|---|
 | **Agent Runtime** | Native | Hosts the ADK graph as reasoning engine `keplaria`. Reaches the screening VM over a Private Service Connect (PSC) interface; that VM has no external IP and is not reachable from the internet, and keeps execution state in Agent Platform Sessions. |
 | **Agent Registry** | Native | The deployment auto-registers with no publish step; the entry is live and refreshes on redeploy. It carries the framework (`google-adk`), the runtime reference, the runtime identity principal, and the callable interfaces. Honest limit: those are the fields the Registry populates itself; it holds no owner, purpose, or tool-scope description of its own. |
-| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP credential is confined rather than spread: only the deterministic executor at the ingress holds it, and no agent ever does. That credential is scoped to the work: it belongs to a purpose-made ERP user holding one role, which grants read, write and create on supplier records and create on correspondence and attachments, and nothing else. It cannot delete a record it created, cannot widen its own permissions, and cannot read an invoice, a payment or a ledger. Those limits are measured against the live site rather than described ([`spikes/frappe_scoped_executor/evidence.json`](spikes/frappe_scoped_executor/evidence.json)), including the reads the ERP grants any signed-in user, which the check records rather than leaves implied. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
+| **Agent Identity** | First-party equivalent | Each service runs as its own service account; secrets come from Secret Manager. The ERP credential is confined rather than spread: only the deterministic executor at the ingress holds it, and no agent ever does. That credential is scoped to the work: it belongs to a purpose-made ERP user holding one role, which grants read, write and create on supplier records, the right to send mail about one, and create on correspondence and attachments, and nothing else. It cannot delete a record it created, cannot widen its own permissions, and cannot read an invoice, a payment or a ledger. Those limits are measured against the live site rather than described ([`spikes/frappe_scoped_executor/evidence.json`](spikes/frappe_scoped_executor/evidence.json)), including the reads the ERP grants any signed-in user, which the check records rather than leaves implied. The reviewer's identity is verified from a signed IAP assertion, never from a header a caller could set. |
 | **Memory Bank** | Deliberately not used | Transactional Firestore owns authoritative case state (case version, event claim, approval, command outbox), and Sessions retain resumable agent history. Generative memory is not trusted with compliance facts, and Sessions are not described here as a Memory Bank equivalent; they hold different things. |
 | **Model Armor** | Measured, not adopted | Probed against this project's own corpus on 2026-08-19 and turned down on the evidence: its prompt-injection filter returns `NO_MATCH_FOUND` on the planted injection fixture that the incumbent check catches with five findings, and its data plane is unreachable from the engine's network. One filter did deliver: malicious-URI detection, with no false positives on clean fixtures. Full measurement, including the context-dilution boundary that explains the miss: [`spikes/model_armor/evidence.json`](spikes/model_armor/evidence.json). |
 | **Agent Gateway** | Not used | Ingress is an authenticated Pub/Sub push adapter on Cloud Run that refuses anonymous callers, and the human decision surface sits behind IAP. Nothing in the design needed a gateway in front of that. |
@@ -285,9 +285,9 @@ The agent graph and its adapters run on two different runtimes:
 
 - **Agent Runtime** hosts the ADK graph as reasoning engine `keplaria`
   (`projects/584548214478/locations/us-central1/reasoningEngines/2127503872455868416`).
-  It reaches yente (an open-source sanctions-screening service, running on
-  a private VM) over the `keplaria-psc2` PSC-I (Private Service Connect
-  Interface) network attachment and keeps
+  It reaches yente (OpenSanctions' open-source sanctions-screening service,
+  running here on a private VM) over the `keplaria-psc2` PSC-I (Private
+  Service Connect Interface) network attachment and keeps
   agent execution state in Agent Platform
   Sessions.
 - **Cloud Run** hosts `keplaria-ingress`, the authenticated Pub/Sub push
@@ -788,8 +788,9 @@ ever sitting mid-run waiting on this UI.
   `AF`, no demo data.
 - API credentials: **two identities that are not interchangeable.** The
   deployed services hold the scoped executor, `keplaria-executor`, whose one
-  role grants read/write/create on `Supplier`, read on `Supplier Group`, and
-  read/create on `Communication` and `File`. It reaches them from Secret
+  role grants read/write/create on `Supplier` plus the right to send mail
+  about one, read on `Supplier Group`, and read/create on `Communication` and
+  `File`. It reaches them from Secret
   Manager as `frappe-api-key` / `frappe-api-secret`, and locally from
   `.env.secrets` as `FRAPPE_API_KEY` / `FRAPPE_API_SECRET`. The site owner's
   key is `FRAPPE_ADMIN_API_KEY` / `FRAPPE_ADMIN_API_SECRET` in `.env.secrets`
@@ -798,12 +799,27 @@ ever sitting mid-run waiting on this UI.
   before that both were the owner's key. Re-provision the identity with
   `spikes/frappe_scoped_executor/provision.py` and re-measure it with the
   harness beside it.
-- **Known issue:** the site's cron scheduler has never ticked (Frappe Cloud
-  support ticket filed 2026-08-12), so Email Queue does not auto-flush.
-  Outbound email works via API dispatch instead: queue with
-  `communication.email.make`, then `email_queue.send_now`, proven in
-  `spikes/frappe_capability/`. Probe for the fix: Email Queue `f7pj5o8901`
-  flushing on its own + fresh `Scheduled Job Log` entries.
+- **Cron scheduler: was broken, now fixed (re-measured 2026-08-27).** It had
+  never ticked since the site was created (Frappe Cloud support ticket filed
+  2026-08-12), so Email Queue never auto-flushed, and the day-2 capability
+  spike dispatched mail by hand instead: `communication.email.make` followed
+  by `email_queue.send_now`, in `spikes/frappe_capability/`. It ticks now.
+  Every `Scheduled Job Type` carries a current `last_execution`; the
+  `Scheduled Job Log` runs back to 2026-08-20, the oldest entry its retention
+  window still holds; and a message queued with no `send_now` call left
+  `Not Sent` on its own 62 seconds later. Demo suppliers carry `@example.com`
+  addresses, which have no MX record, so an auto-flushed message ends in a
+  delivery error by design and nothing reaches a real recipient.
+- **Outbound mail must go through `communication.email.make`.** A plain
+  `Communication` insert does not send: `send_email` is not a docfield on that
+  doctype and its `after_insert` never dispatches, so the insert files
+  correspondence and queues nothing at all. That was this executor's send path
+  until 2026-08-27, and the integration test covering it could not tell,
+  because it asserted only that an id came back; it now reads Email Queue
+  through the owner credential, which is the only identity here that can. That
+  method checks Frappe's `email` right on the *reference* document before it
+  will queue, and holding that right on `Supplier` is the one thing the
+  executor role gained for it.
 
 ## Availability and cost
 
@@ -825,3 +841,17 @@ against a bill, the cost of keeping the agent runtime warm, turned out to be
 zero: that platform meters request-processing time, not held instances, so the
 warm pin is free. Details in
 [`spikes/cost_posture/`](spikes/cost_posture/evidence.json).
+
+## Credits
+
+The screening service this project runs on is
+[yente](https://github.com/opensanctions/yente), published under the MIT
+licence by [OpenSanctions](https://www.opensanctions.org), who were generous
+about how their work could be used for this hackathon entry. Thank you.
+
+What is indexed here is a synthetic watchlist fixture rather than the
+OpenSanctions dataset, so no OpenSanctions data is used or redistributed by
+this project; the reasoning is in
+[`fixtures/watchlist/README.md`](fixtures/watchlist/README.md). Provenance for
+every third-party component, code and data and assets alike, is in
+[THIRD_PARTY.md](THIRD_PARTY.md).

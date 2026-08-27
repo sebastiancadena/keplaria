@@ -14,25 +14,40 @@ USER = "keplaria-executor@keplaria.example"
 
 # Exactly the rights app/executor/frappe.py exercises, and nothing else.
 # Supplier: create_supplier_if_absent (create), set/clear_supplier_hold (write),
-# send_supplier_message (read). Supplier Group: leaf_supplier_group (read).
-# Communication: send_supplier_message (create). File: attach_evidence
+# send_supplier_message (read, and `email` — Frappe's communication.email.make
+# checks the `email` right on the REFERENCE document before it will queue mail
+# about that document, and that method is the only whitelisted path to the
+# mail queue; granted 2026-08-27, when the send was found to have been filing
+# correspondence and mailing nothing). Supplier Group: leaf_supplier_group
+# (read). Communication: send_supplier_message (create). File: attach_evidence
 # (read for the idempotency lookup, create for upload_file).
 GRANTS: dict[str, set[str]] = {
-    "Supplier": {"read", "write", "create"},
+    "Supplier": {"read", "write", "create", "email"},
     "Supplier Group": {"read"},
     "Communication": {"read", "create"},
     "File": {"read", "create"},
 }
 
-# Every permission flag Frappe stores on a Custom DocPerm row. The harness
-# checks the granted set against GRANTS over THIS list rather than over the
-# flags that happen to be set, so a right added in a future Frappe version is
-# a failure by default instead of an unnoticed grant.
+# Every permission flag Frappe stores on a Custom DocPerm row. `provision.py`
+# writes the row flag by flag over THIS list, so a right the contract does not
+# name is turned off whether Frappe seeded it or a person set it.
 PERM_FLAGS = [
     "read", "write", "create", "delete", "submit", "cancel", "amend",
     "report", "export", "import", "share", "print", "email",
-    "set_user_permissions",
+    "set_user_permissions", "select", "impersonate", "mask",
 ]
+
+# The harness deliberately does NOT read the list above. It derives what the
+# role holds from the live row's own 0/1 columns, minus these, so a right a
+# future Frappe version adds is measured the day it appears rather than
+# staying invisible until someone remembers to extend a hardcoded list.
+# `select`, `impersonate` and `mask` are that exact case: three v16 columns
+# this list did not carry until 2026-08-27, while the file claimed a new
+# right would fail by default. All three read 0. `if_owner` is a modifier
+# rather than a right, so it is excluded from the set and asserted to be off
+# separately: a row that granted its rights only over records the executor
+# created would describe a different identity than the one claimed.
+NON_PERMISSION_FIELDS = {"docstatus", "idx", "permlevel", "if_owner"}
 
 # Rights the executor must NOT hold on anything it can write. Asserted
 # directly against the live API, not inferred from the permission rows.

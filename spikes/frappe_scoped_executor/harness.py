@@ -52,7 +52,7 @@ from spikes.frappe_scoped_executor.contract import (  # noqa: E402
     GRANTS,
     HIGH_VALUE_DOCTYPES,
     INHERITED_READS,
-    PERM_FLAGS,
+    NON_PERMISSION_FIELDS,
     ROLE,
     USER,
 )
@@ -129,9 +129,15 @@ def check_identity(scoped, admin) -> dict:
         "detail": f"FRAPPE_API_KEY authenticates as {who}",
         "evidence": "frappe.auth.get_logged_user",
     })
+    # The owner's address is a personal one and this file is committed, so it
+    # is compared and then thrown away rather than written down. It was
+    # redacted by hand once, after the 2026-08-23 run, which meant the next
+    # run of this harness put it straight back and turned `doctor.sh` red on
+    # its secret-hygiene check (2026-08-27). A redaction that lives in the
+    # writer cannot be forgotten by the next person to re-run it.
     checks.append({
         "kind": "api", "ok": who != owner,
-        "detail": f"executor identity is not the site owner ({owner})",
+        "detail": "executor identity is not the site owner (redacted)",
         "evidence": "frappe.auth.get_logged_user",
     })
     roles = sorted(
@@ -168,8 +174,21 @@ def check_role_matches_contract(admin) -> dict:
             })
             continue
         row = rows[0]
-        live = {flag for flag in PERM_FLAGS if int(row.get(flag) or 0)}
-        ok = live == granted and int(row.get("permlevel") or 0) == 0
+        # Discovered from the row, not from a list in contract.py: a right a
+        # future Frappe version adds arrives here as an unexpected grant
+        # rather than as a column nothing reads.
+        live = {
+            field
+            for field, value in row.items()
+            if field not in NON_PERMISSION_FIELDS
+            and isinstance(value, int)
+            and value == 1
+        }
+        ok = (
+            live == granted
+            and int(row.get("permlevel") or 0) == 0
+            and int(row.get("if_owner") or 0) == 0
+        )
         checks.append({
             "kind": "api", "ok": ok,
             "detail": f"{doctype}: granted {sorted(live)}"

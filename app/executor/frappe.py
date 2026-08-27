@@ -192,6 +192,16 @@ def send_supplier_message(
     Recipient resolution is deliberately strict: a Supplier with no
     email_id is an error, not a silently skipped send. A notice nobody
     receives that reports success is worse than a failure.
+
+    Dispatched through `communication.email.make`, NOT through a plain
+    Communication insert. The insert this replaced looked like it mailed,
+    because it carried `send_email: 1`, but Communication has no such
+    docfield and its `after_insert` never sends: for as long as that code
+    existed it filed correspondence and queued nothing, measured as zero
+    Email Queue rows against Frappe v16.31.0 on 2026-08-27. `make` is the
+    only whitelisted path that reaches the mail queue, and it checks the
+    `email` right on the REFERENCE document before queueing, which is why
+    the executor role carries that right on Supplier and nowhere else.
     """
     supplier = client.get(f"/api/resource/Supplier/{supplier_name}")
     if supplier.status_code >= 400:
@@ -208,16 +218,14 @@ def send_supplier_message(
         raise FrappeError(f"supplier {supplier_name!r} has no email_id to write to")
 
     response = client.post(
-        "/api/resource/Communication",
+        "/api/method/frappe.core.doctype.communication.email.make",
         json={
-            "communication_type": "Communication",
-            "communication_medium": "Email",
-            "sent_or_received": "Sent",
+            "doctype": "Supplier",
+            "name": supplier_name,
             "subject": subject,
             "content": body,
             "recipients": recipient,
-            "reference_doctype": "Supplier",
-            "reference_name": supplier_name,
+            "communication_medium": "Email",
             "send_email": 1,
         },
     )
@@ -226,9 +234,21 @@ def send_supplier_message(
             f"message failed: HTTP {response.status_code} {response.text[:300]}"
         )
     try:
-        external_id = response.json()["data"]["name"]
+        message = response.json()["message"]
+        external_id = message["name"]
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise FrappeError(f"message send returned an unexpected body: {exc}") from exc
+
+    # `make` reports recipients it declined to queue (unsubscribed, disabled,
+    # malformed) rather than failing on them, which would be a send that
+    # reports success and mails nobody: the same silence the strict recipient
+    # resolution above exists to prevent.
+    declined = message.get("emails_not_sent_to") or ""
+    if recipient in declined:
+        raise FrappeError(
+            f"the ERP filed the message but declined to queue it for "
+            f"{recipient!r} (emails_not_sent_to={declined!r})"
+        )
     return {"external_id": external_id, "created": True}
 
 
