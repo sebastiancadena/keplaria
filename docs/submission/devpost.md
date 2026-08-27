@@ -41,7 +41,7 @@ mechanism in the same breath, per the no-term-before-clarity rule.
 | Try it out — case console | <https://keplaria-console-bklu5jcdea-uc.a.run.app> (no sign-in; cases grouped by supplier, and the fleet page for the rulebook with live counts) |
 | Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP; the two organizer accounts are pre-authorized) |
 | Code repository | <https://github.com/sebastiancadena/keplaria> |
-| Frozen commit | `f972ce6` — <https://github.com/sebastiancadena/keplaria/commit/f972ce6>; every deployed container was verified against this commit file for file, and the tests, evaluations and timed runs cited here were re-run against it |
+| Frozen commit | `eff56c0` — <https://github.com/sebastiancadena/keplaria/commit/eff56c0>; every deployed container was verified against this commit file for file, and the tests, evaluations and timed runs cited here were re-run against it |
 | Demonstration video | <https://youtu.be/54GiU75AjH4> (3:23; the build record `docs/submission/video-build.md` names the exact file by sha256) |
 | Architecture diagram | uploaded as a submission image; it is generated from committed sources in the repository, so it cannot drift from the deployed system |
 

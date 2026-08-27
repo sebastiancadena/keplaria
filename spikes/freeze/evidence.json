@@ -1,14 +1,14 @@
 {
-  "captured_at": "2026-08-25T01:04:06.853126+00:00",
+  "captured_at": "2026-08-27T18:11:05.928316+00:00",
   "what_this_is": "The frozen-artifact set the submission cites: deployment, catalog, trace, test, metric and billing artifacts, each discovered live and tied to the one commit in `commit`.",
   "verdict": "PASS",
   "problems": {},
   "commit": {
-    "sha": "f972ce6a6b6c6680d50ee76ff4a5a3f2b9250a77",
-    "short": "f972ce6",
-    "subject": "fix(spike): parse pytest's bar-less -q summary and record a crashed capture section",
-    "committed_at": "2026-08-24T20:04:06-05:00",
-    "expected": "f972ce6",
+    "sha": "eff56c0834b135caef54b57a740c045530d6894b",
+    "short": "eff56c0",
+    "subject": "fix(site): /proof evidence paths are links into the public repository",
+    "committed_at": "2026-08-27T13:05:44-05:00",
+    "expected": null,
     "clean": true,
     "ok": true,
     "problems": []
@@ -16,9 +16,9 @@
   "deployment": {
     "cloud_run": {
       "keplaria-console": {
-        "revision": "keplaria-console-00022-bhn",
-        "deployed_at": "2026-08-24T23:27:26.811125Z",
-        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:f55e35e040d0bcde8047aa5430759597f1ec173286fa4752e267271898d9a940",
+        "revision": "keplaria-console-00023-8p7",
+        "deployed_at": "2026-08-27T18:07:45.756103Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:aa2ce6650f803700000f4f5b98545b0381cfc21fce7a631b25b86553b0b211b0",
         "url": "https://keplaria-console-bklu5jcdea-uc.a.run.app",
         "dockerfile": "console/Dockerfile",
         "files_compared": 80,
@@ -28,9 +28,9 @@
         "ok": true
       },
       "keplaria-review": {
-        "revision": "keplaria-review-00022-44l",
-        "deployed_at": "2026-08-24T23:28:05.897856Z",
-        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:f55e35e040d0bcde8047aa5430759597f1ec173286fa4752e267271898d9a940",
+        "revision": "keplaria-review-00023-tfj",
+        "deployed_at": "2026-08-27T18:09:37.272802Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:aa2ce6650f803700000f4f5b98545b0381cfc21fce7a631b25b86553b0b211b0",
         "url": "https://keplaria-review-bklu5jcdea-uc.a.run.app",
         "dockerfile": "console/Dockerfile",
         "files_compared": 80,
@@ -99,31 +99,16 @@
   "trace": {
     "driver": "spikes/lifecycle/harness.py",
     "window": {
-      "start": "2026-08-25T01:04:51.043154Z",
-      "end": "2026-08-25T01:05:46.185390Z"
+      "start": "2026-08-27T18:15:30.259002Z",
+      "end": "2026-08-27T18:16:43.022737Z"
     },
     "lifecycle_result": "PASS",
-    "case_id": "DEMO-27c56608",
+    "case_id": "DEMO-de961412",
     "traces": [
       {
-        "trace_id": "15aebdde16b77e9600ad8f499b05215b",
+        "trace_id": "083de7f00dd76dc64bf63938e45aa2c3",
         "root": "invoke_workflow keplaria_workflow",
-        "start": "2026-08-25T01:05:28.581400072Z"
-      },
-      {
-        "trace_id": "283f9faa63c46346ca9f816155f81bc9",
-        "root": "/pubsub/push",
-        "start": "2026-08-25T01:04:58.930691Z"
-      },
-      {
-        "trace_id": "2e84baeac056570526aecd831321ca82",
-        "root": "invoke_workflow keplaria_workflow",
-        "start": "2026-08-25T01:05:21.140190718Z"
-      },
-      {
-        "trace_id": "37f66d59f0f88a6d6e3e4ced6a93644b",
-        "root": "invoke_workflow keplaria_workflow",
-        "start": "2026-08-25T01:05:13.416937171Z"
+        "start": "2026-08-27T18:15:58.012470730Z"
       }
     ],
     "ok": true,
@@ -131,7 +116,7 @@
   },
   "test": {
     "command": "uv run pytest -q  (addopts: -m 'not live')",
-    "passed": 628,
+    "passed": 633,
     "failed": 0,
     "deselected": 15,
     "errors": 0,
@@ -143,7 +128,7 @@
   "metric": {
     "domain_evals": {
       "command": "bash tests/eval/run_domain_evals.sh",
-      "graded_at": "2026-08-25T01:09:05.733353Z",
+      "graded_at": "2026-08-27T18:20:16.663277Z",
       "cases": 24,
       "errors": 0,
       "mean_score": 1.0,
@@ -170,13 +155,13 @@
   "billing": {
     "table": "keplaria.billing_export.gcp_billing_export_resource_v1_006252_CAF71A_EC72B9",
     "forward_only_since": "2026-08-19 07:00:00+00",
-    "cost_usd": 12.92,
-    "credits_usd": -12.92,
+    "cost_usd": 23.98,
+    "credits_usd": -23.98,
     "first_usage": "2026-08-19 07:00:00+00",
-    "last_export": "2026-08-24 23:45:44.548171+00",
-    "last_usage": "2026-08-24 18:00:00+00",
-    "n_rows": 6428,
-    "gross_cost_usd": 12.92,
+    "last_export": "2026-08-27 16:03:08.570752+00",
+    "last_usage": "2026-08-27 10:00:00+00",
+    "n_rows": 10571,
+    "gross_cost_usd": 23.98,
     "net_cost_usd": 0.0,
     "ok": true,
     "problems": []
