@@ -168,13 +168,13 @@ resource planning: the business&rsquo;s system of record for suppliers and
 purchasing). The ongoing work of noticing the expiry, chasing the renewal,
 and deciding whether it is still safe to buy goes back to a person with a
 calendar reminder.</p>
-<p class="sub">Keplaria stays. One durable mission per supplier wakes months
+<p class="sub">Keplaria stays. One durable case per supplier wakes months
 later on its own clock: it requests renewed evidence, places a reversible
 purchasing hold when a certificate lapses, checks the renewal against the
-source document, and releases the hold. An LLM (large language model)
-coordinator <em>proposes</em> which specialist agents should run; a
-deterministic policy layer <em>decides</em>, against a versioned catalog.</p>
-<div class="figures"><div class="fig"><b>45.1s</b><span>of machine work, one deployed run</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed (author-timed, not practitioner-reviewed)</span></div><div class="fig"><b>1</b><span>decision a human had to make</span></div></div>
+source document, and releases the hold. A language-model coordinator
+<em>proposes</em> which specialist agents should run; a deterministic policy
+layer <em>decides</em>, against a versioned catalog.</p>
+<div class="figures"><div class="fig"><b>45.1s</b><span>of machine work, one deployed run of the whole lifecycle</span></div><div class="fig"><b>663.5s</b><span>for the same work by hand, timed (author-timed, not practitioner-reviewed)</span></div><div class="fig"><b>19</b><span>of 20 manual steps removed; the last is the approval policy requires</span></div><div class="fig"><b>380</b><span>simulated business days of renewal, hold and release in one recording</span></div></div>
 <p class="sub">It stops exactly where policy requires a human decision
 &mdash; and nowhere else. Nothing reaches the ERP except through an outbox (a
 queue of pending ERP writes, released only on approval).</p>
@@ -201,10 +201,9 @@ stage, that is nothing yet.</p>
 </div>
 <div class="evalstep"><a href="https://keplaria-review-bklu5jcdea-uc.a.run.app/review"><b>2&nbsp;&middot; Review console
 (Ground Control)</b></a>
-<p>Google sign-in, gated by Cloud IAP (Identity-Aware Proxy:
-Google&rsquo;s sign-in check in front of the service). Cases the policy
-stopped wait here with their ERP writes held; approving is what releases
-them.</p></div>
+<p>Google sign-in, enforced by Cloud IAP, Google&rsquo;s identity check in
+front of the service. Cases the policy stopped wait here with their ERP
+writes held; approving is what releases them.</p></div>
 <div class="evalstep"><b>3&nbsp;&middot; Demonstration video</b>
 <p><a href="https://youtu.be/54GiU75AjH4">https://youtu.be/54GiU75AjH4</a> (3:23). What it shows: one continuous, unedited take. A stop for
 a human, an approval that releases the held writes, then a simulated year
@@ -236,6 +235,36 @@ and every command, including the ones policy refused. A case stopped
 for a human says so plainly, and says that nothing has been written. The
 <a href="https://keplaria-console-bklu5jcdea-uc.a.run.app/fleet">fleet page</a> is the rulebook, with a count of
 how many cases exercised each rule.</p></div></section>
+<section class="sec"><h2>The security model, in six claims</h2>
+<div class="secbody"><div class="evalgrid">
+<div class="evalstep"><b>No agent holds a credential</b>
+<p>No agent holds a credential or a write tool, and a clock event never
+reaches a language-model agent at all.</p></div>
+<div class="evalstep"><b>The executor is scoped</b>
+<p>The one ERP credential belongs to the deterministic executor, under a role
+that cannot delete, cannot widen its own permissions, and cannot read a
+financial document. Those limits are read back off the live ERP by the health
+check, not assumed.</p></div>
+<div class="evalstep"><b>Tainted documents stay outside</b>
+<p>A document flagged as tainted is never shown to any agent, and its case is
+forced to a blocked verdict, so a tainted document cannot cause an ERP
+write.</p></div>
+<div class="evalstep"><b>Identity is verified, not asserted</b>
+<p>The reviewer&rsquo;s identity comes from a signed IAP assertion, never from
+a header a caller could set.</p></div>
+<div class="evalstep"><b>The engine has no internet path</b>
+<p>The reasoning engine has no route to the public internet: it reaches the
+screening service over Private Service Connect only, and secrets come from
+Secret Manager, per service identity.</p></div>
+<div class="evalstep"><b>Failure becomes durable state</b>
+<p>Never a silent exception: a failed ERP command stays durable and an
+unattended sweep re-drives it to exactly one record.</p></div>
+</div>
+<p class="sub">Each claim is enforced by a test or a deployed check, itemised
+in <a href="https://github.com/sebastiancadena/keplaria#security-model-in-six-claims">the README&rsquo;s security
+section</a>. Two limits, stated rather than hidden: a parked case is durable
+state, not a suspended run; and a supplier who becomes sanctioned after
+onboarding cannot yet be held.</p></div></section>
 <section class="sec"><h2>Built on</h2>
 <div class="secbody"><p class="sub mono">Agent Development Kit &middot; Gemini &middot; Agent Runtime
 &middot; Cloud Run &middot; Firestore &middot; Pub/Sub &middot; ERPNext &middot;
