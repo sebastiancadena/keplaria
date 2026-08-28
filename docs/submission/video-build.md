@@ -13,7 +13,7 @@ assembly; this file is the public pointer to the exact artifact.
 | Frozen commit shown | `f972ce6` (`spikes/freeze/evidence.json`; deployed containers are tied to it by content) |
 | Video repo commit | `2c01b8a` |
 | Narration | Google Cloud Text-to-Speech, `en-US-Chirp3-HD-Charon` (see `THIRD_PARTY.md`), one request per sentence through `video/narrate_beat.py`; every utterance passed the three listeners in `video/listen.py` (round-trip transcription, pitch contour, blind meaning), 55/55, six after a re-roll |
-| YouTube URL | <https://youtu.be/54GiU75AjH4> (public, uploaded 2026-08-26; it still carries the `b2f46eda…` cut until the re-narrated file is uploaded and every surface is re-pointed) |
+| YouTube URL | <https://youtu.be/YXCgRq_HVQ8> (public, uploaded 2026-08-27, the re-narrated cut; the 2026-08-26 cut remains at <https://youtu.be/54GiU75AjH4>) |
 
 ## How it was checked
 

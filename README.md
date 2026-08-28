@@ -57,7 +57,7 @@ Python, running on the
    ([details below](#access-for-judges-and-testers)).
    Cases the policy stopped wait here with their ERP writes held; an
    approval is what releases them.
-3. **Watch the demonstration video**: <https://youtu.be/54GiU75AjH4> (3:23).
+3. **Watch the demonstration video**: <https://youtu.be/YXCgRq_HVQ8> (3:43).
    What it shows: one continuous unedited take. A stop for a human, an approval releasing
    the ERP writes the same moment, then a simulated year and a half of
    renewals, a hold, and a release.

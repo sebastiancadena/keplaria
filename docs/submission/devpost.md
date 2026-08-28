@@ -43,7 +43,7 @@ mechanism in the same breath, per the no-term-before-clarity rule.
 | Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP; the two organizer accounts are pre-authorized) |
 | Code repository | <https://github.com/sebastiancadena/keplaria> |
 | Frozen commit | Recorded in `spikes/freeze/evidence.json` in the repository, never hand-declared: the capture verifies every deployed container against that commit file for file, and `scripts/doctor.sh` fails if the deployed state and the recorded commit drift apart |
-| Demonstration video | <https://youtu.be/54GiU75AjH4> (3:23; the build record `docs/submission/video-build.md` names the exact file by sha256) |
+| Demonstration video | <https://youtu.be/YXCgRq_HVQ8> (3:43; the build record `docs/submission/video-build.md` names the exact file by sha256) |
 | Architecture diagram | uploaded as a submission image; it is generated from committed sources in the repository, so it cannot drift from the deployed system |
 
 ---
