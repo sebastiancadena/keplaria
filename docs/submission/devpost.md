@@ -37,6 +37,7 @@ mechanism in the same breath, per the no-term-before-clarity rule.
 
 | Field | Value |
 |---|---|
+| Submitted entry | <https://devpost.com/software/keplaria> — the live copy this file is the source for. Recorded because it was not: the paragraphs below are pasted by hand into that form, so the only way to check that the published wording still matches this file is to open it, and the URL existed nowhere in the repository until 2026-08-28 |
 | Project home | <https://keplaria.com> — the front door; <https://keplaria.com/proof> binds every published number to the run that produced it |
 | Try it out — case console | <https://keplaria-console-bklu5jcdea-uc.a.run.app> (no sign-in; cases grouped by supplier, and the fleet page for the rulebook with live counts) |
 | Try it out — review console | <https://keplaria-review-bklu5jcdea-uc.a.run.app/review> (Google sign-in through Cloud IAP; the two organizer accounts are pre-authorized) |
