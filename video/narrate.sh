@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Render one narration beat with the settled voice treatment.
+# Render one text file as ONE Cloud TTS request, with the settled voice treatment.
+#
+# SUPERSEDED FOR THE VIDEO (2026-08-27) by narrate_beat.py, which renders a beat
+# one sentence per request and places the sentences on the take's clock; this
+# script stays as the single-request primitive and the record of the voice
+# decision below. The rubberband fitting here is what narrate_beat.py replaced
+# with the engine's own speakingRate.
 #
 #   video/narrate.sh <script.txt> <out.wav> [target_seconds] [semitones]
 #

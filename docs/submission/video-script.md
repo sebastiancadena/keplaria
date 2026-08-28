@@ -1,17 +1,27 @@
 # Submission video — narration script and shot list
 
 Target 3:40–3:45; hard cap 4:00. One continuous unedited live segment,
-0:15–2:25. Narration 467 spoken words (the optional pocket is a substitute, not
-additive). Every beat is rendered through `video/narrate.sh` at its slot; a
-clamp warning in the FAST direction means cut the copy, never speed the voice. A
-warning in the SLOW direction (the voice under-fills the slot) is silence over
-live UI, which is fine.
+0:15–2:25. Narration 499 spoken words (the optional pocket is a substitute, not
+additive).
 
-Rendered 2026-08-25 against the slots below: live-segment beats land at
-123–148 wpm with silence to spare; beat 3 at ~154, beat 4 at ~147, the close at
-~144. Nothing needed a fast clamp.
+**Written for the ear, one sentence per line (2026-08-27).** Each line below
+is one utterance: it is synthesised in its own TTS request by
+`video/narrate_beat.py`, placed on the take's clock, and judged on its own by
+`video/listen.py` (round-trip transcription, pitch contour, and a blind
+listener whose paraphrase is checked against the `.meaning` line kept beside
+the beat). The first cut was written for the eye and split by what was on
+screen; the voice read colons as list items, stacked appositives as separate
+places, and a file that opened on "And..." or "Keplaria dot com." cold. The
+rules that came out of that: one idea per sentence, a subject and a finite
+verb in every line, no line opening on a conjunction, no colon-as-reveal, no
+appositive longer than three words, and a fragment only after a blank line
+(a long pause). A beat that will not fit its window is cut, never sped past
+the engine's 1.12 rate clamp; the fitting is native `speakingRate`, not a
+time-stretch.
 
-Lines marked **SYNC** must land on the named on-screen event.
+Lines marked **SYNC** in the shot list must land on the named on-screen
+event; the `.sync` files in the video repo anchor an utterance to a take
+event, and `vo/plans/*.json` records where each one actually landed.
 
 Public vocabulary only: Mission, Payload, Ground Control, Station-keeping,
 Telemetry. Everything else is called what it is.
@@ -32,45 +42,45 @@ any edit.
 
 ## 1. Narration
 
-### Beat 1 — The twist (0:00–0:15) — 26 words
+### Beat 1 — The twist (0:00–0:15) — 24 words
 
-> Supplier onboarding usually ends when the ERP record is created. Keplaria
-> stays for what happens months later. Two synthetic suppliers, one real ERP,
-> one unedited take.
+> Onboarding ends when the ERP record is created.
+> Keplaria stays for what happens months later.
+> Two synthetic suppliers, one real ERP, one unedited take.
 
 The baseline comparison moves to the overlay with its qualifier attached. It
 is the weakest-provenance number in the video (author-timed) and should not be
 the first thing a judge hears; the twist should.
 
-### Beat 2a — Route one: the packet (0:15–0:35) — 37 words
+### Beat 2a — Route one: the packet (0:15–0:35) — 36 words
 
-> This is the deployed system, one continuous take. **SYNC (packet event
-> appears)** A supplier packet arrives. The coordinator proposes a route,
-> evidence plus compliance; it doesn't decide. A deterministic policy gate
-> checks it against a versioned fleet catalog. **SYNC (verdict chip)**
-> Approved: two specialists.
+> A supplier packet arrives.
+> The coordinator proposes two agents, evidence and compliance. It does not decide.
+> The decision belongs to a deterministic policy gate, which uses a versioned fleet catalog.
+> Approved. Two specialists go to work.
 
-### Beat 2b — The stop (0:35–0:55) — 39 words
+### Beat 2b — The stop (0:35–0:55) — 44 words
 
-> The compliance agent flags a sanctions near-match, and the system stops.
-> **SYNC (park timer)** Twelve seconds in, the case, a Payload in our terms,
-> parks in Ground Control, the human-approval dashboard, its two ERP writes
-> held, unexecuted. It doesn't ask. It waits.
+> The compliance agent flags a sanctions near-match. The system stops.
+> After twelve seconds, the case is parked in Ground Control.
+> We call a case a Payload.
+> Both of its ERP commands are on hold, and neither has run.
+> It does not ask. It waits.
 
-### Beat 2c — The human (0:55–1:15) — 21 words
+### Beat 2c — The human (0:55–1:15) — 22 words
 
-> One human, one decision. **SYNC (ERP row appears)** When I approve, the held
-> supplier write is released into ERPNext. Nothing was written before that
-> click.
+> One human. One decision.
+> When I approve, the held supplier record is written into ERPNext.
+> Nothing reached the ERP before that click.
 
 The stand-in attachment is not narrated. The proof is the supplier row and
 the click that preceded it.
 
 ### Beat 2d — Supplier two (1:15–1:45) — 30 words
 
-> Supplier two is a separate case; the approval doesn't carry over. It reads
-> clean, so nobody stops it. **SYNC (extraction panel)** Its fields come from a
-> synthetic page-text fixture, no OCR, no rekeying.
+> Supplier two is a separate case. The approval does not carry over.
+> It reads clean, so nobody stops it.
+> Its fields come from a text fixture. No OCR, no rekeying.
 
 Cut to fit the recorded take (2026-08-25): supplier two onboards in 12.6 s
 and its whole lifecycle plays in 34 s, so this beat holds only the
@@ -78,33 +88,36 @@ data-boundary sentence. The overlooked-user line moved to the end of 2f, over
 the held end frame; "a year and a half in eighty seconds" was dropped (the
 number was never true of the run).
 
-### Beat 2e — Route two: the clock (1:45–2:05) — 35 words
+### Beat 2e — Route two: the clock (1:45–2:05) — 38 words
 
-> Two clock events; no agents, policy alone. **SYNC (first clock chip)** First
-> check: not yet due, nothing happens, correctly. **SYNC (email sent)** Second:
-> due, and a real renewal email goes out. Unanswered. Evidence overdue, **SYNC
-> (hold applied)** and a purchasing hold lands in the ERP.
+> Next, the clock fires twice, with no agents involved.
+> The first check is not due. Nothing happens.
+> The second check is due. A real renewal email goes out.
+> Nobody answers, so a purchasing hold lands in the ERP.
 
-### Beat 2f — Route three: the certificate (2:05–2:25) — 55 words
+### Beat 2f — Route three: the certificate (2:05–2:25) — 48 words
 
-> **SYNC (certificate event)** The renewed certificate enters as a published
-> event; policy routes it to evidence only. **SYNC (grounding view)** Every
-> field traces to a verbatim span. **SYNC (hold lifts)** The hold releases.
-> Renewal, hold, release: station-keeping.
+> The renewed certificate arrives as a published event, and policy routes it to evidence only.
+> Every field traces to a verbatim span.
+> The purchasing hold is released.
+> Renewal, hold, release. We call that station-keeping.
 >
-> **SYNC (run freezes on end state)** Three hundred eighty simulated business
-> days. Five under real hold. Zero human touches. The supplier's side of all
-> this was answering one email: no portal, no account.
+> Three hundred eighty simulated business days. Five under a real hold. Zero human touches.
 
-### Beat 3 — Architecture and the security boundary (2:25–2:57) — 82 words
+### Beat 3 — Architecture and the security boundary (2:25–2:57) — 108 words
 
-> Six boxes: events in, the coordinator proposes, a deterministic gate decides
-> against a versioned fleet catalog, and only the outbox reaches the ERP;
-> Ground Control can pause it first. That boundary is the security model:
-> agents hold no ERP credential; the one executor runs as a scoped ERP role
-> that cannot delete; Firestore, not the model, remembers the case for months.
-> Three departments, permitted agents and commands each: that table is the
-> fleet. On Google Cloud: the registered graph, and one trace.
+> Here is the architecture, in six boxes.
+> Events come in, and the coordinator proposes a route.
+> The decision belongs to a deterministic gate, which uses a versioned fleet catalog.
+> Only the outbox reaches the ERP, and Ground Control can pause a case on the way.
+>
+> That boundary is the security model.
+> The agents hold no ERP credential.
+> One executor runs as a scoped ERP role that cannot delete.
+> The case state lives in Firestore for months, not in the model.
+>
+> Three departments, each with its permitted agents and commands. That table is the fleet.
+> On Google Cloud you can see the registered graph, the services, and one trace.
 
 Every sentence here is backed by a committed proof: the credential boundary by
 `spikes/frappe_scoped_executor/evidence.json` (role read back off the live
@@ -113,25 +126,35 @@ site: no delete, no role widening, no financial documents) and the
 Firestore-owned case version and outbox. "Memory" is said once and means
 durable case state; nothing implies the agents learn.
 
-### Beat 4 — Failure, recovery, and safety (2:57–3:30) — 81 words
+### Beat 4 — Failure, recovery, and safety (2:57–3:30) — 111 words
 
-> The part most demos skip: failure. **SYNC (command ledger)** A failed ERP
-> command stays durable; when the destination is repaired, the unattended sweep
-> re-drives that same command to done: one record, no duplicate. **SYNC
-> (injected doc)** This planted instruction is caught by a deterministic scan
-> and blocked before any agent sees it: zero ERP writes. **SYNC (red field)**
-> And a schema-valid worker count with no source span is rejected, retried
-> once, and parked for a human: zero ERP writes. Every refusal lands in
-> Telemetry, our OpenTelemetry traces. Not perfect. Contained.
+> Now the part most demos skip. Failure.
+> A failed ERP command stays durable.
+> When the destination is repaired, the unattended sweep re-drives that same command to done.
+> The result is one record, with no duplicate.
+>
+> **SYNC (injected doc)**
+> Someone planted an instruction in this document.
+> A deterministic scan catches it first, so no AI agent ever reads it.
+> Nothing was written to the ERP.
+>
+> **SYNC (red field)**
+> Here, a worker count is schema-valid, but it has no source span in the document.
+> It is rejected, retried once, and then parked for a human.
+> Again, nothing was written to the ERP.
+> Every refusal lands in Telemetry, meaning the OpenTelemetry traces.
+> It is not perfect, but it is contained.
 
 Three panels, not four: the replay-safety contract is real but a fourth panel
 in 35 seconds cannot be read. It stays on `/proof`.
 
-### Beat 5 — Close (3:30–3:45) — 36 words
+### Beat 5 — Close (3:30–3:45) — 38 words
 
-> Kepler didn't discover that planets move; he showed their motion obeys law.
-> Launch a case once, and it stays up for months, corrected by policy, not by
-> you. Put your work in orbit. Keplaria dot com.
+> Kepler did not discover that the planets move. He showed that their motion obeys law.
+> Launch a case once. It stays up for months, and policy corrects it, not you.
+> Put your work in orbit.
+>
+> Keplaria dot com.
 
 **The scoreboard on the overlay carries three ideas, not six.** Fifteen seconds
 cannot hold six figures and land the name. The full figures, qualifiers
