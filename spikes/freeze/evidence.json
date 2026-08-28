@@ -1,14 +1,14 @@
 {
-  "captured_at": "2026-08-27T18:11:05.928316+00:00",
+  "captured_at": "2026-08-28T00:16:20.318036+00:00",
   "what_this_is": "The frozen-artifact set the submission cites: deployment, catalog, trace, test, metric and billing artifacts, each discovered live and tied to the one commit in `commit`.",
   "verdict": "PASS",
   "problems": {},
   "commit": {
-    "sha": "eff56c0834b135caef54b57a740c045530d6894b",
-    "short": "eff56c0",
-    "subject": "fix(site): /proof evidence paths are links into the public repository",
-    "committed_at": "2026-08-27T13:05:44-05:00",
-    "expected": null,
+    "sha": "cf0470abaaca044e4b49fbbaeb3c15059e609d9a",
+    "short": "cf0470a",
+    "subject": "chore(evidence): re-run the ten-run streak against ingress revision 00014",
+    "committed_at": "2026-08-27T19:16:15-05:00",
+    "expected": "cf0470a",
     "clean": true,
     "ok": true,
     "problems": []
@@ -16,9 +16,9 @@
   "deployment": {
     "cloud_run": {
       "keplaria-console": {
-        "revision": "keplaria-console-00023-8p7",
-        "deployed_at": "2026-08-27T18:07:45.756103Z",
-        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:aa2ce6650f803700000f4f5b98545b0381cfc21fce7a631b25b86553b0b211b0",
+        "revision": "keplaria-console-00024-2qz",
+        "deployed_at": "2026-08-27T22:23:06.649816Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:db3de749eddbe4d7475a89af534f8c905428ae4244175fab9265f55540775f60",
         "url": "https://keplaria-console-bklu5jcdea-uc.a.run.app",
         "dockerfile": "console/Dockerfile",
         "files_compared": 80,
@@ -28,9 +28,9 @@
         "ok": true
       },
       "keplaria-review": {
-        "revision": "keplaria-review-00023-tfj",
-        "deployed_at": "2026-08-27T18:09:37.272802Z",
-        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:aa2ce6650f803700000f4f5b98545b0381cfc21fce7a631b25b86553b0b211b0",
+        "revision": "keplaria-review-00024-kd4",
+        "deployed_at": "2026-08-27T22:23:55.160726Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/console@sha256:db3de749eddbe4d7475a89af534f8c905428ae4244175fab9265f55540775f60",
         "url": "https://keplaria-review-bklu5jcdea-uc.a.run.app",
         "dockerfile": "console/Dockerfile",
         "files_compared": 80,
@@ -40,9 +40,9 @@
         "ok": true
       },
       "keplaria-ingress": {
-        "revision": "keplaria-ingress-00013-kwz",
-        "deployed_at": "2026-08-24T23:59:37.594302Z",
-        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/ingress@sha256:e2bdbe61300361a30970d7f96eff6026ef7becf44f6681e232f8f8b4a00c9217",
+        "revision": "keplaria-ingress-00014-dmc",
+        "deployed_at": "2026-08-27T22:19:45.713360Z",
+        "image": "us-central1-docker.pkg.dev/keplaria/keplaria/ingress@sha256:49afdae2b7b61d8edbcc164b567103a72e8e29a8e8d7bad67130d6773d3ea541",
         "url": "https://keplaria-ingress-bklu5jcdea-uc.a.run.app",
         "dockerfile": "ingress/Dockerfile",
         "files_compared": 45,
@@ -99,16 +99,26 @@
   "trace": {
     "driver": "spikes/lifecycle/harness.py",
     "window": {
-      "start": "2026-08-27T18:15:30.259002Z",
-      "end": "2026-08-27T18:16:43.022737Z"
+      "start": "2026-08-28T00:19:00.339021Z",
+      "end": "2026-08-28T00:19:57.961161Z"
     },
     "lifecycle_result": "PASS",
-    "case_id": "DEMO-de961412",
+    "case_id": "DEMO-df67d6d2",
     "traces": [
       {
-        "trace_id": "083de7f00dd76dc64bf63938e45aa2c3",
+        "trace_id": "0e23b1af7f40ccb3d9f2d86052398404",
         "root": "invoke_workflow keplaria_workflow",
-        "start": "2026-08-27T18:15:58.012470730Z"
+        "start": "2026-08-28T00:19:40.186499491Z"
+      },
+      {
+        "trace_id": "13a5b19764b19355231a741bafe71187",
+        "root": "invoke_workflow keplaria_workflow",
+        "start": "2026-08-28T00:19:24.427897489Z"
+      },
+      {
+        "trace_id": "2ba4ec5efb230edc510316ec636ae945",
+        "root": "invoke_workflow keplaria_workflow",
+        "start": "2026-08-28T00:19:32.758273936Z"
       }
     ],
     "ok": true,
@@ -128,7 +138,7 @@
   "metric": {
     "domain_evals": {
       "command": "bash tests/eval/run_domain_evals.sh",
-      "graded_at": "2026-08-27T18:20:16.663277Z",
+      "graded_at": "2026-08-28T00:23:15.253907Z",
       "cases": 24,
       "errors": 0,
       "mean_score": 1.0,
@@ -136,7 +146,7 @@
     },
     "run_streak": {
       "evidence": "spikes/run_streak/evidence.json",
-      "captured_at": "2026-08-25T00:10:36.693552+00:00",
+      "captured_at": "2026-08-27T23:16:31.508294+00:00",
       "verdict": {
         "consecutive": 10,
         "cold_confirmed": 2,

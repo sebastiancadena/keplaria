@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-08-27T18:16:37.947652+00:00",
-  "case_id": "DEMO-de961412",
+  "captured_at": "2026-08-28T00:19:52.886207+00:00",
+  "case_id": "DEMO-df67d6d2",
   "supplier": "Talleres Cerro Dorado SAS",
   "result": "PASS",
   "steps": [
@@ -15,42 +15,42 @@
       },
       "phase": "committed",
       "routing": {
-        "dropped": [],
-        "route": [
-          "evidence",
-          "compliance"
-        ],
-        "evidence_skipped_tainted_document": false,
-        "reason": "For a new supplier packet, both evidence extraction and compliance screening are required to fully verify the unverified entity.",
-        "added": [],
+        "department_source": "event",
         "proposed": [
           "evidence",
           "compliance"
         ],
-        "department": "procurement",
+        "added": [],
+        "reason": "Both evidence extraction and compliance screening are required for a new supplier packet as the entity has not been verified.",
+        "refused": null,
+        "evidence_skipped_tainted_document": false,
         "evidence_skipped_no_document": false,
-        "department_source": "event",
-        "refused": null
+        "department": "procurement",
+        "route": [
+          "evidence",
+          "compliance"
+        ],
+        "dropped": []
       },
       "lifecycle": {
-        "last_reason": "ONBOARDED",
         "last_effective_date": "2026-01-05",
         "state": "active",
+        "last_reason": "ONBOARDED",
         "cycle": 1
       },
       "certificate": {
-        "expiry_date": "2027-01-01",
         "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
         "extracted_at": "2026-01-05",
+        "expiry_date": "2027-01-01",
         "evidence_version": 1
       },
       "commands": {
-        "DEMO-de961412:attach_evidence:c1": {
+        "DEMO-df67d6d2:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "ada5e53b81"
         },
-        "DEMO-de961412:create_supplier:c1": {
+        "DEMO-df67d6d2:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
@@ -68,42 +68,42 @@
       },
       "phase": "no_action",
       "routing": {
-        "dropped": [],
-        "route": [
-          "evidence",
-          "compliance"
-        ],
-        "evidence_skipped_tainted_document": false,
-        "reason": "For a new supplier packet, both evidence extraction and compliance screening are required to fully verify the unverified entity.",
-        "added": [],
+        "department_source": "event",
         "proposed": [
           "evidence",
           "compliance"
         ],
-        "department": "procurement",
+        "added": [],
+        "reason": "Both evidence extraction and compliance screening are required for a new supplier packet as the entity has not been verified.",
+        "refused": null,
+        "evidence_skipped_tainted_document": false,
         "evidence_skipped_no_document": false,
-        "department_source": "event",
-        "refused": null
+        "department": "procurement",
+        "route": [
+          "evidence",
+          "compliance"
+        ],
+        "dropped": []
       },
       "lifecycle": {
-        "last_reason": "NOT_DUE",
-        "last_effective_date": "2026-10-01",
+        "cycle": 1,
         "state": "active",
-        "cycle": 1
+        "last_effective_date": "2026-10-01",
+        "last_reason": "NOT_DUE"
       },
       "certificate": {
-        "expiry_date": "2027-01-01",
         "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
         "extracted_at": "2026-01-05",
+        "expiry_date": "2027-01-01",
         "evidence_version": 1
       },
       "commands": {
-        "DEMO-de961412:attach_evidence:c1": {
+        "DEMO-df67d6d2:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "ada5e53b81"
         },
-        "DEMO-de961412:create_supplier:c1": {
+        "DEMO-df67d6d2:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
@@ -120,50 +120,50 @@
       },
       "phase": "committed",
       "routing": {
-        "dropped": [],
-        "route": [
-          "evidence",
-          "compliance"
-        ],
-        "evidence_skipped_tainted_document": false,
-        "reason": "For a new supplier packet, both evidence extraction and compliance screening are required to fully verify the unverified entity.",
-        "added": [],
+        "department_source": "event",
         "proposed": [
           "evidence",
           "compliance"
         ],
-        "department": "procurement",
+        "added": [],
+        "reason": "Both evidence extraction and compliance screening are required for a new supplier packet as the entity has not been verified.",
+        "refused": null,
+        "evidence_skipped_tainted_document": false,
         "evidence_skipped_no_document": false,
-        "department_source": "event",
-        "refused": null
+        "department": "procurement",
+        "route": [
+          "evidence",
+          "compliance"
+        ],
+        "dropped": []
       },
       "lifecycle": {
-        "last_reason": "RENEWAL_REQUESTED",
-        "last_effective_date": "2026-12-01",
         "cycle": 1,
-        "state": "renewal_requested"
+        "state": "renewal_requested",
+        "last_reason": "RENEWAL_REQUESTED",
+        "last_effective_date": "2026-12-01"
       },
       "certificate": {
-        "expiry_date": "2027-01-01",
         "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
         "extracted_at": "2026-01-05",
+        "expiry_date": "2027-01-01",
         "evidence_version": 1
       },
       "commands": {
-        "DEMO-de961412:attach_evidence:c1": {
+        "DEMO-df67d6d2:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "ada5e53b81"
         },
-        "DEMO-de961412:create_supplier:c1": {
+        "DEMO-df67d6d2:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-de961412:request_renewal:c1": {
+        "DEMO-df67d6d2:request_renewal:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "eta4rk6vqd"
+          "external_id": "4i6pvh7v73"
         }
       }
     },
@@ -177,55 +177,55 @@
       },
       "phase": "committed",
       "routing": {
-        "dropped": [],
-        "route": [
-          "evidence",
-          "compliance"
-        ],
-        "evidence_skipped_tainted_document": false,
-        "reason": "For a new supplier packet, both evidence extraction and compliance screening are required to fully verify the unverified entity.",
-        "added": [],
+        "department_source": "event",
         "proposed": [
           "evidence",
           "compliance"
         ],
-        "department": "procurement",
+        "added": [],
+        "reason": "Both evidence extraction and compliance screening are required for a new supplier packet as the entity has not been verified.",
+        "refused": null,
+        "evidence_skipped_tainted_document": false,
         "evidence_skipped_no_document": false,
-        "department_source": "event",
-        "refused": null
+        "department": "procurement",
+        "route": [
+          "evidence",
+          "compliance"
+        ],
+        "dropped": []
       },
       "lifecycle": {
-        "last_reason": "HELD_OVERDUE",
-        "last_effective_date": "2027-01-15",
         "cycle": 1,
-        "state": "held"
+        "state": "held",
+        "last_reason": "HELD_OVERDUE",
+        "last_effective_date": "2027-01-15"
       },
       "certificate": {
-        "expiry_date": "2027-01-01",
         "document_checksum": "d400cdc98068b3be902929b06671a3bc6f799184eb209e6613f93508f3810c58",
         "extracted_at": "2026-01-05",
+        "expiry_date": "2027-01-01",
         "evidence_version": 1
       },
       "commands": {
-        "DEMO-de961412:apply_hold:c1": {
+        "DEMO-df67d6d2:apply_hold:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-de961412:attach_evidence:c1": {
+        "DEMO-df67d6d2:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "ada5e53b81"
         },
-        "DEMO-de961412:create_supplier:c1": {
+        "DEMO-df67d6d2:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-de961412:request_renewal:c1": {
+        "DEMO-df67d6d2:request_renewal:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "eta4rk6vqd"
+          "external_id": "4i6pvh7v73"
         }
       }
     },
@@ -240,63 +240,63 @@
       },
       "phase": "committed",
       "routing": {
-        "evidence_skipped_tainted_document": false,
-        "route": [
-          "evidence"
-        ],
-        "dropped": [],
-        "reason": "The event type is certificate_received, which requires engaging only the evidence agent to extract document fields for a known supplier.",
-        "added": [],
+        "department_source": "event",
         "proposed": [
           "evidence"
         ],
-        "department": "procurement",
+        "added": [],
+        "reason": "The event type is certificate_received, which requires only the evidence agent to extract fields from the received document without re-screening compliance.",
+        "refused": null,
+        "evidence_skipped_tainted_document": false,
         "evidence_skipped_no_document": false,
-        "department_source": "event",
-        "refused": null
+        "department": "procurement",
+        "route": [
+          "evidence"
+        ],
+        "dropped": []
       },
       "lifecycle": {
-        "last_reason": "RENEWED",
         "last_effective_date": "2027-01-20",
         "state": "active",
+        "last_reason": "RENEWED",
         "cycle": 2
       },
       "certificate": {
-        "expiry_date": "2028-01-01",
         "document_checksum": "807c25e06e397a8818fd8620715ccb07c0408c13b17b851e8f9849b0a53c256f",
         "extracted_at": "2027-01-20",
+        "expiry_date": "2028-01-01",
         "evidence_version": 2
       },
       "commands": {
-        "DEMO-de961412:apply_hold:c1": {
+        "DEMO-df67d6d2:apply_hold:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-de961412:attach_evidence:c1": {
+        "DEMO-df67d6d2:attach_evidence:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "ada5e53b81"
         },
-        "DEMO-de961412:attach_evidence:c2": {
+        "DEMO-df67d6d2:attach_evidence:c2": {
           "status": "done",
           "cycle": 2,
           "external_id": "08aa99f18c"
         },
-        "DEMO-de961412:clear_hold:c2": {
+        "DEMO-df67d6d2:clear_hold:c2": {
           "status": "done",
           "cycle": 2,
           "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-de961412:create_supplier:c1": {
+        "DEMO-df67d6d2:create_supplier:c1": {
           "status": "done",
           "cycle": 1,
           "external_id": "Talleres Cerro Dorado SAS"
         },
-        "DEMO-de961412:request_renewal:c1": {
+        "DEMO-df67d6d2:request_renewal:c1": {
           "status": "done",
           "cycle": 1,
-          "external_id": "eta4rk6vqd"
+          "external_id": "4i6pvh7v73"
         }
       }
     }
