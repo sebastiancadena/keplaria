@@ -96,7 +96,9 @@ risky supplier during a review would invert the point of the review.
 who has to keep a certificate current is often a small supplier with no
 compliance department and no room for one more portal. Keplaria asks nothing
 of them: no portal, no login, no account, no training. The renewal request is a
-real email sent by the deployed workflow. One boundary is stated rather than
+real email, queued and dispatched by the ERP's own mail queue; the demo
+suppliers carry example.com addresses, which have no MX record, so no message
+is delivered to a real mailbox. One boundary is stated rather than
 implied: in this prototype the returned certificate enters as a published
 event; ingesting the reply from a mailbox is design intent, not built, and the
 video labels it that way on screen.
@@ -157,10 +159,10 @@ deliberately not trusted with compliance facts.
 **Credentials are scoped and confined.** Secrets come from **Secret Manager**;
 each service runs as its own service account; the ERP credential belongs only
 to the deterministic executor, never to an agent, and to a purpose-made ERP
-user whose single role can read, write and create supplier records and create
-correspondence and attachments, and nothing else: it cannot delete what it
-created, widen its own permissions, or read an invoice. Those limits are
-measured against the live site on every run of the check.
+user whose single role can read, write and create supplier records, send mail
+about one, and create correspondence and attachments, and nothing else: it
+cannot delete what it created, widen its own permissions, or read an invoice.
+Those limits are measured against the live site on every run of the check.
 
 **Failures are handled where they happen.** Bounded retries with a dead-letter
 topic and an unattended sweep; a schema-valid but source-unsupported worker
